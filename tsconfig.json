@@ -28,7 +28,7 @@
     "rootDir": ".",
     "paths": {},
     "isolatedDeclarations": false,
-    "composite": true
+    "composite": true,
   },
   "include": [
     "packages/global.d.ts",

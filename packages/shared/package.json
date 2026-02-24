@@ -1,9 +1,40 @@
 {
-  "name": "@nexus/shared",
+  "name": "@diagen/shared",
   "version": "1.0.0",
+  "type": "module",
   "main": "index.js",
-  "scripts": {},
+  "module": "dist/index.mjs",
+  "files": [
+    "dist",
+    "index.js",
+    "index.mjs"
+  ],
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": {
+        "default": "./dist/index.mjs",
+        "node": "./index.mjs"
+      },
+      "require": {
+        "node": {
+          "production": "./dist/index.min.js",
+          "development": "./dist/index.js",
+          "default": "./index.js"
+        },
+        "default": "./index.js"
+      }
+    }
+  },
+  "scripts": {
+    "dev": "tsdown --watch",
+    "build": "tsdown"
+  },
   "author": "",
   "license": "ISC",
-  "description": ""
+  "description": "",
+  "devDependencies": {
+    "tsdown": "^0.20.3"
+  }
 }
