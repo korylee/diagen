@@ -6,7 +6,6 @@
 import type {
   ElementType,
   ShapeCategory,
-  LinkerType,
   ArrowStyle,
   LineStyleType,
   FillType,
@@ -14,7 +13,7 @@ import type {
   TextAlign,
   VerticalAlign,
   TextOrientation
-} from '@vectorgraph/shared';
+} from '../constants';
 
 // ============================================================================
 // Base Types

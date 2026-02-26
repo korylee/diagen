@@ -18,22 +18,19 @@
     "esModuleInterop": true,
     "removeComments": false,
     "jsx": "preserve",
-    "lib": [
-      "es2016",
-      "dom"
-    ],
-    "types": [
-      "node"
-    ],
+    "jsxImportSource": "solid-js",
+    "lib": ["es2016", "dom"],
+    "types": ["node"],
     "rootDir": ".",
     "paths": {},
     "isolatedDeclarations": false,
-    "composite": true,
+    "composite": true
   },
   "include": [
     "packages/global.d.ts",
     "packages/*/src",
     "packages/*/__tests__",
+    "playgrounds/*/src",
     "scripts/*",
     "rollup.*.js"
   ],

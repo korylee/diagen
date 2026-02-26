@@ -1,0 +1,27 @@
+{
+  "name": "@diagen/renderer",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "solid": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "dev": "tsc --watch",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@diagen/core": "workspace:^",
+    "@diagen/shared": "workspace:^",
+    "solid-js": "^1.9.11"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3"
+  }
+}

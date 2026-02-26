@@ -1,0 +1,21 @@
+{
+  "name": "playground-vite",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "@diagen/core": "workspace:^",
+    "@diagen/renderer": "workspace:^",
+    "@diagen/shared": "workspace:^",
+    "solid-js": "^1.9.11",
+    "vite": "^7.3.1"
+  },
+  "devDependencies": {
+    "vite-plugin-solid": "^2.11.10"
+  },
+  "scripts": {
+    "dev": "vite"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": ""
+}

@@ -1,96 +1,104 @@
-/**
- * Shared Constants for VectorGraph Editor
- * Contains enums, default values, and configuration
- */
+import type { Anchor } from './model'
 
 // Element Types
-export enum ElementType {
-  SHAPE = 'shape',
-  LINKER = 'linker',
-  GROUP = 'group',
-  TEXT = 'text',
-  IMAGE = 'image',
-  GRID = 'grid'
-}
+export const ElementType = {
+  SHAPE: 'shape',
+  LINKER: 'linker',
+  GROUP: 'group',
+  TEXT: 'text',
+  IMAGE: 'image',
+  GRID: 'grid',
+} as const
+export type ElementType = (typeof ElementType)[keyof typeof ElementType]
 
 // Shape Categories (similar to ProcessOn)
-export enum ShapeCategory {
-  STANDARD = 'standard',
-  BASIC = 'basic',
-  FLOW = 'flow',
-  LANE = 'lane',
-  UML = 'uml',
-  CUSTOM = 'custom'
-}
+export const ShapeCategory = {
+  STANDARD: 'standard',
+  BASIC: 'basic',
+  FLOW: 'flow',
+  LANE: 'lane',
+  UML: 'uml',
+  CUSTOM: 'custom',
+} as const
+export type ShapeCategory = (typeof ShapeCategory)[keyof typeof ShapeCategory]
 
 // Linker Types
-export enum LinkerType {
-  BROKEN = 'broken',     // 折线
-  STRAIGHT = 'straight', // 直线
-  CURVED = 'curved',     // 曲线
-  ORTHOGONAL = 'orthogonal' // 正交
-}
+export const LinkerType = {
+  BROKEN: 'broken',
+  STRAIGHT: 'straight',
+  CURVED: 'curved',
+  ORTHOGONAL: 'orthogonal',
+} as const
+export type LinkerType = (typeof LinkerType)[keyof typeof LinkerType]
 
 // Arrow Styles
-export enum ArrowStyle {
-  NONE = 'none',
-  SOLID_ARROW = 'solidArrow',
-  DIAMOND = 'diamond',
-  CIRCLE = 'circle',
-  OPEN_ARROW = 'openArrow'
-}
+export const ArrowStyle = {
+  NONE: 'none',
+  SOLID_ARROW: 'solidArrow',
+  DIAMOND: 'diamond',
+  CIRCLE: 'circle',
+  OPEN_ARROW: 'openArrow',
+} as const
+export type ArrowStyle = (typeof ArrowStyle)[keyof typeof ArrowStyle]
 
 // Line Styles
-export enum LineStyleType {
-  SOLID = 'solid',
-  DASHED = 'dashed',
-  DOTTED = 'dotted'
-}
+export const LineStyleType = {
+  SOLID: 'solid',
+  DASHED: 'dashed',
+  DOTTED: 'dotted',
+} as const
+export type LineStyleType = (typeof LineStyleType)[keyof typeof LineStyleType]
 
 // Fill Types
-export enum FillType {
-  NONE = 'none',
-  SOLID = 'solid',
-  GRADIENT = 'gradient',
-  IMAGE = 'image'
-}
+export const FillType = {
+  NONE: 'none',
+  SOLID: 'solid',
+  GRADIENT: 'gradient',
+  IMAGE: 'image',
+} as const
+export type FillType = (typeof FillType)[keyof typeof FillType]
 
 // Gradient Types
-export enum GradientType {
-  LINEAR = 'linear',
-  RADIAL = 'radial'
-}
+export const GradientType = {
+  LINEAR: 'linear',
+  RADIAL: 'radial',
+} as const
+export type GradientType = (typeof GradientType)[keyof typeof GradientType]
 
 // Text Alignments
-export enum TextAlign {
-  LEFT = 'left',
-  CENTER = 'center',
-  RIGHT = 'right'
-}
+export const TextAlign = {
+  LEFT: 'left',
+  CENTER: 'center',
+  RIGHT: 'right',
+} as const
+export type TextAlign = (typeof TextAlign)[keyof typeof TextAlign]
 
-export enum VerticalAlign {
-  TOP = 'top',
-  MIDDLE = 'middle',
-  BOTTOM = 'bottom'
-}
+export const VerticalAlign = {
+  TOP: 'top',
+  MIDDLE: 'middle',
+  BOTTOM: 'bottom',
+} as const
+export type VerticalAlign = (typeof VerticalAlign)[keyof typeof VerticalAlign]
 
 // Text Orientation
-export enum TextOrientation {
-  HORIZONTAL = 'horizontal',
-  VERTICAL = 'vertical'
-}
+export const TextOrientation = {
+  HORIZONTAL: 'horizontal',
+  VERTICAL: 'vertical',
+} as const
+export type TextOrientation = (typeof TextOrientation)[keyof typeof TextOrientation]
 
 // Tool Types
-export enum ToolType {
-  SELECT = 'select',
-  PAN = 'pan',
-  ZOOM_IN = 'zoomIn',
-  ZOOM_OUT = 'zoomOut',
-  TEXT = 'text',
-  SHAPE = 'shape',
-  LINKER = 'linker',
-  ERASER = 'eraser'
-}
+export const ToolType = {
+  SELECT: 'select',
+  PAN: 'pan',
+  ZOOM_IN: 'zoomIn',
+  ZOOM_OUT: 'zoomOut',
+  TEXT: 'text',
+  SHAPE: 'shape',
+  LINKER: 'linker',
+  ERASER: 'eraser',
+} as const
+export type ToolType = (typeof ToolType)[keyof typeof ToolType]
 
 // Default Values
 export const DEFAULTS = {
@@ -113,6 +121,12 @@ export const DEFAULTS = {
   // Shape
   DEFAULT_SHAPE_WIDTH: 120,
   DEFAULT_SHAPE_HEIGHT: 80,
+  DEFAULT_ANCHORS: [
+    { x: 'w/2', y: '0' },
+    { x: 'w/2', y: 'h' },
+    { x: '0', y: 'h/2' },
+    { x: 'w', y: 'h/2' },
+  ],
 
   // Line
   DEFAULT_LINE_WIDTH: 2,
@@ -132,45 +146,33 @@ export const DEFAULTS = {
 
   // Performance
   DISABLE_LINE_JUMPS_THRESHOLD: 400,
-  ENABLE_VIRTUALIZATION_THRESHOLD: 2000
-} as const;
+  ENABLE_VIRTUALIZATION_THRESHOLD: 2000,
+} as const
 
 // Resize Directions
-export const RESIZE_DIRECTIONS = [
-  'tl', 't', 'tr',
-  'l',  'r',
-  'bl', 'b', 'br'
-] as const;
-
-export type ResizeDirection = typeof RESIZE_DIRECTIONS[number];
-
-// Anchor Positions (relative to shape bounds)
-export const DEFAULT_ANCHORS = [
-  { x: 'w/2', y: '0' },      // top center
-  { x: 'w/2', y: 'h' },      // bottom center
-  { x: '0', y: 'h/2' },     // left center
-  { x: 'w', y: 'h/2' },     // right center
-] as const;
+export const RESIZE_DIRECTIONS = ['tl', 't', 'tr', 'l', 'r', 'bl', 'b', 'br'] as const
+export type ResizeDirection = (typeof RESIZE_DIRECTIONS)[number]
 
 // Event Types for Editor
-export enum EditorEventType {
-  RENDER_COMPLETE = 'randerComplete',
-  INITIALIZED = 'initialized',
-  CREATE = 'create',
-  CREATED = 'created',
-  LINKER_CREATING = 'linkerCreating',
-  LINKER_CREATED = 'linkerCreated',
-  SELECT_CHANGED = 'selectChanged',
-  UNDO_STACK_CHANGED = 'undoStackChanged',
-  REDO_STACK_CHANGED = 'redoStackChanged',
-  BEFORE_RESIZE = 'beforeResize',
-  RESIZING = 'resizing',
-  BEFORE_REMOVE = 'beforeRemove',
-  REMOVED = 'removed',
-  SHAPE_CHANGED = 'shapeChanged',
-  CHANGE_LINKERS = 'changeLinkers',
-  RESET_BROKEN_LINKER = 'resetBrokenLinker',
-  SHAPE_COUNT = 'shapeCount',
-  ZOOM_CHANGED = 'zoomChanged',
-  PANE_CHANGED = 'paneChanged'
-}
+export const EditorEventType = {
+  RENDER_COMPLETE: 'randerComplete',
+  INITIALIZED: 'initialized',
+  CREATE: 'create',
+  CREATED: 'created',
+  LINKER_CREATING: 'linkerCreating',
+  LINKER_CREATED: 'linkerCreated',
+  SELECT_CHANGED: 'selectChanged',
+  UNDO_STACK_CHANGED: 'undoStackChanged',
+  REDO_STACK_CHANGED: 'redoStackChanged',
+  BEFORE_RESIZE: 'beforeResize',
+  RESIZING: 'resizing',
+  BEFORE_REMOVE: 'beforeRemove',
+  REMOVED: 'removed',
+  SHAPE_CHANGED: 'shapeChanged',
+  CHANGE_LINKERS: 'changeLinkers',
+  RESET_BROKEN_LINKER: 'resetBrokenLinker',
+  SHAPE_COUNT: 'shapeCount',
+  ZOOM_CHANGED: 'zoomChanged',
+  PANE_CHANGED: 'paneChanged',
+} as const
+export type EditorEventType = (typeof EditorEventType)[keyof typeof EditorEventType]

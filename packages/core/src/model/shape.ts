@@ -2,49 +2,58 @@
  * Shape Element Model
  */
 
-import type { BaseElement, BoxProps, ShapeStyle, LineStyle, FillStyle, FontStyle, ElementAttribute, Anchor, PathDefinition, TextBlock, DataAttribute } from './types';
+import { DEFAULTS } from '../constants'
+import type {
+  BaseElement,
+  BoxProps,
+  ShapeStyle,
+  LineStyle,
+  FillStyle,
+  FontStyle,
+  ElementAttribute,
+  Anchor,
+  PathDefinition,
+  TextBlock,
+  DataAttribute,
+} from './types'
 
 /** Shape element */
 export interface ShapeElement extends BaseElement {
-  type: 'shape';
-  title: string;
-  link?: string;  // Hyperlink URL
+  type: 'shape'
+  title: string
+  link?: string // Hyperlink URL
 
   // Geometry
-  props: BoxProps;
+  props: BoxProps
 
   // Styles
-  shapeStyle: ShapeStyle;
-  lineStyle: LineStyle;
-  fillStyle: FillStyle;
-  fontStyle: FontStyle;
+  shapeStyle: ShapeStyle
+  lineStyle: LineStyle
+  fillStyle: FillStyle
+  fontStyle: FontStyle
 
   // Content
-  textBlock: TextBlock[];
+  textBlock: TextBlock[]
 
   // Connection
-  anchors: Anchor[];
+  anchors: Anchor[]
 
   // Path
-  path: PathDefinition[];
+  path: PathDefinition[]
 
   // Attributes
-  attribute: ElementAttribute;
+  attribute: ElementAttribute
 
   // Custom data
-  dataAttributes: DataAttribute[];
-  data: Record<string, unknown>;
+  dataAttributes: DataAttribute[]
+  data: Record<string, unknown>
 
   // Theme
-  theme?: string;
+  theme?: string
 }
 
 /** Create default shape element */
-export function createDefaultShape(
-  id: string,
-  name: string,
-  options: Partial<ShapeElement> = {}
-): ShapeElement {
+export function createDefaultShape(id: string, name: string, options: Partial<ShapeElement> = {}): ShapeElement {
   return {
     id,
     name,
@@ -59,21 +68,21 @@ export function createDefaultShape(
     props: {
       x: 0,
       y: 0,
-      w: 120,
-      h: 80,
-      angle: 0
+      w: DEFAULTS.DEFAULT_SHAPE_WIDTH,
+      h: DEFAULTS.DEFAULT_SHAPE_HEIGHT,
+      angle: 0,
     },
     shapeStyle: {
-      alpha: 1
+      alpha: 1,
     },
     lineStyle: {
       lineWidth: 2,
       lineColor: '50,50,50',
-      lineStyle: 'solid'
+      lineStyle: 'solid',
     },
     fillStyle: {
       type: 'solid',
-      color: '255,255,255'
+      color: '255,255,255',
     },
     fontStyle: {
       fontFamily: '微软雅黑, Arial, sans-serif',
@@ -85,27 +94,26 @@ export function createDefaultShape(
       underline: false,
       textAlign: 'center',
       vAlign: 'middle',
-      orientation: 'horizontal'
+      orientation: 'horizontal',
     },
-    textBlock: [{
-      position: { x: 10, y: 0, w: 'w-20', h: 'h' },
-      text: ''
-    }],
-    anchors: [
-      { x: 'w/2', y: '0' },
-      { x: 'w/2', y: 'h' },
-      { x: '0', y: 'h/2' },
-      { x: 'w', y: 'h/2' }
+    textBlock: [
+      {
+        position: { x: 10, y: 0, w: 'w-20', h: 'h' },
+        text: '',
+      },
     ],
-    path: [{
-      actions: [
-        { action: 'move', x: '0', y: '0' },
-        { action: 'line', x: 'w', y: '0' },
-        { action: 'line', x: 'w', y: 'h' },
-        { action: 'line', x: '0', y: 'h' },
-        { action: 'close' }
-      ]
-    }],
+    anchors: DEFAULTS.DEFAULT_ANCHORS.slice(),
+    path: [
+      {
+        actions: [
+          { action: 'move', x: '0', y: '0' },
+          { action: 'line', x: 'w', y: '0' },
+          { action: 'line', x: 'w', y: 'h' },
+          { action: 'line', x: '0', y: 'h' },
+          { action: 'close' },
+        ],
+      },
+    ],
     attribute: {
       container: false,
       visible: true,
@@ -115,35 +123,39 @@ export function createDefaultShape(
       collapsed: false,
       markerOffset: 5,
       resizable: true,
-      movable: true
+      movable: true,
     },
     dataAttributes: [],
     data: {},
-    ...options
-  };
+    ...options,
+  }
+}
+
+export function isShape(element?: BaseElement): element is ShapeElement {
+  return element?.type === 'shape'
 }
 
 /** Check if shape is container */
 export function isContainerShape(shape: ShapeElement): boolean {
-  return shape.attribute.container;
+  return shape.attribute.container
 }
 
 /** Check if shape can be resized */
 export function isResizable(shape: ShapeElement): boolean {
-  return shape.attribute.resizable && !shape.locked;
+  return shape.attribute.resizable && !shape.locked
 }
 
 /** Check if shape can be moved */
 export function isMovable(shape: ShapeElement): boolean {
-  return shape.attribute.movable && !shape.locked;
+  return shape.attribute.movable && !shape.locked
 }
 
 /** Check if shape can be rotated */
 export function isRotatable(shape: ShapeElement): boolean {
-  return shape.attribute.rotatable && !shape.locked;
+  return shape.attribute.rotatable && !shape.locked
 }
 
 /** Check if shape can have connections */
 export function isLinkable(shape: ShapeElement): boolean {
-  return shape.attribute.linkable && !shape.locked;
+  return shape.attribute.linkable && !shape.locked
 }

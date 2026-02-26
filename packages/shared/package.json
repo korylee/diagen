@@ -34,7 +34,5 @@
   "author": "",
   "license": "ISC",
   "description": "",
-  "devDependencies": {
-    "tsdown": "^0.20.3"
-  }
+  "devDependencies": {}
 }

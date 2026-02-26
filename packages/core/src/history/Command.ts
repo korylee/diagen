@@ -5,68 +5,66 @@
 
 export interface ICommand {
   /** Unique identifier for the command */
-  id: string;
+  id: string
 
   /** Human-readable name for the command */
-  name: string;
+  name: string
 
   /** Execute the command */
-  execute(): void;
+  execute(): void
 
   /** Undo the command */
-  undo(): void;
+  undo(): void
 
   /** Redo the command (same as execute by default) */
-  redo(): void;
+  redo(): void
 
   /** Whether this command can be merged with the previous one */
-  isMergeable?: boolean;
+  isMergeable?: boolean
 
   /** Whether this command is part of a transaction */
-  transactionId?: string;
+  transactionId?: string
 }
 
 /** Abstract base command with common functionality */
 export abstract class BaseCommand implements ICommand {
-  abstract id: string;
-  abstract name: string;
-  abstract execute(): void;
-  abstract undo(): void;
+  abstract id: string
+  abstract name: string
+  abstract execute(): void
+  abstract undo(): void
 
   redo(): void {
-    this.execute();
+    this.execute()
   }
 
-  isMergeable = false;
-  transactionId?: string;
+  isMergeable = false
+  transactionId?: string
 }
 
 /**
  * Batch command that contains multiple sub-commands
  */
 export class BatchCommand extends BaseCommand {
-  name = 'Batch';
-  isMergeable = true;
+  isMergeable = true
+  id = `batch_${Date.now()}`
 
   constructor(
     public commands: ICommand[],
-    public batchName?: string
+    public name = 'Batch',
   ) {
-    super();
-    this.id = `batch_${Date.now()}`;
-    this.name = batchName || 'Batch';
+    super()
   }
 
   execute(): void {
     for (const cmd of this.commands) {
-      cmd.execute();
+      cmd.execute()
     }
   }
 
   undo(): void {
     // Undo in reverse order
     for (let i = this.commands.length - 1; i >= 0; i--) {
-      this.commands[i].undo();
+      this.commands[i].undo()
     }
   }
 }
@@ -75,9 +73,13 @@ export class BatchCommand extends BaseCommand {
  * Command that does nothing (for placeholder/merge scenarios)
  */
 export class NoOpCommand extends BaseCommand {
-  id = 'noop';
-  name = 'No Operation';
+  id = 'noop'
+  name = 'No Operation'
 
-  execute(): void { /* no-op */ }
-  undo(): void { /* no-op */ }
+  execute(): void {
+    /* no-op */
+  }
+  undo(): void {
+    /* no-op */
+  }
 }

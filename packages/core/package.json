@@ -1,14 +1,42 @@
 {
-  "name": "@nexus/core",
+  "name": "@diagen/core",
   "version": "1.0.0",
+  "type": "module",
   "main": "index.js",
+  "module": "dist/index.mjs",
+  "files": [
+    "dist",
+    "index.js",
+    "index.mjs"
+  ],
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": {
+        "default": "./dist/index.mjs",
+        "node": "./index.mjs"
+      },
+      "require": {
+        "node": {
+          "production": "./dist/index.min.js",
+          "development": "./dist/index.js",
+          "default": "./index.js"
+        },
+        "default": "./index.js"
+      }
+    }
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsdown"
   },
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@diagen/shared": "workspace:^",
     "solid-js": "^1.9.11"
+  },
+  "devDependencies": {
   }
 }
