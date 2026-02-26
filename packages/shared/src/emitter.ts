@@ -95,3 +95,5 @@ export function createEmitter<Events extends Record<EventType, any> = Record<Eve
     clear,
   }
 }
+
+export type Emitter = ReturnType<typeof createEmitter>

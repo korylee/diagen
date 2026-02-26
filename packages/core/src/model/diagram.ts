@@ -85,14 +85,6 @@ export function createEmptyDiagram(
   };
 }
 
-/** Get element by ID */
-export function getElementById(
-  diagram: Diagram,
-  id: string
-): DiagramElement | undefined {
-  return diagram.elements[id];
-}
-
 /** Get all shapes */
 export function getAllShapes(diagram: Diagram): ShapeElement[] {
   return diagram.orderList

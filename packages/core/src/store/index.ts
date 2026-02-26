@@ -6,17 +6,23 @@
 
 import { createStore } from 'solid-js/store'
 
-import type { Point, Rect, Viewport } from '@diagen/shared'
-import { createEmitter, deepClone, deepMerge, generateId } from '@diagen/shared'
+import type { Point, Viewport } from '@diagen/shared'
+import { createEmitter, generateId } from '@diagen/shared'
 
 import type { Diagram, DiagramElement, LinkerElement, LinkerEndpoint, ShapeElement } from '../model'
 import { createDefaultLinker, createEmptyDiagram, isLinker, isShape } from '../model'
 import type { LinkerType } from '../constants'
 import { ToolType } from '../constants'
-import { HistoryManager } from '../history'
-import type { ICommand } from '../history/Command'
-import { SelectionManager } from '../selection'
 import { createMemo } from 'solid-js'
+import {
+  type Command,
+  createEditManager,
+  createElementManager,
+  createHistoryManager,
+  createSelectionManager,
+} from './managers'
+import { StoreContext } from './managers/types'
+import { createViewportManager } from './managers/viewport'
 
 // ============================================================================
 // Store State Types
@@ -52,9 +58,6 @@ export interface DesignerStoreOptions {
   id?: string
   initialDiagram?: Partial<Diagram>
   initialViewport?: Partial<Viewport>
-  maxHistorySize?: number
-  onHistoryChange?: (undoCount: number, redoCount: number) => void
-  onStateChange?: (state: EditorState) => void
 }
 
 // ============================================================================
@@ -100,151 +103,20 @@ export function createDesignerStore(options: DesignerStoreOptions = {}) {
 
   const initialState = createInitialState(options)
   const [state, setState] = createStore(initialState)
-  const elements = createMemo(() => state.diagram.elements)
-  const orderList = createMemo(() => state.diagram.orderList)
+  const ctx: StoreContext = {
+    state,
+    setState,
+    emit: emitter.emit,
+  }
+  const element = createElementManager(ctx)
+  const history = createHistoryManager(ctx)
+  const selection = createSelectionManager(ctx, { element })
+  const viewport = createViewportManager(ctx, { element })
+  const edit = createEditManager(ctx, { element, selection, history })
+
+  const { orderList, getElementById, elements } = element
   const page = createMemo(() => state.diagram.page)
-  const viewport = createMemo(() => state.viewport)
   const activeTool = createMemo(() => state.activeTool)
-
-  const selection = new SelectionManager()
-  const history = new HistoryManager({
-    maxSize: options.maxHistorySize,
-    onStackChange: options.onHistoryChange,
-  })
-
-  function getElementById(id: string): DiagramElement | undefined {
-    return elements()[id]
-  }
-
-  function _addElements(elements: DiagramElement[]) {
-    const ids: string[] = []
-    for (const element of elements) {
-      setState('diagram', 'elements', element.id, element)
-      ids.push(element.id)
-    }
-    setState('diagram', 'orderList', list => [...list, ...ids])
-    emitter.emit('element:added', elements)
-  }
-  function _removeElements(els: (string | DiagramElement)[]) {
-    const ids = els.map(el => (typeof el === 'string' ? el : el.id)).filter(id => getElementById(id))
-    setState('diagram', 'elements', els => {
-      const newEls = { ...els }
-      for (const id of ids) {
-        delete newEls[id]
-      }
-      return newEls
-    })
-
-    setState('diagram', 'orderList', list => list.filter(id => !ids.includes(id)))
-
-    emitter.emit('element:removed', ids)
-  }
-  function addElement(element: DiagramElement, options: { recordHistory?: boolean; select?: boolean } = {}): void {
-    const { recordHistory = true, select = true } = options
-
-    const command: ICommand = {
-      id: generateId('cmd_add'),
-      name: `Add ${element.name || 'element'}`,
-
-      execute: () => {
-        _addElements([element])
-      },
-
-      undo: () => {
-        _removeElements([element])
-      },
-
-      redo: () => {
-        command.execute()
-      },
-    }
-
-    if (recordHistory) {
-      history.execute(command)
-    } else {
-      command.execute()
-    }
-
-    if (select) {
-      selection.replace([element.id])
-    }
-  }
-
-  function updateElement(id: string, patch: Partial<DiagramElement>, options: { recordHistory?: boolean } = {}): void {
-    const { recordHistory = true } = options
-
-    const element = getElementById(id)
-    if (!element) {
-      console.warn(`Element ${id} not found`)
-      return
-    }
-
-    const previousValues: Record<string, unknown> = {}
-
-    const command: ICommand = {
-      id: generateId('cmd_update'),
-      name: 'Update element',
-
-      execute: () => {
-        setState('diagram', 'elements', id, el => {
-          return deepMerge(deepClone(el), patch)
-        })
-      },
-
-      undo: () => {
-        setState('diagram', 'elements', id, el => {
-          return deepMerge(deepClone(el), previousValues) as DiagramElement
-        })
-      },
-
-      redo: () => {
-        command.execute()
-      },
-    }
-
-    for (const key in patch) {
-      previousValues[key] = (element as any)[key]
-    }
-
-    if (recordHistory) {
-      history.execute(command)
-    } else {
-      command.execute()
-    }
-  }
-
-  function removeElements(ids: string[], options: { recordHistory?: boolean } = {}): void {
-    const { recordHistory = true } = options
-
-    if (ids.length === 0) return
-
-    const elements = ids.map(id => getElementById(id)).filter(el => !!el)
-
-    const command: ICommand = {
-      id: generateId('cmd_remove'),
-      name: `Remove ${ids.length} element(s)`,
-
-      execute: () => {
-        _removeElements(ids)
-
-        selection.deselectMultiple(ids)
-      },
-
-      undo: () => {
-        _addElements(elements)
-      },
-
-      redo: () => {
-        command.execute()
-      },
-    }
-
-    if (recordHistory) {
-      history.execute(command)
-    } else {
-      command.execute()
-    }
-  }
 
   function moveElements(
     ids: string[],
@@ -269,7 +141,7 @@ export function createDesignerStore(options: DesignerStoreOptions = {}) {
     > = {}
 
     for (const id of expandedIds) {
-      const element = elements()[id]
+      const element = getElementById(id)
       if (!element) continue
 
       if (isShape(element)) {
@@ -289,13 +161,14 @@ export function createDesignerStore(options: DesignerStoreOptions = {}) {
       }
     }
 
-    const command: ICommand = {
+    const command: Command = {
       id: generateId('cmd_move'),
       name: `Move ${expandedIds.length} element(s)`,
+      timestamp: Date.now(),
 
       execute: () => {
         for (const id of expandedIds) {
-          const element = elements()[id]
+          const element = getElementById(id)
           if (!element) continue
 
           if (isShape(element)) {
@@ -338,7 +211,7 @@ export function createDesignerStore(options: DesignerStoreOptions = {}) {
 
       undo: () => {
         for (const id in previousShapePositions) {
-          const element = elements()[id]
+          const element = getElementById(id)
           if (!element || !isShape(element)) continue
           const shape = element as ShapeElement
           const pos = previousShapePositions[id]
@@ -354,7 +227,7 @@ export function createDesignerStore(options: DesignerStoreOptions = {}) {
         }
 
         for (const id in previousLinkerState) {
-          const element = elements()[id]
+          const element = getElementById(id)
           if (!isLinker(element)) continue
           const linker = element as LinkerElement
           const state = previousLinkerState[id]
@@ -382,104 +255,10 @@ export function createDesignerStore(options: DesignerStoreOptions = {}) {
     }
 
     if (recordHistory) {
-      history.execute(command)
+      // history.execute(command)
     } else {
       command.execute()
     }
-  }
-
-  function select(ids: string | string[], clearPrevious = true): void {
-    const idArray = Array.isArray(ids) ? ids : [ids]
-
-    if (clearPrevious) {
-      selection.replace(idArray)
-    } else {
-      selection.selectMultiple(idArray)
-    }
-  }
-
-  function clearSelection(): void {
-    selection.clear()
-  }
-
-  function getSelectedElements(): DiagramElement[] {
-    return selection
-      .getSelection()
-      .map(id => elements()[id])
-      .filter(Boolean)
-  }
-
-  function setZoom(zoom: number, center?: Point): void {
-    const minZoom = 0.1
-    const maxZoom = 5
-    const newZoom = Math.max(minZoom, Math.min(maxZoom, zoom))
-
-    if (center) {
-      const oldZoom = state.viewport.zoom
-      const scale = newZoom / oldZoom
-
-      setState('viewport', {
-        zoom: newZoom,
-        x: center.x - (center.x - state.viewport.x) * scale,
-        y: center.y - (center.y - state.viewport.y) * scale,
-      })
-    } else {
-      setState('viewport', 'zoom', newZoom)
-    }
-  }
-
-  function zoomIn(): void {
-    setZoom(state.viewport.zoom + 0.1)
-  }
-
-  function zoomOut(): void {
-    setZoom(state.viewport.zoom - 0.1)
-  }
-
-  function zoomToFit(padding = 50): void {
-    const els = orderList()
-      .map(id => elements()[id])
-      .filter(isShape)
-
-    if (els.length === 0) {
-      setZoom(1)
-      return
-    }
-
-    let minX = Infinity,
-      minY = Infinity
-    let maxX = -Infinity,
-      maxY = -Infinity
-
-    for (const el of els) {
-      const { x, y, w, h } = el.props
-      minX = Math.min(minX, x)
-      minY = Math.min(minY, y)
-      maxX = Math.max(maxX, x + w)
-      maxY = Math.max(maxY, y + h)
-    }
-
-    const contentWidth = maxX - minX
-    const contentHeight = maxY - minY
-    const viewportWidth = state.canvasSize.width
-    const viewportHeight = state.canvasSize.height
-
-    const zoomX = (viewportWidth - padding * 2) / contentWidth
-    const zoomY = (viewportHeight - padding * 2) / contentHeight
-    const newZoom = Math.min(zoomX, zoomY, 1)
-
-    setState('viewport', {
-      zoom: newZoom,
-      x: (viewportWidth - contentWidth * newZoom) / 2 - minX * newZoom,
-      y: (viewportHeight - contentHeight * newZoom) / 2 - minY * newZoom,
-    })
-  }
-
-  function pan(deltaX: number, deltaY: number): void {
-    setState('viewport', {
-      x: state.viewport.x + deltaX,
-      y: state.viewport.y + deltaY,
-    })
   }
 
   function setCanvasSize(width: number, height: number): void {
@@ -513,9 +292,10 @@ export function createDesignerStore(options: DesignerStoreOptions = {}) {
 
     const diagram = JSON.parse(json) as Diagram
 
-    const command: ICommand = {
+    const command: Command = {
       id: generateId('cmd_load'),
       name: 'Load diagram',
+      timestamp: Date.now(),
 
       execute: () => {
         setState('diagram', diagram)
@@ -540,48 +320,16 @@ export function createDesignerStore(options: DesignerStoreOptions = {}) {
     selection.clear()
   }
 
-  function clear(options: { recordHistory?: boolean } = {}): void {
-    const { recordHistory = true } = options
-
-    const elements = deepClone(state.diagram.elements)
-    const orderList = [...state.diagram.orderList]
-
-    const command: ICommand = {
-      id: generateId('cmd_clear'),
-      name: 'Clear diagram',
-
-      execute: () => {
-        setState('diagram', 'elements', {})
-        setState('diagram', 'orderList', [])
-        selection.clear()
-      },
-
-      undo: () => {
-        setState('diagram', 'elements', elements)
-        setState('diagram', 'orderList', orderList)
-      },
-
-      redo: () => {
-        command.execute()
-      },
-    }
-
-    if (recordHistory) {
-      history.execute(command)
-    } else {
-      command.execute()
-    }
-  }
-
   function createLinker(from: LinkerEndpoint, to: LinkerEndpoint, type: LinkerType = 'broken'): LinkerElement {
     const linker = createDefaultLinker(generateId('linker'), {
       from: { ...from },
       to: { ...to },
       linkerType: type,
     })
-    const command: ICommand = {
+    const command: Command = {
       id: generateId('cmd_create_linker'),
       name: 'Create linker',
+      timestamp: Date.now(),
 
       execute: () => {
         setState('diagram', 'elements', linker.id, linker)
@@ -601,7 +349,7 @@ export function createDesignerStore(options: DesignerStoreOptions = {}) {
       },
     }
 
-    history.execute(command)
+    // history.execute(command)
 
     return linker
   }
@@ -630,9 +378,10 @@ export function createDesignerStore(options: DesignerStoreOptions = {}) {
       }
     }
 
-    const command: ICommand = {
+    const command: Command = {
       id: generateId('cmd_group'),
       name: `Group ${ids.length} elements`,
+      timestamp: Date.now(),
 
       execute: () => {
         for (const id of ids) {
@@ -682,9 +431,10 @@ export function createDesignerStore(options: DesignerStoreOptions = {}) {
       previousGroups[el.id] = el.group
     }
 
-    const command: ICommand = {
+    const command: Command = {
       id: generateId('cmd_ungroup'),
       name: `Ungroup ${ids.length} elements`,
+      timestamp: Date.now(),
 
       execute: () => {
         for (const id of ids) {
@@ -710,7 +460,7 @@ export function createDesignerStore(options: DesignerStoreOptions = {}) {
     }
 
     if (recordHistory) {
-      history.execute(command)
+      // history.execute(command)
     } else {
       command.execute()
     }
@@ -758,106 +508,36 @@ export function createDesignerStore(options: DesignerStoreOptions = {}) {
     return Array.from(result)
   }
 
-  function getElementBounds(id: string): Rect | null {
-    const element = getElementById(id)
-    if (!element) return null
-
-    if (isShape(element)) {
-      const props = element.props
-      return {
-        x: props.x,
-        y: props.y,
-        w: props.w,
-        h: props.h,
-      }
-    }
-
-    if (isLinker(element)) {
-      const from = element.from
-      const to = element.to
-
-      const minX = Math.min(from.x, to.x)
-      const minY = Math.min(from.y, to.y)
-      const maxX = Math.max(from.x, to.x)
-      const maxY = Math.max(from.y, to.y)
-
-      return {
-        x: minX,
-        y: minY,
-        w: maxX - minX,
-        h: maxY - minY,
-      }
-    }
-
-    return null
-  }
-
-  function getSelectionBounds(): Rect | null {
-    const selectedIds = selection.getSelection()
-    if (selectedIds.length === 0) return null
-
-    let minX = Infinity,
-      minY = Infinity
-    let maxX = -Infinity,
-      maxY = -Infinity
-
-    for (const id of selectedIds) {
-      const bounds = getElementBounds(id)
-      if (bounds) {
-        minX = Math.min(minX, bounds.x)
-        minY = Math.min(minY, bounds.y)
-        maxX = Math.max(maxX, bounds.x + bounds.w)
-        maxY = Math.max(maxY, bounds.y + bounds.h)
-      }
-    }
-
-    if (minX === Infinity) return null
-
-    return {
-      x: minX,
-      y: minY,
-      w: maxX - minX,
-      h: maxY - minY,
-    }
-  }
-
-  function dispose(): void {
-    history.clear()
-    selection.clear()
-  }
+  function dispose(): void {}
 
   return {
     id: id,
     state,
+    element,
     history,
     selection,
+    edit,
 
+    // 快捷方式
     elements,
+    getElementById,
+    addElements: edit.add,
+    removeElements: edit.remove,
+    updateElement: edit.update,
+    clearElements: edit.clear,
+
+    undo: history.undo,
+    redo: history.redo,
+    canUndo: history.canUndo,
+    canRedo: history.canRedo,
+
     orderList,
     page,
     viewport,
     activeTool,
 
-    get elementCount() {
-      return state.diagram.orderList.length
-    },
-    get selectedIds() {
-      return selection.getSelection()
-    },
-
-    getElementById,
-    addElement,
-    updateElement,
-    removeElements,
     moveElements,
-    select,
-    clearSelection,
-    getSelectedElements,
-    setZoom,
-    zoomIn,
-    zoomOut,
-    zoomToFit,
-    pan,
+
     setCanvasSize,
     setTool,
     toggleGrid,
@@ -865,7 +545,6 @@ export function createDesignerStore(options: DesignerStoreOptions = {}) {
     setGridSize,
     serialize,
     loadFromJSON,
-    clear,
     createLinker,
     group,
     ungroup,
@@ -873,8 +552,6 @@ export function createDesignerStore(options: DesignerStoreOptions = {}) {
     isInSameGroup,
     getGroupsFromElements,
     expandSelectionToGroups,
-    getElementBounds,
-    getSelectionBounds,
     dispose,
   }
 }

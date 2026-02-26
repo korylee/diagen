@@ -1,9 +1,10 @@
-import { createMemo, createSelector, createSignal, For, onMount } from 'solid-js'
+import { createMemo, createSignal, For, onMount } from 'solid-js'
 import { ShapeCanvas } from './ShapeCanvas'
 import { LinkerCanvas } from './LinkerCanvas'
 import { SelectionBox } from './SelectionBox'
-import { isShape, type LinkerElement, type Point, type ShapeElement, isLinker } from '@diagen/core'
+import { isLinker, isShape, type ShapeElement } from '@diagen/core'
 import { useStore } from './StoreProvider'
+import type { Point } from '@diagen/shared'
 
 export interface CanvasRendererProps {
   /** Optional class name for styling */
@@ -19,6 +20,9 @@ export interface CanvasRendererProps {
  */
 export function CanvasRenderer(props: CanvasRendererProps) {
   const store = useStore()
+  const { element, selection } = store
+  const { elements, getElementById } = element
+  const { isSelected, selectedIds } = selection
   let containerRef: HTMLDivElement | undefined
 
   // Viewport size for canvas rendering
@@ -31,17 +35,6 @@ export function CanvasRenderer(props: CanvasRendererProps) {
   const [viewportStart, setViewportStart] = createSignal<Point>({ x: 0, y: 0 })
   const [selectedStartPositions, setSelectedStartPositions] = createSignal<Record<string, Point>>({})
 
-  // Reactive selectors
-  const isSelected = createSelector(() => store.selectedIds)
-
-  // Memoized element list for rendering
-  const elements = createMemo(() => {
-    return store.orderList().map(id => store.elements()[id]).filter(Boolean)
-  })
-
-  // Memoized shapes only (for selection box calculation)
-  const shapes = createMemo(() => elements().filter(isShape))
-
   // Update viewport size on mount and resize
   const updateViewportSize = () => {
     if (containerRef) {
@@ -52,7 +45,7 @@ export function CanvasRenderer(props: CanvasRendererProps) {
 
   // Helper to get shape by ID
   const getShapeById = (id: string): ShapeElement | undefined => {
-    const el = store.getElementById(id)
+    const el = getElementById(id)
     return isShape(el) ? el : undefined
   }
 
@@ -102,10 +95,7 @@ export function CanvasRenderer(props: CanvasRendererProps) {
         store.selection.select(id)
       }
     } else {
-      // Select single (clear previous unless already selected)
-      if (!isSelected(id)) {
-        store.select(id)
-      }
+      store.selection.replace([id])
     }
 
     // Start drag operation
@@ -114,8 +104,8 @@ export function CanvasRenderer(props: CanvasRendererProps) {
 
     // Store initial positions of all selected elements
     const startPositions: Record<string, Point> = {}
-    for (const selectedId of store.selectedIds) {
-      const el = store.getElementById(selectedId)
+    for (const selectedId of selectedIds()) {
+      const el = getElementById(selectedId)
       if (isShape(el)) {
         startPositions[selectedId] = { x: el.props.x, y: el.props.y }
       }
@@ -140,10 +130,10 @@ export function CanvasRenderer(props: CanvasRendererProps) {
     const dy = (e.clientY - dragStart().y) / store.state.viewport.zoom
 
     // Move all selected elements
-    for (const id of store.selectedIds) {
+    for (const id of selectedIds()) {
       const startPos = selectedStartPositions()[id]
       if (startPos) {
-        const el = store.state.diagram.elements[id]
+        const el = getElementById(id)
         if (isShape(el)) {
           // Use updateElement for individual moves during drag (no history)
           // This will be replaced with proper drag handling
@@ -166,7 +156,7 @@ export function CanvasRenderer(props: CanvasRendererProps) {
   const handleMouseUp = () => {
     if (isDragging()) {
       // Commit the batch operation
-      store.history.commitBatch('Move elements')
+      store.history.commitBatch()
     }
 
     if (isPanning()) {
@@ -234,7 +224,6 @@ export function CanvasRenderer(props: CanvasRendererProps) {
                   shape={element}
                   viewport={store.state.viewport}
                   viewportSize={viewportSize()}
-                  isSelected={isSelected(element.id)}
                   onMouseDown={e => handleShapeMouseDown(e, element.id)}
                 />
               )
@@ -245,9 +234,7 @@ export function CanvasRenderer(props: CanvasRendererProps) {
                   linker={element}
                   viewport={store.state.viewport}
                   viewportSize={viewportSize()}
-                  getShapeById={getShapeById}
-                  isSelected={isSelected(element.id)}
-                  onSelect={e => handleShapeMouseDown(e, element.id)}
+                  onMouseDown={e => handleShapeMouseDown(e, element.id)}
                 />
               )
             }
@@ -258,8 +245,6 @@ export function CanvasRenderer(props: CanvasRendererProps) {
 
       {/* Selection Box Overlay */}
       <SelectionBox
-        shapes={shapes()}
-        selectedIds={store.selectedIds}
         viewport={store.state.viewport}
         onResize={(id, width, height) => {
           const shape = getShapeById(id)

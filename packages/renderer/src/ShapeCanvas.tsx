@@ -1,22 +1,25 @@
 import { onMount, createEffect, on } from 'solid-js';
-import type { ShapeElement } from '@diagen/core/model';
+import type { ShapeElement } from '@diagen/core';
 import type { Rect, Viewport } from '@diagen/shared';
 import { isRectVisible } from '@diagen/shared';
 import { renderShape } from './render-utils';
+import { useStore } from './StoreProvider'
 
 export interface ShapeCanvasProps {
   shape: ShapeElement;
   viewport: Viewport;
   viewportSize: { width: number; height: number };
-  isSelected?: boolean;
-  onSelect?: (id: string, event: MouseEvent) => void;
+  onMouseDown?: (event: MouseEvent) => void;
 }
 
 const DPR = window.devicePixelRatio || 1;
 
 export function ShapeCanvas(props: ShapeCanvasProps) {
   let canvasRef: HTMLCanvasElement | undefined;
-  let containerRef: HTMLDivElement | undefined;
+  let containerRef: HTMLDivElement | undefined
+
+  const { selection } = useStore()
+  const { isSelected } = selection
 
   const padding = 4;
 
@@ -90,7 +93,7 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
 
   const handleMouseDown = (e: MouseEvent) => {
     e.stopPropagation();
-    props.onSelect?.(props.shape.id, e);
+    props.onMouseDown?.(e);
   };
 
   const pos = () => getScreenPosition();
@@ -105,7 +108,7 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
         top: `${pos().y - padding}px`,
         width: `${size().width}px`,
         height: `${size().height}px`,
-        cursor: props.isSelected ? 'move' : 'pointer',
+        cursor: isSelected(props.shape.id) ? 'move' : 'pointer',
         'pointer-events': 'auto',
       }}
     >

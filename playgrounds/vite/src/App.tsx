@@ -3,10 +3,10 @@
  * Demonstrates the usage of DesignerStore with StoreProvider and CanvasRenderer
  */
 
-import { createSignal, onMount, Show, For } from 'solid-js'
-import { createDesignerStore, createDefaultShape } from '@diagen/core'
-import { CanvasRenderer, useStore, StoreProvider } from '@diagen/renderer'
-import type { ShapeElement, LinkerElement } from '@diagen/core'
+import { createSignal, onMount } from 'solid-js'
+import type { ShapeElement } from '@diagen/core'
+import { createDefaultShape, createDesignerStore } from '@diagen/core'
+import { CanvasRenderer, StoreProvider, useStore } from '@diagen/renderer'
 import { generateId } from '@diagen/shared'
 
 /**
@@ -15,6 +15,9 @@ import { generateId } from '@diagen/shared'
  */
 function Toolbar() {
   const store = useStore()
+  const { selection, element } = store
+  const { selectedIds } = selection
+  const { getElementById } = element
   ;(window as any).store = store
   const [zoomDisplay, setZoomDisplay] = createSignal(100)
 
@@ -41,7 +44,7 @@ function Toolbar() {
   }
 
   const addLinker = () => {
-    const selected = store.selectedIds
+    const selected = selectedIds()
     if (selected.length < 2) {
       alert('Select at least 2 shapes to connect')
       return
@@ -49,8 +52,8 @@ function Toolbar() {
 
     const fromId = selected[0]
     const toId = selected[1]
-    const fromShape = store.getElementById(fromId)
-    const toShape = store.getElementById(toId)
+    const fromShape = getElementById(fromId)
+    const toShape = getElementById(toId)
 
     if (fromShape?.type !== 'shape' || toShape?.type !== 'shape') {
       alert('Linkers can only connect shapes')
@@ -75,7 +78,7 @@ function Toolbar() {
   }
 
   const deleteSelected = () => {
-    const ids = store.selectedIds
+    const ids = selectedIds()
     if (ids.length === 0) return
     store.removeElements(ids)
   }
@@ -104,7 +107,7 @@ function Toolbar() {
   }
 
   const groupSelected = () => {
-    const ids = store.selectedIds
+    const ids = selectedIds()
     if (ids.length < 2) {
       alert('Select at least 2 elements to group')
       return
@@ -115,7 +118,7 @@ function Toolbar() {
 
   const ungroupSelected = () => {
     // Get unique groups from selection
-    const groups = store.getGroupsFromElements(store.selectedIds)
+    const groups = store.getGroupsFromElements(selectedIds())
     groups.forEach(groupId => store.ungroup(groupId))
   }
 
@@ -193,7 +196,7 @@ function Toolbar() {
 
       <div class="toolbar-section">
         <span class="status-text">
-          Selected: {store.selectedIds.length} | Total: {store.elementCount}
+          Selected: {selectedIds().length} | Total: {store.elementCount}
         </span>
       </div>
     </div>
@@ -248,7 +251,7 @@ function SampleDataLoader() {
 
     // Add shapes without history and without auto-select
     shapes.forEach(shape => {
-      store.addElement(shape, { recordHistory: false, select: false })
+      store.element.add([shape], { recordHistory: false, select: false })
     })
 
     // Create linkers between shapes
@@ -263,7 +266,7 @@ function SampleDataLoader() {
     })
 
     // Select first shape
-    store.select(shape1Id)
+    store.selection.select(shape1Id)
   })
 
   return null

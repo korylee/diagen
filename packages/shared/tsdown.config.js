@@ -12,7 +12,7 @@ export default defineConfig(() => {
     const config = {
       ...baseConfig,
       format,
-      dts: format === 'cjs',
+      dts: true,
     }
     configs.push(config)
     configs.push({

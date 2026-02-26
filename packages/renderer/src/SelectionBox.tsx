@@ -1,14 +1,13 @@
 import { createMemo, For } from 'solid-js'
-import type { DiagramElement, ShapeElement } from '@diagen/core'
 import type { Rect, Viewport } from '@diagen/shared'
 import { canvasToScreen } from '@diagen/shared'
+import { useStore } from './StoreProvider'
 
 export interface SelectionBoxProps {
-  selectedIds: readonly string[]
-  elements: Record<string, DiagramElement>
   viewport: Viewport
   onResizeStart?: (direction: string, event: MouseEvent) => void
   onRotateStart?: (event: MouseEvent) => void
+  onResize: (id: string, width: number, height: number) => void
 }
 
 const RESIZE_HANDLES = [
@@ -23,31 +22,8 @@ const RESIZE_HANDLES = [
 ]
 
 export function SelectionBox(props: SelectionBoxProps) {
-  const getSelectionBounds = createMemo((): Rect | null => {
-    const { selectedIds, elements } = props
-    if (selectedIds.length === 0) return null
-
-    let minX = Infinity,
-      minY = Infinity,
-      maxX = -Infinity,
-      maxY = -Infinity
-
-    for (const id of selectedIds) {
-      const el = elements[id]
-      if (!el) continue
-
-      if (el.type === 'shape') {
-        const shape = el as ShapeElement
-        minX = Math.min(minX, shape.props.x)
-        minY = Math.min(minY, shape.props.y)
-        maxX = Math.max(maxX, shape.props.x + shape.props.w)
-        maxY = Math.max(maxY, shape.props.y + shape.props.h)
-      }
-    }
-
-    if (minX === Infinity) return null
-    return { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
-  })
+  const { selection } = useStore()
+  const { getSelectionBounds } = selection
 
   const getScreenBounds = createMemo(() => {
     const bounds = getSelectionBounds()
