@@ -1,43 +1,40 @@
-import { onMount, createEffect, on } from 'solid-js'
-import type { LinkerElement, ShapeElement, Viewport } from '@diagen/core'
-import type { Rect } from '@diagen/shared'
+import { createEffect, on, onMount } from 'solid-js'
+import type { LinkerElement } from '@diagen/core'
 import { isRectVisible } from '@diagen/core'
+import type { Rect } from '@diagen/shared'
 import { calculateLinkerRoute, getLinkerBounds, renderLinker } from '../../utils'
-import { useDesigner } from '../../components/DesignerProvider'
+import { useDesigner } from '../../components'
 
 export interface LinkerCanvasProps {
   linker: LinkerElement
-  viewport: Viewport
-  viewportSize: { width: number; height: number }
   onMouseDown?: (event: MouseEvent) => void
 }
 
 const DPR = window.devicePixelRatio || 1
 
 export function LinkerCanvas(props: LinkerCanvasProps) {
+  const { view, selection, getElementById } = useDesigner()
+
   let canvasRef: HTMLCanvasElement | undefined
   let containerRef: HTMLDivElement | undefined
 
-  const store = useDesigner()
-  const { isSelected } = store.selection
-
   const padding = 20
 
-  const getRoute = () => calculateLinkerRoute(props.linker, store.getElementById as any)
+  const getRoute = () => calculateLinkerRoute(props.linker, getElementById as any)
 
   const getBounds = (): Rect => getLinkerBounds(getRoute())
 
   const getScreenPosition = () => {
     const bounds = getBounds()
     return {
-      x: bounds.x * props.viewport.zoom,
-      y: bounds.y * props.viewport.zoom,
+      x: bounds.x * view.viewport().zoom,
+      y: bounds.y * view.viewport().zoom,
     }
   }
 
   const getCanvasSize = () => {
     const bounds = getBounds()
-    const zoom = props.viewport.zoom
+    const zoom = view.viewport().zoom
     return {
       width: Math.max(1, Math.ceil(bounds.w * zoom) + padding * 2),
       height: Math.max(1, Math.ceil(bounds.h * zoom) + padding * 2),
@@ -45,11 +42,11 @@ export function LinkerCanvas(props: LinkerCanvasProps) {
   }
 
   const isVisible = () =>
-    isRectVisible(getBounds(), props.viewport, {
+    isRectVisible(getBounds(), view.viewport(), {
       x: 0,
       y: 0,
-      w: props.viewportSize.width,
-      h: props.viewportSize.height,
+      w: view.canvasSize().width,
+      h: view.canvasSize().height,
     })
 
   const doRender = () => {
@@ -60,7 +57,7 @@ export function LinkerCanvas(props: LinkerCanvasProps) {
     const size = getCanvasSize()
     const route = getRoute()
     const bounds = getBounds()
-    const scale = props.viewport.zoom
+    const scale = view.viewport().zoom
 
     ctx.clearRect(0, 0, size.width * DPR, size.height * DPR)
     ctx.save()
@@ -90,7 +87,7 @@ export function LinkerCanvas(props: LinkerCanvasProps) {
 
   createEffect(
     on(
-      () => [props.linker, props.viewport],
+      () => [props.linker, view.viewport()],
       () => updateCanvas(),
     ),
   )
@@ -111,7 +108,7 @@ export function LinkerCanvas(props: LinkerCanvasProps) {
         top: `${pos().y - padding}px`,
         width: `${size().width}px`,
         height: `${size().height}px`,
-        cursor: isSelected(props.linker.id) ? 'move' : 'pointer',
+        cursor: selection.isSelected(props.linker.id) ? 'move' : 'pointer',
         'pointer-events': 'auto',
       }}
     >

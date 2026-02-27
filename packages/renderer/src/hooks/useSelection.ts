@@ -1,85 +1,77 @@
-import { createSignal, createMemo, onCleanup } from 'solid-js'
-import type { Point, Rect } from '@diagen/shared'
+import { batch, createMemo, createSignal } from 'solid-js'
+import { isRectIntersect, type Point, type Rect } from '@diagen/shared'
+import { useDesigner } from '../components'
 
-export interface UseSelectionOptions {
-  onStart?: (startPoint: Point) => void
-  onChange?: (rect: Rect) => void
-  onEnd?: (rect: Rect) => void
-  minSize?: number
-}
+// ============================================================================
+// 框选 Hook - 与 Designer 集成
+// ============================================================================
 
-export interface UseSelectionReturn {
-  isSelecting: () => boolean
-  selectionRect: () => Rect | null
-  start: (point: Point) => void
-  update: (point: Point) => void
-  end: () => void
-  cancel: () => void
-}
-
-export function useSelection(options: UseSelectionOptions = {}): UseSelectionReturn {
+export function useSelection(options: { minSize?: number } = {}) {
   const { minSize = 5 } = options
+  const designer = useDesigner()
 
   const [isSelecting, setIsSelecting] = createSignal(false)
   const [startPoint, setStartPoint] = createSignal<Point | null>(null)
   const [endPoint, setEndPoint] = createSignal<Point | null>(null)
 
-  const selectionRect = createMemo<Rect | null>(() => {
+  const rect = createMemo<Rect | null>(() => {
     const start = startPoint()
     const end = endPoint()
     if (!start || !end) return null
-    const x = Math.min(start.x, end.x)
-    const y = Math.min(start.y, end.y)
     return {
-      x,
-      y,
+      x: Math.min(start.x, end.x),
+      y: Math.min(start.y, end.y),
       w: Math.abs(end.x - start.x),
-      h: Math.abs(end.y - start.y)
+      h: Math.abs(end.y - start.y),
     }
   })
 
-  const isValidSelection = () => {
-    const rect = selectionRect()
-    return rect && (rect.w >= minSize || rect.h >= minSize)
-  }
-
   const start = (point: Point) => {
-    setStartPoint(point)
-    setEndPoint(point)
-    setIsSelecting(true)
-    options.onStart?.(point)
+    batch(() => {
+      setStartPoint(point)
+      setEndPoint(point)
+      setIsSelecting(true)
+    })
   }
 
-  const update = (point: Point) => {
-    if (!isSelecting()) return
-    setEndPoint(point)
-    const rect = selectionRect()
-    if (rect) options.onChange?.(rect)
+  const move = (point: Point) => {
+    if (isSelecting()) {
+      setEndPoint(point)
+    }
   }
 
   const end = () => {
-    if (!isSelecting()) return
-    const rect = selectionRect()
-    if (rect && isValidSelection()) {
-      options.onEnd?.(rect)
+    const r = rect()
+    if (r && r.w >= minSize && r.h >= minSize) {
+      selectInRect(r)
     }
-    setIsSelecting(false)
-    setStartPoint(null)
-    setEndPoint(null)
+    reset()
   }
 
   const cancel = () => {
-    setIsSelecting(false)
-    setStartPoint(null)
-    setEndPoint(null)
+    reset()
   }
 
-  return {
-    isSelecting,
-    selectionRect,
-    start,
-    update,
-    end,
-    cancel
+  const reset = () => {
+    batch(() => {
+      setIsSelecting(false)
+      setStartPoint(null)
+      setEndPoint(null)
+    })
   }
+
+  const selectInRect = (r: Rect) => {
+    const ids: string[] = []
+    for (const el of designer.element.shapes()) {
+      const elRect = { x: el.props.x, y: el.props.y, w: el.props.w, h: el.props.h }
+      if (isRectIntersect(r, elRect)) {
+        ids.push(el.id)
+      }
+    }
+    if (ids.length > 0) {
+      designer.selection.replace(ids)
+    }
+  }
+
+  return { isSelecting, rect, start, move, end, cancel }
 }

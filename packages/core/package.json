@@ -14,8 +14,8 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": {
-        "default": "./dist/index.mjs",
-        "node": "./index.mjs"
+        "node": "./index.mjs",
+        "default": "./dist/index.mjs"
       },
       "require": {
         "node": {
@@ -38,11 +38,7 @@
   "description": "",
   "dependencies": {
     "@diagen/shared": "workspace:^",
-    "solid-js": "^1.9.11"
+    "solid-js": "catalog:dev"
   },
-  "devDependencies": {
-    "vitest": "^4.0.18",
-    "@vitest/ui": "^4.0.18",
-    "@vitest/coverage-v8": "^4.0.18"
-  }
+  "devDependencies": {}
 }

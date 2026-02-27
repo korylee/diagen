@@ -1,8 +1,9 @@
-import { createMemo, createSignal, For, onMount } from 'solid-js'
+import { createMemo, For, onMount, Show } from 'solid-js'
 import { LinkerCanvas, ShapeCanvas } from './element'
-import { SelectionBox, useDesigner } from '../components'
-import { isLinker, isShape, type LinkerElement, Schema, type ShapeElement } from '@diagen/core'
+import { SelectionBox, SelectionLayer, useDesigner } from '../components'
+import { isLinker, isShape, type LinkerElement, Schema, screenToCanvas as _screenToCanvas } from '@diagen/core'
 import type { Point } from '@diagen/shared'
+import { useDrag, useKeyboard, usePan, useResize, useSelection } from '../hooks'
 
 export interface CanvasRendererProps {
   /** Optional class name for styling */
@@ -18,33 +19,33 @@ export interface CanvasRendererProps {
  */
 export function CanvasRenderer(props: CanvasRendererProps) {
   const designer = useDesigner()
-  const { element, selection } = designer
-  const { elements, getById: getElementById } = element
-  const { isSelected, selectedIds } = selection
+  const { element, selection, view, edit } = designer
+
   let containerRef: HTMLDivElement | undefined
 
-  // Viewport size for canvas rendering
-  const [viewportSize, setViewportSize] = createSignal({ width: 800, height: 600 })
+  // 使用新的交互 hooks
+  const drag = useDrag({ threshold: 3 })
+  const pan = usePan({ button: 1 })
+  const resize = useResize({ minWidth: 20, minHeight: 20 })
+  const boxSelect = useSelection({ minSize: 5 })
 
-  // Local state for drag operations
-  const [isDragging, setIsDragging] = createSignal(false)
-  const [isPanning, setIsPanning] = createSignal(false)
-  const [dragStart, setDragStart] = createSignal<Point>({ x: 0, y: 0 })
-  const [viewportStart, setViewportStart] = createSignal<Point>({ x: 0, y: 0 })
-  const [selectedStartPositions, setSelectedStartPositions] = createSignal<Record<string, Point>>({})
+  // 使用 mousetrap 风格的键盘 hook
+  const kb = useKeyboard()
+  kb.bind('delete', () => edit.remove(selection.selectedIds()))
+  kb.bind('ctrl+a', () => selection.selectAll())
+  kb.bind('escape', () => {
+    if (drag.isDragging() || drag.isPending()) drag.cancel()
+    if (pan.isPanning()) pan.end()
+    if (resize.isResizing()) resize.cancel()
+    if (boxSelect.isSelecting()) boxSelect.cancel()
+  })
 
   // Update viewport size on mount and resize
   const updateViewportSize = () => {
     if (containerRef) {
       const rect = containerRef.getBoundingClientRect()
-      setViewportSize({ width: rect.width, height: rect.height })
+      view.setCanvasSize(rect.width, rect.height)
     }
-  }
-
-  // Helper to get shape by ID
-  const getShapeById = (id: string): ShapeElement | undefined => {
-    const el = getElementById(id)
-    return isShape(el) ? el : undefined
   }
 
   // Viewport calculations
@@ -61,138 +62,87 @@ export function CanvasRenderer(props: CanvasRendererProps) {
     }
   })
 
+  // 坐标转换
+  const screenToCanvas = (screen: Point): Point => _screenToCanvas(screen, view.viewport())
+
   // Mouse event handlers
   const handleCanvasMouseDown = (e: MouseEvent) => {
-    // Only handle if clicking directly on canvas (not on shapes)
     if (e.target !== containerRef) return
 
-    // Middle mouse or Space+click for panning
-    if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
-      setIsPanning(true)
-      setDragStart({ x: e.clientX, y: e.clientY })
-      setViewportStart({ x: designer.state.viewport.x, y: designer.state.viewport.y })
+    // 平移检测
+    if (pan.canPan(e)) {
+      pan.start(e)
       e.preventDefault()
       return
     }
 
-    // Left click - clear selection and start box selection
+    // 左键 - 框选
     if (e.button === 0) {
-      designer.selection.clear()
+      selection.clear()
+      const rect = containerRef!.getBoundingClientRect()
+      boxSelect.start(screenToCanvas({ x: e.clientX - rect.left, y: e.clientY - rect.top }))
     }
   }
 
   const handleShapeMouseDown = (e: MouseEvent, id: string) => {
     e.stopPropagation()
 
-    // Toggle selection with Ctrl/Cmd
-    if (e.ctrlKey || e.metaKey) {
-      if (isSelected(id)) {
-        // Deselect
-        designer.selection.deselect(id)
-      } else {
-        designer.selection.select(id)
-      }
-    } else {
-      designer.selection.replace([id])
-    }
-
-    // Start drag operation
-    setIsDragging(true)
-    setDragStart({ x: e.clientX, y: e.clientY })
-
-    // Store initial positions of all selected elements
-    const startPositions: Record<string, Point> = {}
-    for (const selectedId of selectedIds()) {
-      const el = getElementById(selectedId)
-      if (isShape(el)) {
-        startPositions[selectedId] = { x: el.props.x, y: el.props.y }
-      }
-    }
-    setSelectedStartPositions(startPositions)
-
-    // Begin batch for history
-    designer.history.startTransaction()
-  }
-
-  const handleMouseMove = (e: MouseEvent) => {
-    if (isPanning()) {
-      const dx = e.clientX - dragStart().x
-      const dy = e.clientY - dragStart().y
-      designer.view.pan(viewportStart().x + dx, viewportStart().y + dy)
+    // 调整大小检测
+    const rect = containerRef!.getBoundingClientRect()
+    const point = screenToCanvas({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+    const hit = resize.hitTest(point)
+    if (hit) {
+      resize.start(hit.id, hit.dir, e)
       return
     }
 
-    if (!isDragging()) return
+    // 选择逻辑
+    if (e.ctrlKey || e.metaKey) {
+      selection.isSelected(id) ? selection.deselect(id) : selection.select(id)
+    } else {
+      selection.replace([id])
+    }
 
-    const dx = (e.clientX - dragStart().x) / designer.state.viewport.zoom
-    const dy = (e.clientY - dragStart().y) / designer.state.viewport.zoom
+    // 开始拖动
+    drag.start(e)
+  }
 
-    // Move all selected elements
-    for (const id of selectedIds()) {
-      const startPos = selectedStartPositions()[id]
-      if (startPos) {
-        const el = getElementById(id)
-        if (isShape(el)) {
-          // Use updateElement for individual moves during drag (no history)
-          // This will be replaced with proper drag handling
-          designer.updateElement(
-            id,
-            {
-              props: {
-                ...el.props,
-                x: startPos.x + dx,
-                y: startPos.y + dy,
-              },
-            },
-            { record: false },
-          )
-        }
-      }
+  const handleMouseMove = (e: MouseEvent) => {
+    if (resize.isResizing()) {
+      resize.move(e)
+    } else if (pan.isPanning()) {
+      pan.move(e)
+    } else if (drag.isDragging() || drag.isPending()) {
+      drag.move(e)
+    } else if (boxSelect.isSelecting()) {
+      const rect = containerRef!.getBoundingClientRect()
+      boxSelect.move(screenToCanvas({ x: e.clientX - rect.left, y: e.clientY - rect.top }))
     }
   }
 
   const handleMouseUp = () => {
-    if (isDragging()) {
-      // Commit the batch operation
-      designer.history.commitTransaction()
-    }
-
-    if (isPanning()) {
-      // Pan is complete
-    }
-
-    setIsDragging(false)
-    setIsPanning(false)
-    setSelectedStartPositions({})
+    if (resize.isResizing()) resize.end()
+    else if (pan.isPanning()) pan.end()
+    else if (drag.isDragging() || drag.isPending()) drag.end()
+    else if (boxSelect.isSelecting()) boxSelect.end()
   }
 
   const handleWheel = (e: WheelEvent) => {
     e.preventDefault()
-
     if (!containerRef) return
-
     const rect = containerRef.getBoundingClientRect()
-    const mouseX = e.clientX - rect.left
-    const mouseY = e.clientY - rect.top
-
-    // Calculate zoom
     const delta = e.deltaY > 0 ? -0.1 : 0.1
     const newZoom = Math.max(0.1, Math.min(5, designer.state.viewport.zoom + delta))
-
-    designer.view.setZoom(newZoom, { x: mouseX, y: mouseY })
+    designer.view.setZoom(newZoom, { x: e.clientX - rect.left, y: e.clientY - rect.top })
   }
 
   onMount(() => {
     updateViewportSize()
     window.addEventListener('resize', updateViewportSize)
-
     if (containerRef) {
       containerRef.addEventListener('wheel', handleWheel, { passive: false })
     }
-
-    return () => {
-      window.removeEventListener('resize', updateViewportSize)
-    }
+    return () => window.removeEventListener('resize', updateViewportSize)
   })
 
   return (
@@ -205,7 +155,7 @@ export function CanvasRenderer(props: CanvasRendererProps) {
         overflow: 'hidden',
         position: 'relative',
         'background-color': '#f5f5f5',
-        cursor: isPanning() ? 'grabbing' : isDragging() ? 'grabbing' : 'default',
+        cursor: pan.isPanning() ? 'grabbing' : drag.isDragging() ? 'grabbing' : 'default',
         ...props.style,
       }}
       onMouseDown={handleCanvasMouseDown}
@@ -214,17 +164,10 @@ export function CanvasRenderer(props: CanvasRendererProps) {
       onMouseLeave={handleMouseUp}
     >
       <div style={pageStyle()}>
-        <For each={elements()}>
-          {element => {
+        <For each={element.elements()}>
+          {(element: any) => {
             if (isShape(element)) {
-              return (
-                <ShapeCanvas
-                  shape={element}
-                  viewport={designer.state.viewport}
-                  viewportSize={viewportSize()}
-                  onMouseDown={e => handleShapeMouseDown(e, element.id)}
-                />
-              )
+              return <ShapeCanvas shape={element} onMouseDown={e => handleShapeMouseDown(e, element.id)} />
             }
             if (isLinker(element)) {
               // 确保 Linker 使用 Schema 中的定义（如果存在）
@@ -236,8 +179,6 @@ export function CanvasRenderer(props: CanvasRendererProps) {
               return (
                 <LinkerCanvas
                   linker={linkerWithDef as LinkerElement}
-                  viewport={designer.state.viewport}
-                  viewportSize={viewportSize()}
                   onMouseDown={e => handleShapeMouseDown(e, element.id)}
                 />
               )
@@ -247,18 +188,18 @@ export function CanvasRenderer(props: CanvasRendererProps) {
         </For>
       </div>
 
-      {/* Selection Box Overlay */}
+      {/*选中框 resize手柄 rotate手柄 等交互*/}
       <SelectionBox
-        viewport={designer.state.viewport}
-        onResize={(id, width, height) => {
-          const shape = getShapeById(id)
-          if (shape) {
-            designer.updateElement(id, {
-              props: { ...shape.props, w: width, h: height },
-            })
-          }
+        onResizeStart={(dir, e) => {
+          const ids = selection.selectedIds()
+          if (ids.length === 1) resize.start(ids[0], dir, e)
         }}
       />
+
+      {/* 框选层 - 用于显示框选区域 */}
+      <Show when={boxSelect.isSelecting() && boxSelect.rect()}>
+        {rect => <SelectionLayer rect={rect()} />}
+      </Show>
     </div>
   )
 }

@@ -142,9 +142,11 @@ export function createViewManager(ctx: DesignerContext, deps: { element: Element
   }
 
   return {
+    // memo
     viewport,
     canvasSize,
 
+    // methods
     setZoom,
     setPan,
     zoomIn,

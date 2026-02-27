@@ -1,6 +1,6 @@
 import { Schema, type ShapeElement, type LineStyle, type FillStyle, type FontStyle, type PathDefinition } from '@diagen/core';
 import type { Point } from '@diagen/shared';
-import { evaluateExpression, compileExpression, evaluateCompiled, type CompiledExpression } from './expression-compiler';
+import { evaluateExpression, compileExpression, evaluateCompiled, type CompiledExpression } from '@diagen/core';
 
 export function parseColor(color: string | undefined): string {
   if (!color) return 'rgba(0,0,0,1)';

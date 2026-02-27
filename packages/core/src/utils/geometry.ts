@@ -1,4 +1,4 @@
-import { Rect } from 'packages/shared'
+import { Rect } from '@diagen/shared'
 import { DiagramElement, isLinkerConnected, isShape } from '../model'
 
 export function getElementBounds(element: DiagramElement): Rect | null {

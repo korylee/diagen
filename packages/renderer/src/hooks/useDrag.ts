@@ -1,101 +1,124 @@
-import { createSignal, createMemo, onCleanup } from 'solid-js'
+import { createSignal, createMemo, onCleanup, batch } from 'solid-js'
 import type { Point } from '@diagen/shared'
+import { useDesigner } from '../components/DesignerProvider'
+import { isShape } from '@diagen/core'
+
+// ============================================================================
+// 拖动 Hook - 与 Designer 集成
+// ============================================================================
 
 export interface UseDragOptions {
-  onStart?: (startPoint: Point, event: MouseEvent) => void | boolean
-  onMove?: (delta: Point, event: MouseEvent) => void
-  onEnd?: (endPoint: Point, event: MouseEvent) => void
   threshold?: number
 }
 
-export interface UseDragReturn {
-  isDragging: () => boolean
-  startPoint: () => Point | null
-  currentPoint: () => Point | null
-  delta: () => Point
-  start: (event: MouseEvent) => void
-  cancel: () => void
-}
 
-export function useDrag(options: UseDragOptions = {}): UseDragReturn {
-  const { threshold = 0 } = options
+export function useDrag(options: UseDragOptions = {}) {
+  const { threshold = 3 } = options
+  const designer = useDesigner()
 
   const [isDragging, setIsDragging] = createSignal(false)
-  const [startPoint, setStartPoint] = createSignal<Point | null>(null)
-  const [currentPoint, setCurrentPoint] = createSignal<Point | null>(null)
-  const [isTriggered, setIsTriggered] = createSignal(false)
+  const [isPending, setIsPending] = createSignal(false)// 已启动但未超过阈值
+  const [startPositions, setStartPositions] = createSignal<Record<string, Point>>({})
+  const [startMouse, setStartMouse] = createSignal<Point | null>(null)
+  const [lastMouse, setLastMouse] = createSignal<Point | null>(null)
 
   const delta = createMemo<Point>(() => {
-    const start = startPoint()
-    const current = currentPoint()
-    if (!start || !current) return { x: 0, y: 0 }
-    return { x: current.x - start.x, y: current.y - start.y }
+    const start = startMouse()
+    const last = lastMouse()
+    if (!start || !last) return { x: 0, y: 0 }
+    return { x: last.x - start.x, y: last.y - start.y }
   })
 
-  const handleMouseMove = (e: MouseEvent) => {
-    const point: Point = { x: e.clientX, y: e.clientY }
-    setCurrentPoint(point)
+  const start = (e: MouseEvent, ids?: string[]) => {
+    const targetIds = ids ?? designer.selection.selectedIds()
+    if (targetIds.length === 0) return
 
-    if (!isTriggered()) {
-      const d = delta()
-      if (Math.abs(d.x) > threshold || Math.abs(d.y) > threshold) {
-        setIsTriggered(true)
-        setIsDragging(true)
+    const positions: Record<string, Point> = {}
+    for (const id of targetIds) {
+      const el = designer.element.getById(id)
+      if (el && isShape(el)) {
+        positions[id] = { x: el.props.x, y: el.props.y }
       }
-      return
     }
 
-    options.onMove?.(delta(), e)
+    if (Object.keys(positions).length === 0) return
+
+    batch(() => {
+      setStartPositions(positions)
+      setStartMouse({ x: e.clientX, y: e.clientY })
+      setLastMouse({ x: e.clientX, y: e.clientY })
+      setIsPending(true)
+      setIsDragging(threshold === 0)
+    })
+
+    designer.history.transaction.begin()
   }
 
-  const handleMouseUp = (e: MouseEvent) => {
-    const point: Point = { x: e.clientX, y: e.clientY }
+  const move = (e: MouseEvent) => {
+    if (!isPending()) return
 
+    const start = startMouse()
+    if (!start) return
+
+    const dx = e.clientX - start.x
+    const dy = e.clientY - start.y
+
+    // 检查阈值
+    if (!isDragging()) {
+      if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) {
+        setLastMouse({ x: e.clientX, y: e.clientY })
+        return
+      }
+      setIsDragging(true)
+    }
+
+    setLastMouse({ x: e.clientX, y: e.clientY })
+
+    // 应用移动
+    const zoom = designer.state.viewport.zoom
+    const positions = startPositions()
+
+    for (const [id, startPos] of Object.entries(positions)) {
+      const el = designer.element.getById(id)
+      if (!el || !isShape(el)) continue
+
+      designer.edit.update(id, {
+        props: {
+          ...el.props,
+          x: startPos.x + dx / zoom,
+          y: startPos.y + dy / zoom
+        }
+      })
+    }
+  }
+
+  const end = () => {
     if (isDragging()) {
-      options.onEnd?.(point, e)
+      designer.history.transaction.commit()
+    } else {
+      designer.history.transaction.abort()
     }
-
-    setIsDragging(false)
-    setStartPoint(null)
-    setCurrentPoint(null)
-    setIsTriggered(false)
-
-    window.removeEventListener('mousemove', handleMouseMove)
-    window.removeEventListener('mouseup', handleMouseUp)
-  }
-
-  const start = (event: MouseEvent) => {
-    const point: Point = { x: event.clientX, y: event.clientY }
-
-    const shouldStart = options.onStart?.(point, event)
-    if (shouldStart === false) return
-
-    setStartPoint(point)
-    setCurrentPoint(point)
-    setIsTriggered(threshold === 0)
-    setIsDragging(threshold === 0)
-
-    window.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('mouseup', handleMouseUp)
+    reset()
   }
 
   const cancel = () => {
-    setIsDragging(false)
-    setStartPoint(null)
-    setCurrentPoint(null)
-    setIsTriggered(false)
-    window.removeEventListener('mousemove', handleMouseMove)
-    window.removeEventListener('mouseup', handleMouseUp)
+    designer.history.transaction.abort()
+    reset()
   }
 
-  onCleanup(cancel)
-
-  return {
-    isDragging,
-    startPoint,
-    currentPoint,
-    delta,
-    start,
-    cancel
+  const reset = () => {
+    batch(() => {
+      setIsDragging(false)
+      setIsPending(false)
+      setStartPositions({})
+      setStartMouse(null)
+      setLastMouse(null)
+    })
   }
+
+  onCleanup(() => {
+    if (isPending()) cancel()
+  })
+
+  return { isDragging, isPending, delta, start, move, end, cancel }
 }

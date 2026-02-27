@@ -7,6 +7,7 @@ import type { ShapeElement } from './shape'
 import type { LinkerElement } from './linker'
 import type { PageConfig } from './page'
 import type { Theme } from './types'
+import { generateId } from '@diagen/shared'
 
 export type DiagramElement = ShapeElement | LinkerElement
 
@@ -51,10 +52,9 @@ export interface Diagram {
   properties?: Record<string, unknown>
 }
 
-/** Create empty diagram */
-export function createEmptyDiagram(id: string, options: Partial<Diagram> = {}): Diagram {
+export function createDiagram(overrides: Partial<Diagram> = {}): Diagram {
+  const id = overrides.id || generateId('diagram')
   const now = Date.now()
-
   return {
     id,
     name: 'Untitled Diagram',
@@ -78,16 +78,8 @@ export function createEmptyDiagram(id: string, options: Partial<Diagram> = {}): 
     createdAt: now,
     updatedAt: now,
     comments: [],
-    ...options,
+    ...overrides,
   }
-}
-
-/** Get children of a container shape */
-export function getChildrenOfShape(diagram: Diagram, shapeId: string): DiagramElement[] {
-  const shape = diagram.elements[shapeId]
-  if (!shape || shape.type !== 'shape') return []
-
-  return shape.children.map(id => diagram.elements[id]).filter(Boolean)
 }
 
 /** Serialize diagram to JSON */

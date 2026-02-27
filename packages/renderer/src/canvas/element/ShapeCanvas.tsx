@@ -3,18 +3,17 @@ import type { ShapeElement, Viewport } from '@diagen/core';
 import type { Rect } from '@diagen/shared';
 import { isRectVisible } from '@diagen/core';
 import { renderShape } from '../../utils';
-import { useDesigner } from '../../components/DesignerProvider'
+import { useDesigner } from '../../components'
 
 export interface ShapeCanvasProps {
   shape: ShapeElement;
-  viewport: Viewport;
-  viewportSize: { width: number; height: number };
   onMouseDown?: (event: MouseEvent) => void;
 }
 
 const DPR = window.devicePixelRatio || 1;
 
 export function ShapeCanvas(props: ShapeCanvasProps) {
+  const {view} = useDesigner()
   let canvasRef: HTMLCanvasElement | undefined;
   let containerRef: HTMLDivElement | undefined
 
@@ -33,14 +32,14 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
   const getScreenPosition = () => {
     const bounds = getBounds();
     return {
-      x: bounds.x * props.viewport.zoom,
-      y: bounds.y * props.viewport.zoom
-    };
+      x: bounds.x * view.viewport().zoom,
+      y: bounds.y * view.viewport().zoom,
+    }
   };
 
   const getCanvasSize = () => {
     const bounds = getBounds();
-    const zoom = props.viewport.zoom;
+    const zoom = view.viewport().zoom
     return {
       width: Math.max(1, Math.ceil(bounds.w * zoom) + padding * 2),
       height: Math.max(1, Math.ceil(bounds.h * zoom) + padding * 2),
@@ -48,12 +47,12 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
   };
 
   const isVisible = () =>
-    isRectVisible(getBounds(), props.viewport, {
+    isRectVisible(getBounds(), view.viewport(), {
       x: 0,
       y: 0,
-      w: props.viewportSize.width,
-      h: props.viewportSize.height,
-    });
+      w: view.canvasSize().width,
+      h: view.canvasSize().height,
+    })
 
   const doRender = () => {
     if (!canvasRef) return;
@@ -61,7 +60,7 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
     if (!ctx) return;
 
     const size = getCanvasSize();
-    const scale = props.viewport.zoom;
+    const scale = view.viewport().zoom
 
     ctx.clearRect(0, 0, size.width * DPR, size.height * DPR);
     ctx.save();
@@ -89,7 +88,7 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
 
   onMount(() => updateCanvas());
 
-  createEffect(on(() => [props.shape, props.viewport], () => updateCanvas()));
+  createEffect(on(() => [props.shape, view.viewport()], () => updateCanvas()));
 
   const handleMouseDown = (e: MouseEvent) => {
     e.stopPropagation();

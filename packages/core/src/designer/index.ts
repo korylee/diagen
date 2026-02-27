@@ -5,8 +5,7 @@ import { createEmitter, generateId } from '@diagen/shared'
 
 import { createMemo } from 'solid-js'
 import { ToolType } from '../constants'
-import type { Diagram, DiagramElement } from '../model'
-import { createEmptyDiagram } from '../model'
+import { createDiagram, createPage, Diagram, DiagramElement, PageConfig } from '../model'
 import {
   type Command,
   createEditManager,
@@ -49,8 +48,8 @@ export interface EditorState {
 
 export interface DesignerOptions {
   id?: string
-  initialDiagram?: Partial<Diagram>
   initialViewport?: Partial<Viewport>
+  initialPage?: Partial<PageConfig>
 }
 
 // ============================================================================
@@ -58,7 +57,10 @@ export interface DesignerOptions {
 // ============================================================================
 
 function createInitialState(options: DesignerOptions): EditorState {
-  const diagram = createEmptyDiagram(options.id || generateId('diagram'), options.initialDiagram)
+  const diagram = createDiagram({
+    id: options.id,
+    page: createPage(options.initialPage),
+  })
 
   return {
     diagram,
@@ -256,10 +258,6 @@ export function createDesigner(options: DesignerOptions = {}) {
   //   }
   // }
 
-  function setCanvasSize(width: number, height: number): void {
-    setState('canvasSize', { width, height })
-  }
-
   function setTool(tool: ToolType): void {
     setState('activeTool', tool)
   }
@@ -313,118 +311,6 @@ export function createDesigner(options: DesignerOptions = {}) {
     }
 
     selection.clear()
-  }
-
-  function group(ids: string[], options: { recordHistory?: boolean } = {}): string | null {
-    const { recordHistory = true } = options
-
-    if (ids.length < 2) {
-      console.warn('Need at least 2 elements to form a group')
-      return null
-    }
-
-    const elements = ids.map(id => state.diagram.elements[id]).filter(Boolean)
-    if (elements.length !== ids.length) {
-      console.warn('Some elements not found')
-      return null
-    }
-
-    const groupId = generateId('group')
-
-    const previousGroups: Record<string, string | null> = {}
-    for (const id of ids) {
-      const el = state.diagram.elements[id]
-      if (el) {
-        previousGroups[id] = el.group
-      }
-    }
-
-    const command: Command = {
-      id: generateId('cmd_group'),
-      name: `Group ${ids.length} elements`,
-      timestamp: Date.now(),
-
-      execute: () => {
-        for (const id of ids) {
-          setState('diagram', 'elements', id, (el: DiagramElement) => ({
-            ...el,
-            group: groupId,
-          }))
-        }
-      },
-
-      undo: () => {
-        for (const id of ids) {
-          setState('diagram', 'elements', id, (el: DiagramElement) => ({
-            ...el,
-            group: previousGroups[id],
-          }))
-        }
-      },
-
-      redo: () => {
-        command.execute()
-      },
-    }
-
-    if (recordHistory) {
-      history.execute(command)
-    } else {
-      command.execute()
-    }
-
-    return groupId
-  }
-
-  function ungroup(groupId: string, options: { recordHistory?: boolean } = {}): void {
-    const { recordHistory = true } = options
-
-    const groupElements = getGroupShapes(groupId)
-    if (groupElements.length === 0) {
-      console.warn(`Group ${groupId} not found or empty`)
-      return
-    }
-
-    const ids = groupElements.map(el => el.id)
-
-    const previousGroups: Record<string, string | null> = {}
-    for (const el of groupElements) {
-      previousGroups[el.id] = el.group
-    }
-
-    const command: Command = {
-      id: generateId('cmd_ungroup'),
-      name: `Ungroup ${ids.length} elements`,
-      timestamp: Date.now(),
-
-      execute: () => {
-        for (const id of ids) {
-          setState('diagram', 'elements', id, (el: DiagramElement) => ({
-            ...el,
-            group: null,
-          }))
-        }
-      },
-
-      undo: () => {
-        for (const id of ids) {
-          setState('diagram', 'elements', id, (el: DiagramElement) => ({
-            ...el,
-            group: previousGroups[id],
-          }))
-        }
-      },
-
-      redo: () => {
-        command.execute()
-      },
-    }
-
-    if (recordHistory) {
-      // history.execute(command)
-    } else {
-      command.execute()
-    }
   }
 
   function getGroupShapes(groupId: string): DiagramElement[] {
@@ -500,15 +386,12 @@ export function createDesigner(options: DesignerOptions = {}) {
     page,
     activeTool,
 
-    setCanvasSize,
     setTool,
     toggleGrid,
     toggleSnapToGrid,
     setGridSize,
     serialize,
     loadFromJSON,
-    group,
-    ungroup,
     getGroupShapes,
     isInSameGroup,
     getGroupsFromElements,

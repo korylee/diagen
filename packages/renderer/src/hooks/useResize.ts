@@ -1,170 +1,156 @@
-import { createSignal, createMemo, onCleanup } from 'solid-js'
+import { batch, createSignal, onCleanup } from 'solid-js'
 import type { Point, Rect } from '@diagen/shared'
+import { useDesigner } from '../components'
+import { isShape } from '@diagen/core'
+
+// ============================================================================
+// 调整大小 Hook - 与 Designer 集成
+// ============================================================================
 
 export type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
 
-export interface UseResizeOptions {
-  onStart?: (direction: ResizeDirection, startBounds: Rect) => void
-  onChange?: (newBounds: Rect) => void
-  onEnd?: (newBounds: Rect) => void
-  minWidth?: number
-  minHeight?: number
-}
+const HANDLE_SIZE = 8
 
-export interface UseResizeReturn {
-  isResizing: () => boolean
-  direction: () => ResizeDirection | null
-  start: (direction: ResizeDirection, startBounds: Rect, startPoint: Point) => void
-  update: (currentPoint: Point, modifiers?: { shift?: boolean; alt?: boolean }) => void
-  end: () => void
-  cancel: () => void
-}
-
-export function useResize(options: UseResizeOptions = {}): UseResizeReturn {
+export function useResize(
+  options: {
+    minWidth?: number
+    minHeight?: number
+  } = {},
+) {
   const { minWidth = 20, minHeight = 20 } = options
+  const designer = useDesigner()
 
-  const [isResizing, setIsResizing] = createSignal(false)
+  const [targetId, setTargetId] = createSignal<string | null>(null)
   const [direction, setDirection] = createSignal<ResizeDirection | null>(null)
   const [startBounds, setStartBounds] = createSignal<Rect | null>(null)
-  const [startPoint, setStartPoint] = createSignal<Point | null>(null)
-  const [currentBounds, setCurrentBounds] = createSignal<Rect | null>(null)
+  const [startMouse, setStartMouse] = createSignal<Point | null>(null)
+  const [ratio, setRatio] = createSignal(1)
 
-  const calculateNewBounds = (
-    dir: ResizeDirection,
-    bounds: Rect,
-    start: Point,
-    current: Point,
-    modifiers: { shift?: boolean; alt?: boolean } = {}
-  ): Rect => {
-    const { shift = false, alt = false } = modifiers
-    const dx = current.x - start.x
-    const dy = current.y - start.y
+  const isResizing = () => targetId() !== null
 
-    let newBounds = { ...bounds }
+  const start = (id: string, dir: ResizeDirection, e: MouseEvent) => {
+    const el = designer.element.getById(id)
+    if (!el || !isShape(el)) return
+
+    const bounds: Rect = { x: el.props.x, y: el.props.y, w: el.props.w, h: el.props.h }
+
+    batch(() => {
+      setTargetId(id)
+      setDirection(dir)
+      setStartBounds(bounds)
+      setStartMouse({ x: e.clientX, y: e.clientY })
+      setRatio(bounds.w / bounds.h)
+    })
+
+    designer.history.transaction.begin()
+  }
+
+  const move = (e: MouseEvent) => {
+    const start = startMouse()
+    const bounds = startBounds()
+    const dir = direction()
+    const id = targetId()
+    if (!start || !bounds || !dir || !id) return
+
+    const zoom = designer.state.viewport.zoom
+    const dx = (e.clientX - start.x) / zoom
+    const dy = (e.clientY - start.y) / zoom
+
+    let { x, y, w, h } = bounds
+    const keepRatio = e.shiftKey
+    const center = e.altKey
 
     if (dir.includes('n')) {
-      newBounds.y = bounds.y + dy
-      newBounds.h = bounds.h - dy
+      y = bounds.y + dy
+      h = bounds.h - dy
     }
     if (dir.includes('s')) {
-      newBounds.h = bounds.h + dy
+      h = bounds.h + dy
     }
     if (dir.includes('w')) {
-      newBounds.x = bounds.x + dx
-      newBounds.w = bounds.w - dx
+      x = bounds.x + dx
+      w = bounds.w - dx
     }
     if (dir.includes('e')) {
-      newBounds.w = bounds.w + dx
+      w = bounds.w + dx
     }
 
-    if (shift) {
-      const ratio = bounds.w / bounds.h
-      if (['n', 's'].includes(dir)) {
-        newBounds.w = newBounds.h * ratio
-      } else if (['e', 'w'].includes(dir)) {
-        newBounds.h = newBounds.w / ratio
-      } else {
-        if (Math.abs(dx) > Math.abs(dy)) {
-          newBounds.h = newBounds.w / ratio
-        } else {
-          newBounds.w = newBounds.h * ratio
-        }
-      }
+    if (keepRatio) {
+      const r = ratio()
+      if (['n', 's'].includes(dir)) w = h * r
+      else if (['e', 'w'].includes(dir)) h = w / r
+      else if (Math.abs(dx) > Math.abs(dy)) h = w / r
+      else w = h * r
     }
 
-    if (alt) {
+    if (center) {
       const cx = bounds.x + bounds.w / 2
       const cy = bounds.y + bounds.h / 2
-      newBounds.x = cx - newBounds.w / 2
-      newBounds.y = cy - newBounds.h / 2
+      x = cx - w / 2
+      y = cy - h / 2
     }
 
-    newBounds.w = Math.max(minWidth, newBounds.w)
-    newBounds.h = Math.max(minHeight, newBounds.h)
+    w = Math.max(minWidth, w)
+    h = Math.max(minHeight, h)
 
-    return newBounds
-  }
-
-  const handleMouseMove = (e: MouseEvent) => {
-    const dir = direction()
-    const bounds = startBounds()
-    const start = startPoint()
-    if (!dir || !bounds || !start) return
-
-    const current: Point = { x: e.clientX, y: e.clientY }
-    const newBounds = calculateNewBounds(dir, bounds, start, current, {
-      shift: e.shiftKey,
-      alt: e.altKey
-    })
-    setCurrentBounds(newBounds)
-    options.onChange?.(newBounds)
-  }
-
-  const handleMouseUp = () => {
-    const bounds = currentBounds()
-    if (bounds) options.onEnd?.(bounds)
-    setIsResizing(false)
-    setDirection(null)
-    setStartBounds(null)
-    setStartPoint(null)
-    setCurrentBounds(null)
-    window.removeEventListener('mousemove', handleMouseMove)
-    window.removeEventListener('mouseup', handleMouseUp)
-  }
-
-  const start = (dir: ResizeDirection, bounds: Rect, point: Point) => {
-    setDirection(dir)
-    setStartBounds(bounds)
-    setStartPoint(point)
-    setCurrentBounds(bounds)
-    setIsResizing(true)
-    options.onStart?.(dir, bounds)
-
-    window.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('mouseup', handleMouseUp)
-  }
-
-  const update = (currentPoint: Point, modifiers = {}) => {
-    const dir = direction()
-    const bounds = startBounds()
-    const start = startPoint()
-    if (!dir || !bounds || !start) return
-
-    const newBounds = calculateNewBounds(dir, bounds, start, currentPoint, modifiers)
-    setCurrentBounds(newBounds)
-    options.onChange?.(newBounds)
+    const el = designer.element.getById(id)
+    if (el && isShape(el)) {
+      designer.edit.update(id, { props: { ...el.props, x, y, w, h } })
+    }
   }
 
   const end = () => {
-    const bounds = currentBounds()
-    if (bounds) options.onEnd?.(bounds)
-    setIsResizing(false)
-    setDirection(null)
-    setStartBounds(null)
-    setStartPoint(null)
-    setCurrentBounds(null)
-    window.removeEventListener('mousemove', handleMouseMove)
-    window.removeEventListener('mouseup', handleMouseUp)
+    designer.history.transaction.commit()
+    reset()
   }
 
   const cancel = () => {
-    setIsResizing(false)
-    setDirection(null)
-    setStartBounds(null)
-    setStartPoint(null)
-    setCurrentBounds(null)
-    window.removeEventListener('mousemove', handleMouseMove)
-    window.removeEventListener('mouseup', handleMouseUp)
+    designer.history.transaction.abort()
+    reset()
   }
 
-  onCleanup(cancel)
-
-  return {
-    isResizing,
-    direction,
-    start,
-    update,
-    end,
-    cancel
+  const reset = () => {
+    batch(() => {
+      setTargetId(null)
+      setDirection(null)
+      setStartBounds(null)
+      setStartMouse(null)
+    })
   }
+
+  const hitTest = (point: Point): { id: string; dir: ResizeDirection } | null => {
+    const selected = designer.selection.selectedIds()
+    if (selected.length !== 1) return null
+
+    const id = selected[0]
+    const el = designer.element.getById(id)
+    if (!el || !isShape(el)) return null
+
+    const { x, y, w, h } = el.props
+    const size = HANDLE_SIZE / designer.state.viewport.zoom
+
+    const handles: Array<{ dir: ResizeDirection; px: number; py: number }> = [
+      { dir: 'nw', px: x, py: y },
+      { dir: 'n', px: x + w / 2, py: y },
+      { dir: 'ne', px: x + w, py: y },
+      { dir: 'w', px: x, py: y + h / 2 },
+      { dir: 'e', px: x + w, py: y + h / 2 },
+      { dir: 'sw', px: x, py: y + h },
+      { dir: 's', px: x + w / 2, py: y + h },
+      { dir: 'se', px: x + w, py: y + h },
+    ]
+
+    for (const h of handles) {
+      if (Math.abs(point.x - h.px) <= size && Math.abs(point.y - h.py) <= size) {
+        return { id, dir: h.dir }
+      }
+    }
+    return null
+  }
+
+  onCleanup(() => {
+    if (isResizing()) cancel()
+  })
+
+  return { isResizing, direction, targetId, start, move, end, cancel, hitTest }
 }

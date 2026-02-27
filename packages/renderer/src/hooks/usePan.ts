@@ -1,70 +1,70 @@
-import { createSignal, createMemo, onCleanup } from 'solid-js'
+import { batch, createSignal, onCleanup, onMount } from 'solid-js'
 import type { Point } from '@diagen/shared'
+import { useDesigner } from '../components'
 
-export interface UsePanOptions {
-  onStart?: () => void
-  onChange?: (delta: Point) => void
-  onEnd?: (totalDelta: Point) => void
-}
+// ============================================================================
+// 平移 Hook - 与 Designer 集成
+// ============================================================================
 
-export interface UsePanReturn {
-  isPanning: () => boolean
-  delta: () => Point
-  start: (event: MouseEvent) => void
-  cancel: () => void
-}
+export function usePan(
+  options: {
+    button?: number // 默认中键(1)
+  } = {},
+) {
+  const { button = 1 } = options
+  const designer = useDesigner()
+  const { view } = designer
 
-export function usePan(options: UsePanOptions = {}): UsePanReturn {
   const [isPanning, setIsPanning] = createSignal(false)
-  const [startPoint, setStartPoint] = createSignal<Point | null>(null)
-  const [currentPoint, setCurrentPoint] = createSignal<Point | null>(null)
+  const [isSpacePressed, setIsSpacePressed] = createSignal(false)
+  const [startMouse, setStartMouse] = createSignal<Point | null>(null)
+  const [startViewport, setStartViewport] = createSignal<Point | null>(null)
 
-  const delta = createMemo<Point>(() => {
-    const start = startPoint()
-    const current = currentPoint()
-    if (!start || !current) return { x: 0, y: 0 }
-    return { x: current.x - start.x, y: current.y - start.y }
+  onMount(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space') setIsSpacePressed(true)
+    }
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') setIsSpacePressed(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    window.addEventListener('keyup', onKeyUp)
+    onCleanup(() => {
+      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keyup', onKeyUp)
+    })
   })
 
-  const handleMouseMove = (e: MouseEvent) => {
-    setCurrentPoint({ x: e.clientX, y: e.clientY })
-    options.onChange?.(delta())
+  const canPan = (e: MouseEvent): boolean => e.button === button || (isSpacePressed() && e.button === 0)
+
+  const start = (e: MouseEvent) => {
+    if (!canPan(e)) return
+    const vp = designer.state.viewport
+    batch(() => {
+      setIsPanning(true)
+      setStartMouse({ x: e.clientX, y: e.clientY })
+      setStartViewport({ x: vp.x, y: vp.y })
+    })
   }
 
-  const handleMouseUp = () => {
-    options.onEnd?.(delta())
-    setIsPanning(false)
-    setStartPoint(null)
-    setCurrentPoint(null)
-    window.removeEventListener('mousemove', handleMouseMove)
-    window.removeEventListener('mouseup', handleMouseUp)
+  const move = (e: MouseEvent) => {
+    const sm = startMouse()
+    const sv = startViewport()
+    if (!isPanning() || !sm || !sv) return
+    view.pan(sv.x + e.clientX - sm.x, sv.y + e.clientY - sm.y)
   }
 
-  const start = (event: MouseEvent) => {
-    const point: Point = { x: event.clientX, y: event.clientY }
-    setStartPoint(point)
-    setCurrentPoint(point)
-    setIsPanning(true)
-    options.onStart?.()
-
-    window.addEventListener('mousemove', handleMouseMove)
-    window.addEventListener('mouseup', handleMouseUp)
+  const end = () => {
+    batch(() => {
+      setIsPanning(false)
+      setStartMouse(null)
+      setStartViewport(null)
+    })
   }
 
-  const cancel = () => {
-    setIsPanning(false)
-    setStartPoint(null)
-    setCurrentPoint(null)
-    window.removeEventListener('mousemove', handleMouseMove)
-    window.removeEventListener('mouseup', handleMouseUp)
-  }
+  onCleanup(() => {
+    if (isPanning()) end()
+  })
 
-  onCleanup(cancel)
-
-  return {
-    isPanning,
-    delta,
-    start,
-    cancel
-  }
+  return { isPanning, isSpacePressed, canPan, start, move, end }
 }

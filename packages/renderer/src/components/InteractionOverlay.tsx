@@ -1,16 +1,31 @@
 import { createMemo, For, Show } from 'solid-js'
-import type { Viewport } from '@diagen/core'
-import type { Rect, Point } from '@diagen/shared'
-import { canvasToScreen, canvasRectToScreen } from '@diagen/core'
+import { canvasRectToScreen, canvasToScreen, isShape } from '@diagen/core'
+import type { Point, Rect } from '@diagen/shared'
 import type { ResizeDirection } from '../hooks'
+import { useDesigner } from './DesignerProvider'
 
-export interface SelectionLayerProps {
-  rect: Rect
-  viewport: Viewport
-}
+// ============================================================================
+// 常量
+// ============================================================================
 
-export function SelectionLayer(props: SelectionLayerProps) {
-  const screenRect = () => canvasRectToScreen(props.rect, props.viewport)
+const HANDLE_POSITIONS = [
+  { dir: 'nw', x: 0, y: 0, cursor: 'nwse-resize' },
+  { dir: 'n', x: 0.5, y: 0, cursor: 'ns-resize' },
+  { dir: 'ne', x: 1, y: 0, cursor: 'nesw-resize' },
+  { dir: 'w', x: 0, y: 0.5, cursor: 'ew-resize' },
+  { dir: 'e', x: 1, y: 0.5, cursor: 'ew-resize' },
+  { dir: 'sw', x: 0, y: 1, cursor: 'nesw-resize' },
+  { dir: 's', x: 0.5, y: 1, cursor: 'ns-resize' },
+  { dir: 'se', x: 1, y: 1, cursor: 'nwse-resize' },
+] as const
+
+// ============================================================================
+// 框选层 - 用于显示框选区域
+// ============================================================================
+
+export function SelectionLayer(props: { rect: Rect }) {
+  const designer = useDesigner()
+  const screenRect = () => canvasRectToScreen(props.rect, designer.view.viewport())
 
   return (
     <div
@@ -23,164 +38,143 @@ export function SelectionLayer(props: SelectionLayerProps) {
         border: '1px dashed #2196f3',
         'background-color': 'rgba(33, 150, 243, 0.1)',
         'pointer-events': 'none',
-        'z-index': 9999
+        'z-index': 9999,
       }}
     />
   )
 }
 
-export interface ResizeHandlesProps {
-  bounds: Rect
-  viewport: Viewport
-  onResizeStart: (direction: ResizeDirection, event: MouseEvent) => void
-  visible?: boolean
+// ============================================================================
+// 选中框 + 调整手柄 + 旋转手柄 - 统一组件
+// ============================================================================
+
+export interface SelectionBoxProps {
+  onResizeStart?: (direction: ResizeDirection, event: MouseEvent) => void
+  onRotateStart?: (event: MouseEvent) => void
+  showRotateHandle?: boolean
 }
 
-const HANDLE_POSITIONS: Array<{ dir: ResizeDirection; x: number; y: number; cursor: string }> = [
-  { dir: 'nw', x: 0, y: 0, cursor: 'nwse-resize' },
-  { dir: 'n', x: 0.5, y: 0, cursor: 'ns-resize' },
-  { dir: 'ne', x: 1, y: 0, cursor: 'nesw-resize' },
-  { dir: 'w', x: 0, y: 0.5, cursor: 'ew-resize' },
-  { dir: 'e', x: 1, y: 0.5, cursor: 'ew-resize' },
-  { dir: 'sw', x: 0, y: 1, cursor: 'nesw-resize' },
-  { dir: 's', x: 0.5, y: 1, cursor: 'ns-resize' },
-  { dir: 'se', x: 1, y: 1, cursor: 'nwse-resize' }
-]
+export function SelectionBox(props: SelectionBoxProps) {
+  const designer = useDesigner()
+  const { selection, element } = designer
 
-export function ResizeHandles(props: ResizeHandlesProps) {
-  const screenBounds = () => canvasRectToScreen(props.bounds, props.viewport)
-
-  const handleMouseDown = (dir: ResizeDirection, e: MouseEvent) => {
-    e.stopPropagation()
-    e.preventDefault()
-    props.onResizeStart(dir, e)
-  }
+  const screenBounds = createMemo(() => {
+    const bounds = selection.getSelectionBounds()
+    if (!bounds) return null
+    return canvasRectToScreen(bounds, designer.state.viewport)
+  })
 
   return (
-    <Show when={props.visible !== false}>
-      <div
-        style={{
-          position: 'absolute',
-          left: `${screenBounds().x - 1}px`,
-          top: `${screenBounds().y - 1}px`,
-          width: `${screenBounds().w + 2}px`,
-          height: `${screenBounds().h + 2}px`,
-          border: '2px solid #2196f3',
-          'pointer-events': 'none',
-          'z-index': 1000
-        }}
-      >
-        <For each={HANDLE_POSITIONS}>
-          {(handle) => (
-            <div
-              style={{
-                position: 'absolute',
-                left: `${handle.x * 100}%`,
-                top: `${handle.y * 100}%`,
-                width: '8px',
-                height: '8px',
-                'background-color': 'white',
-                border: '1px solid #2196f3',
-                'border-radius': '1px',
-                transform: 'translate(-50%, -50%)',
-                cursor: handle.cursor,
-                'pointer-events': 'auto'
-              }}
-              onMouseDown={(e) => handleMouseDown(handle.dir, e)}
-            />
-          )}
-        </For>
-      </div>
-    </Show>
-  )
-}
-
-export interface RotateHandleProps {
-  bounds: Rect
-  viewport: Viewport
-  onRotateStart: (event: MouseEvent) => void
-  visible?: boolean
-}
-
-export function RotateHandle(props: RotateHandleProps) {
-  const screenBounds = () => canvasRectToScreen(props.bounds, props.viewport)
-
-  const handleMouseDown = (e: MouseEvent) => {
-    e.stopPropagation()
-    e.preventDefault()
-    props.onRotateStart(e)
-  }
-
-  return (
-    <Show when={props.visible !== false}>
-      <>
+    <Show when={screenBounds()}>
+      {bounds => (
         <div
           style={{
             position: 'absolute',
-            left: `${screenBounds().x + screenBounds().w / 2}px`,
-            top: `${screenBounds().y - 25}px`,
-            width: '12px',
-            height: '12px',
-            'background-color': 'white',
-            border: '1px solid #2196f3',
-            'border-radius': '50%',
-            transform: 'translateX(-50%)',
-            cursor: 'grab',
-            'pointer-events': 'auto',
-            'z-index': 1001
-          }}
-          onMouseDown={handleMouseDown}
-        />
-        <div
-          style={{
-            position: 'absolute',
-            left: `${screenBounds().x + screenBounds().w / 2}px`,
-            top: `${screenBounds().y - 20}px`,
-            width: '1px',
-            height: '15px',
-            'background-color': '#2196f3',
-            transform: 'translateX(-50%)',
+            left: `${bounds().x - 1}px`,
+            top: `${bounds().y - 1}px`,
+            width: `${bounds().w + 2}px`,
+            height: `${bounds().h + 2}px`,
+            border: '2px solid #2196f3',
             'pointer-events': 'none',
-            'z-index': 1000
+            'z-index': 1000,
           }}
-        />
-      </>
+        >
+          {/* 调整大小手柄 */}
+          <For each={HANDLE_POSITIONS}>
+            {handle => (
+              <div
+                style={{
+                  position: 'absolute',
+                  left: `${handle.x * 100}%`,
+                  top: `${handle.y * 100}%`,
+                  width: '8px',
+                  height: '8px',
+                  'background-color': 'white',
+                  border: '1px solid #2196f3',
+                  'border-radius': '1px',
+                  transform: 'translate(-50%, -50%)',
+                  cursor: handle.cursor,
+                  'pointer-events': 'auto',
+                }}
+                onMouseDown={e => {
+                  e.stopPropagation()
+                  e.preventDefault()
+                  props.onResizeStart?.(handle.dir, e)
+                }}
+              />
+            )}
+          </For>
+
+          {/* 旋转手柄 */}
+          <Show when={props.showRotateHandle ?? true}>
+            <>
+              <div
+                style={{
+                  position: 'absolute',
+                  left: '50%',
+                  top: '-25px',
+                  width: '12px',
+                  height: '12px',
+                  'background-color': 'white',
+                  border: '1px solid #2196f3',
+                  'border-radius': '50%',
+                  transform: 'translateX(-50%)',
+                  cursor: 'grab',
+                  'pointer-events': 'auto',
+                }}
+                onMouseDown={e => {
+                  e.stopPropagation()
+                  props.onRotateStart?.(e)
+                }}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  left: '50%',
+                  top: '-20px',
+                  width: '1px',
+                  height: '15px',
+                  'background-color': '#2196f3',
+                  transform: 'translateX(-50%)',
+                }}
+              />
+            </>
+          </Show>
+        </div>
+      )}
     </Show>
   )
 }
 
-export interface AnchorPreviewProps {
-  elementId: string
-  viewport: Viewport
-  getElement: (id: string) => { props: { x: number; y: number; w: number; h: number } } | undefined
-  getAnchors: (id: string) => Array<{ x: number | string; y: number | string; id?: string }>
-  highlightAnchor?: string
-}
+// ============================================================================
+// 锚点预览 - 连线时显示元素的锚点
+// ============================================================================
 
-export function AnchorPreview(props: AnchorPreviewProps) {
-  const element = () => props.getElement(props.elementId)
-  const anchors = () => props.getAnchors(props.elementId)
+export function AnchorPreview(props: { elementId: string; highlightAnchor?: string }) {
+  const designer = useDesigner()
 
-  const getAnchorPosition = (anchor: { x: number | string; y: number | string }): Point => {
+  const element = () => designer.element.getById(props.elementId)
+  const anchors = () => [
+    { x: 0.5, y: 0, id: 'top' },
+    { x: 1, y: 0.5, id: 'right' },
+    { x: 0.5, y: 1, id: 'bottom' },
+    { x: 0, y: 0.5, id: 'left' },
+  ]
+
+  const getAnchorPosition = (anchor: { x: number; y: number }): Point => {
     const el = element()
-    if (!el) return { x: 0, y: 0 }
-
-    const w = el.props.w
-    const h = el.props.h
-    const x = typeof anchor.x === 'number' ? anchor.x : w * 0.5
-    const y = typeof anchor.y === 'number' ? anchor.y : h * 0.5
-
+    if (!el || !isShape(el)) return { x: 0, y: 0 }
     return {
-      x: el.props.x + x,
-      y: el.props.y + y
+      x: el.props.x + el.props.w * anchor.x,
+      y: el.props.y + el.props.h * anchor.y,
     }
   }
 
   return (
     <For each={anchors()}>
-      {(anchor) => {
+      {(anchor: { x: number; y: number; id: string }) => {
         const pos = getAnchorPosition(anchor)
-        const screenPos = canvasToScreen(pos, props.viewport)
+        const screenPos = canvasToScreen(pos, designer.state.viewport)
         const isHighlight = anchor.id === props.highlightAnchor
 
         return (
@@ -193,9 +187,9 @@ export function AnchorPreview(props: AnchorPreviewProps) {
               height: '10px',
               'border-radius': '50%',
               background: isHighlight ? '#2196f3' : '#fff',
-              border: `2px solid #2196f3`,
+              border: '2px solid #2196f3',
               cursor: 'crosshair',
-              'z-index': 9998
+              'z-index': 9998,
             }}
           />
         )
@@ -204,16 +198,13 @@ export function AnchorPreview(props: AnchorPreviewProps) {
   )
 }
 
-export interface LinkerPreviewProps {
-  from: Point
-  to: Point
-  viewport: Viewport
-  hasTarget?: boolean
-}
-
-export function LinkerPreview(props: LinkerPreviewProps) {
-  const fromScreen = () => canvasToScreen(props.from, props.viewport)
-  const toScreen = () => canvasToScreen(props.to, props.viewport)
+// ============================================================================
+// 连线预览 - 拖动连线时显示预览线
+// ============================================================================
+export function LinkerPreview(props: { from: Point; to: Point; hasTarget?: boolean }) {
+  const designer = useDesigner()
+  const fromScreen = () => canvasToScreen(props.from, designer.state.viewport)
+  const toScreen = () => canvasToScreen(props.to, designer.state.viewport)
 
   return (
     <svg
@@ -224,7 +215,7 @@ export function LinkerPreview(props: LinkerPreviewProps) {
         width: '100%',
         height: '100%',
         'pointer-events': 'none',
-        'z-index': 9997
+        'z-index': 9997,
       }}
     >
       <line

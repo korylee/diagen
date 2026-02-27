@@ -2,26 +2,25 @@
  * Page Model
  */
 
+import { generateId } from '@diagen/shared'
+
 export interface PageConfig {
-  id: string;
-  name: string;
-  backgroundColor: string;
-  width: number;
-  height: number;
-  padding: number;
-  showGrid: boolean;
-  gridSize: number;
-  gridColor?: string;
-  gridStyle?: 'dot' | 'line' | 'cross';
-  orientation: 'portrait' | 'landscape';
-  lineJumps: boolean;
+  id: string
+  name: string
+  backgroundColor: string
+  width: number
+  height: number
+  padding: number
+  showGrid: boolean
+  gridSize: number
+  gridColor?: string
+  gridStyle?: 'dot' | 'line' | 'cross'
+  orientation: 'portrait' | 'landscape'
+  lineJumps: boolean
 }
 
-/** Create default page config */
-export function createDefaultPage(
-  id: string,
-  options: Partial<PageConfig> = {}
-): PageConfig {
+export function createPage(overrides: Partial<PageConfig> = {}): PageConfig {
+  const id = overrides.id || generateId('page')
   return {
     id,
     name: 'Page 1',
@@ -35,6 +34,6 @@ export function createDefaultPage(
     gridStyle: 'line',
     orientation: 'portrait',
     lineJumps: false,
-    ...options
-  };
+    ...overrides,
+  }
 }

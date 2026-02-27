@@ -3,8 +3,8 @@
  * Demonstrates the usage of Designer with DesignerProvider and CanvasRenderer
  */
 
-import { createSignal, onMount } from 'solid-js'
-import type { ShapeElement } from '@diagen/core'
+import { batch, createSignal, onMount } from 'solid-js'
+import type { LinkerElement, ShapeElement } from '@diagen/core'
 import { createDesigner, Schema } from '@diagen/core'
 import { CanvasRenderer, DesignerProvider, useDesigner } from '@diagen/renderer'
 import { generateId } from '@diagen/shared'
@@ -15,9 +15,7 @@ import { generateId } from '@diagen/shared'
  */
 function Toolbar() {
   const designer = useDesigner()
-  const { selection, element } = designer
-  const { selectedIds } = selection
-  const { getElementById } = element
+  const { getElementById, selection, element } = designer
   ;(window as any).designer = designer
   const [zoomDisplay, setZoomDisplay] = createSignal(100)
 
@@ -37,11 +35,11 @@ function Toolbar() {
       },
     )!
 
-    designer.addElement(shape, { select: true })
+    designer.edit.add([shape])
   }
 
   const addLinker = () => {
-    const selected = selectedIds()
+    const selected = selection.selectedIds()
     if (selected.length < 2) {
       alert('Select at least 2 shapes to connect')
       return
@@ -57,7 +55,8 @@ function Toolbar() {
       return
     }
 
-    const linker = designer.createLinker(
+    const linker = Schema.createLinker(
+      'linker',
       {
         id: fromId,
         x: (fromShape as ShapeElement).props.x + (fromShape as ShapeElement).props.w / 2,
@@ -68,30 +67,29 @@ function Toolbar() {
         x: (toShape as ShapeElement).props.x + (toShape as ShapeElement).props.w / 2,
         y: (toShape as ShapeElement).props.y + (toShape as ShapeElement).props.h / 2,
       },
-      'broken',
-    )
+    )!
 
     console.log('Created linker:', linker.id)
   }
 
   const deleteSelected = () => {
-    const ids = selectedIds()
+    const ids = selection.selectedIds()
     if (ids.length === 0) return
     designer.removeElements(ids)
   }
 
   const zoomIn = () => {
-    designer.zoomIn()
+    designer.view.zoomIn()
     updateZoomDisplay()
   }
 
   const zoomOut = () => {
-    designer.zoomOut()
+    designer.view.zoomOut()
     updateZoomDisplay()
   }
 
   const fitToScreen = () => {
-    designer.zoomToFit()
+    designer.view.zoomToFit()
     updateZoomDisplay()
   }
 
@@ -104,19 +102,19 @@ function Toolbar() {
   }
 
   const groupSelected = () => {
-    const ids = selectedIds()
+    const ids = selection.selectedIds()
     if (ids.length < 2) {
       alert('Select at least 2 elements to group')
       return
     }
-    const groupId = designer.group(ids)
+    const groupId = designer.element.group(ids)
     console.log('Created group:', groupId)
   }
 
   const ungroupSelected = () => {
     // Get unique groups from selection
-    const groups = designer.getGroupsFromElements(selectedIds())
-    groups.forEach(groupId => designer.ungroup(groupId))
+    const groups = designer.getGroupsFromElements(selection.selectedIds())
+    groups.forEach(groupId => designer.element.ungroup(groupId))
   }
 
   const toggleGrid = () => {
@@ -193,7 +191,7 @@ function Toolbar() {
 
       <div class="toolbar-section">
         <span class="status-text">
-          Selected: {selectedIds().length} | Total: {designer.elementCount}
+          Selected: {selection.selectedIds().length} | Total: {element.elementCount()}
         </span>
       </div>
     </div>
@@ -251,23 +249,15 @@ function SampleDataLoader() {
         },
       )!,
     ]
+    const linkers: LinkerElement[] = [
+      Schema.createLinker('linker', { id: shape1Id, x: 250, y: 200 }, { id: shape2Id, x: 400, y: 200 })!,
+      Schema.createLinker('linker', { id: shape2Id, x: 550, y: 200 }, { id: shape3Id, x: 700, y: 200 })!,
+    ]
 
-    // Add shapes without history and without auto-select
-    shapes.forEach(shape => {
-      designer.element.add([shape], { recordHistory: false, select: false })
+    batch(() => {
+      designer.element.add(shapes)
+      designer.element.add(linkers)
     })
-
-    // Create linkers between shapes
-    designer.createLinker({ id: shape1Id, x: 250, y: 200 }, { id: shape2Id, x: 400, y: 200 }, 'broken', {
-      recordHistory: false,
-      select: false,
-    })
-
-    designer.createLinker({ id: shape2Id, x: 550, y: 200 }, { id: shape3Id, x: 700, y: 200 }, 'broken', {
-      recordHistory: false,
-      select: false,
-    })
-
     // Select first shape
     designer.selection.select(shape1Id)
   })
@@ -282,14 +272,10 @@ function SampleDataLoader() {
 export default function App() {
   // Create the store instance
   const designer = createDesigner({
-    id: 'playground',
-    initialDiagram: {
-      name: 'Playground Diagram',
-      page: {
-        width: 1200,
-        height: 900,
-        backgroundColor: '255,255,255',
-      },
+    initialPage: {
+      width: 1200,
+      height: 900,
+      backgroundColor: '255,255,255',
     },
   })
 

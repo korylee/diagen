@@ -32,6 +32,7 @@
     "packages/*/__tests__",
     "playgrounds/*/src",
     "scripts/*",
-    "rollup.*.js"
+    "rollup.*.js",
+    "tsdown.config.js"
   ],
 }

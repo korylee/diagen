@@ -1,18 +1,10 @@
 import { batch, createMemo } from 'solid-js'
 import { generateId } from '@diagen/shared'
 import { DesignerContext } from './types'
-import {
-  BoxProps,
-  DiagramElement,
-  isLinker,
-  isShape,
-  LinkerElement,
-  LinkerEndpoint,
-  ShapeElement,
-} from '../../model'
-import { deepMerge } from '@diagen/shared'
+import { BoxProps, DiagramElement, isLinker, isShape, LinkerElement, LinkerEndpoint, ShapeElement } from '../../model'
 import { Schema } from '../../schema'
-import { produce } from 'solid-js/store'
+import { produce, SetStoreFunction } from 'solid-js/store'
+import { EditorState } from '../index'
 
 const CreateMethods = {
   shape: (schemaId: string, box: BoxProps, overrides?: Partial<ShapeElement>): ShapeElement | null =>
@@ -36,6 +28,7 @@ export const createElementManager = (ctx: DesignerContext) => {
       .map(id => elementMap()[id])
       .filter(Boolean),
   )
+  const elementCount = createMemo(() => elements().length)
   const shapes = createMemo(() => elements().filter(el => isShape(el)) as ShapeElement[])
   const linkers = createMemo(() => elements().filter(el => isLinker(el)) as LinkerElement[])
 
@@ -78,27 +71,9 @@ export const createElementManager = (ctx: DesignerContext) => {
     ctx.emit('element:removed', { ids })
   }
 
-  function update(ids: string[], overrides: Partial<DiagramElement>) {
-    if (ids.length === 0) return
-
-    ctx.setState(
-      'diagram',
-      'elements',
-      produce(els => {
-        for (const id of ids) {
-          const el = els[id]
-          if (el) {
-            // 使用 deepMerge 确保样式等嵌套属性被正确合并
-            deepMerge(el, overrides)
-          }
-        }
-      }),
-    )
-
-    ctx.emit('element:updated', {
-      ids,
-      overrides,
-    })
+  const update: SetStoreFunction<EditorState['diagram']['elements']> = (...args: unknown[]) => {
+    ctx.setState('diagram', 'elements', ...(args as [any]))
+    ctx.emit('element:updated')
   }
 
   function clear() {
@@ -210,9 +185,7 @@ export const createElementManager = (ctx: DesignerContext) => {
   function distribute(ids: string[], type: 'horizontal' | 'vertical') {
     if (ids.length < 3) return
 
-    const selectedShapes = ids
-      .map(id => elementMap()[id])
-      .filter(isShape) as ShapeElement[]
+    const selectedShapes = ids.map(id => elementMap()[id]).filter(isShape) as ShapeElement[]
     if (selectedShapes.length < 3) return
 
     if (type === 'horizontal') {
@@ -223,13 +196,17 @@ export const createElementManager = (ctx: DesignerContext) => {
       const gap = (last.props.x + last.props.w - first.props.x - totalWidth) / (sorted.length - 1)
 
       let currentX = first.props.x
-      ctx.setState('diagram', 'elements', produce(els => {
-        for (let i = 0; i < sorted.length; i++) {
-          const el = els[sorted[i].id] as ShapeElement
-          el.props.x = currentX
-          currentX += el.props.w + gap
-        }
-      }))
+      ctx.setState(
+        'diagram',
+        'elements',
+        produce(els => {
+          for (let i = 0; i < sorted.length; i++) {
+            const el = els[sorted[i].id] as ShapeElement
+            el.props.x = currentX
+            currentX += el.props.w + gap
+          }
+        }),
+      )
     } else {
       const sorted = [...selectedShapes].sort((a, b) => a.props.y - b.props.y)
       const first = sorted[0]
@@ -238,13 +215,17 @@ export const createElementManager = (ctx: DesignerContext) => {
       const gap = (last.props.y + last.props.h - first.props.y - totalHeight) / (sorted.length - 1)
 
       let currentY = first.props.y
-      ctx.setState('diagram', 'elements', produce(els => {
-        for (let i = 0; i < sorted.length; i++) {
-          const el = els[sorted[i].id] as ShapeElement
-          el.props.y = currentY
-          currentY += el.props.h + gap
-        }
-      }))
+      ctx.setState(
+        'diagram',
+        'elements',
+        produce(els => {
+          for (let i = 0; i < sorted.length; i++) {
+            const el = els[sorted[i].id] as ShapeElement
+            el.props.y = currentY
+            currentY += el.props.h + gap
+          }
+        }),
+      )
     }
   }
 
@@ -353,6 +334,7 @@ export const createElementManager = (ctx: DesignerContext) => {
   return {
     elementMap,
     elements,
+    elementCount,
     orderList,
     shapes,
     linkers,
