@@ -1,4 +1,4 @@
-import type { StoreContext } from './types'
+import type { DesignerContext } from './types'
 import { createStore, produce } from 'solid-js/store'
 import { createMemo } from 'solid-js'
 import { generateId } from '@diagen/shared'
@@ -56,7 +56,7 @@ export interface HistoryState {
   transaction?: { name: string; commands: Command[] }
 }
 
-export function createHistoryManager(ctx: StoreContext) {
+export function createHistoryManager(ctx: DesignerContext) {
   const { emit } = ctx
 
   const [state, setState] = createStore<HistoryState>({

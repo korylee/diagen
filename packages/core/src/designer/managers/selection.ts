@@ -1,4 +1,4 @@
-import type { StoreContext } from './types'
+import type { DesignerContext } from './types'
 import { createMemo } from 'solid-js'
 import { createStore, produce } from 'solid-js/store'
 import { getElementBounds } from '../../utils'
@@ -7,7 +7,7 @@ import { ensureArray, normalizeRect } from '@diagen/shared'
 import { ElementManager } from './element'
 
 export function createSelectionManager(
-  ctx: StoreContext,
+  ctx: DesignerContext,
   deps: {
     element: ElementManager
   },

@@ -1,3 +1,4 @@
 export * from './model'
-export * from './store'
+export * from './designer'
 export * from './schema'
+export * from './utils'

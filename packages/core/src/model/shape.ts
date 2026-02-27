@@ -2,7 +2,7 @@
  * Shape Element Model
  */
 
-import { generateId } from 'packages/shared'
+import { generateId } from '@diagen/shared'
 import { DEFAULTS } from '../constants'
 import type {
   Anchor,

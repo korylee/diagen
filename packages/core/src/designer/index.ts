@@ -1,12 +1,6 @@
-/**
- * Designer Store
- * Main state management for the editor using SolidJS createStore
- * Function-based implementation for better flexibility and plugin support
- */
-
 import { createStore } from 'solid-js/store'
 
-import type { Viewport } from '@diagen/shared'
+import type { Viewport } from '../utils'
 import { createEmitter, generateId } from '@diagen/shared'
 
 import { createMemo } from 'solid-js'
@@ -19,9 +13,9 @@ import {
   createElementManager,
   createHistoryManager,
   createSelectionManager,
-  createViewportManager,
+  createViewManager,
 } from './managers'
-import { StoreContext } from './managers/types'
+import { DesignerContext } from './managers/types'
 
 // ============================================================================
 // Store State Types
@@ -53,7 +47,7 @@ export interface EditorState {
 // Designer Store Options
 // ============================================================================
 
-export interface DesignerStoreOptions {
+export interface DesignerOptions {
   id?: string
   initialDiagram?: Partial<Diagram>
   initialViewport?: Partial<Viewport>
@@ -63,7 +57,7 @@ export interface DesignerStoreOptions {
 // Helper Functions
 // ============================================================================
 
-function createInitialState(options: DesignerStoreOptions): EditorState {
+function createInitialState(options: DesignerOptions): EditorState {
   const diagram = createEmptyDiagram(options.id || generateId('diagram'), options.initialDiagram)
 
   return {
@@ -96,22 +90,23 @@ function createInitialState(options: DesignerStoreOptions): EditorState {
 // Designer Store Factory Function
 // ============================================================================
 
-export function createDesignerStore(options: DesignerStoreOptions = {}) {
+export function createDesigner(options: DesignerOptions = {}) {
   const id = options.id || generateId('editor')
   const emitter = createEmitter()
 
   const initialState = createInitialState(options)
   const [state, setState] = createStore(initialState)
-  const ctx: StoreContext = {
+  const ctx: DesignerContext = {
     state,
     setState,
     emit: emitter.emit,
   }
+
   // managers 分层
   const element = createElementManager(ctx)
   const history = createHistoryManager(ctx)
   const selection = createSelectionManager(ctx, { element })
-  const viewport = createViewportManager(ctx, { element })
+  const view = createViewManager(ctx, { element })
   const edit = createEditManager(ctx, { element, selection, history })
 
   const { getById: getElementById, elements } = element
@@ -486,6 +481,7 @@ export function createDesignerStore(options: DesignerStoreOptions = {}) {
     history,
     selection,
     edit,
+    view,
 
     // 快捷方式
     elements,
@@ -502,7 +498,6 @@ export function createDesignerStore(options: DesignerStoreOptions = {}) {
     canRedo: history.canRedo,
 
     page,
-    viewport,
     activeTool,
 
     setCanvasSize,
@@ -522,4 +517,4 @@ export function createDesignerStore(options: DesignerStoreOptions = {}) {
   }
 }
 
-export type DesignerStore = ReturnType<typeof createDesignerStore>
+export type Designer = ReturnType<typeof createDesigner>

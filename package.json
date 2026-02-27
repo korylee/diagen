@@ -11,7 +11,10 @@
   "devDependencies": {
     "@types/node": "^25.2.3",
     "prettier": "^3.8.1",
-    "typescript": "catalog:dev",
-    "tsdown": "catalog:dev"
+    "tsdown": "catalog:dev",
+    "typescript": "catalog:dev"
+  },
+  "dependencies": {
+    "vitest": "^4.0.18"
   }
 }

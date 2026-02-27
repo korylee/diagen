@@ -1,69 +1,94 @@
-/**
- * Object utilities for VectorGraph Editor
- */
+import { isObject, isPlainObject } from './is'
 
-type DeepPartial<T> = {
-  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P]
+export function deepClone<T>(obj: T, cache = new WeakMap<object, any>()): T {
+  // 基础类型和 null 直接返回
+  if (obj === null || typeof obj !== 'object') return obj
+
+  // 处理循环引用
+  if (cache.has(obj as object)) return cache.get(obj as object)
+
+  // 处理包装对象
+  if (obj instanceof Date) return new Date(obj.getTime()) as unknown as T
+  if (obj instanceof RegExp) return new RegExp(obj.source, obj.flags) as unknown as T
+
+  // 处理 Map/Set
+  if (obj instanceof Map) {
+    const cloned = new Map()
+    cache.set(obj, cloned)
+    obj.forEach((v, k) => cloned.set(deepClone(k, cache), deepClone(v, cache)))
+    return cloned as unknown as T
+  }
+
+  if (obj instanceof Set) {
+    const cloned = new Set()
+    cache.set(obj, cloned)
+    obj.forEach(v => cloned.add(deepClone(v, cache)))
+    return cloned as unknown as T
+  }
+
+  // 处理 TypedArray/ArrayBuffer
+  if (ArrayBuffer.isView(obj)) return new (obj.constructor as any)(obj) as T
+  if (obj instanceof ArrayBuffer) return obj.slice(0) as T
+
+  // 创建目标对象，保持原型链
+  const cloned = Array.isArray(obj) ? [] : Object.create(Object.getPrototypeOf(obj))
+
+  cache.set(obj as object, cloned)
+
+  // 复制所有属性（包括不可枚举和 Symbol）
+  Reflect.ownKeys(obj as object).forEach(key => {
+    const desc = Object.getOwnPropertyDescriptor(obj as object, key)!
+    Object.defineProperty(cloned, key, {
+      ...desc,
+      value: deepClone(desc.value, cache),
+    })
+  })
+
+  return cloned
 }
 
-/**
- * Deep clone an object
- */
-export function deepClone<T>(obj: T): T {
-  if (obj === null || typeof obj !== 'object') {
-    return obj
-  }
+export function deepMerge<T extends object, S extends object>(
+  target: T,
+  source: S,
+  cache = new WeakMap<object, object>(),
+): T & S {
+  // 类型守卫
+  if (!isObject(target) || !isObject(source)) return source as T & S
 
-  if (obj instanceof Date) {
-    return new Date(obj.getTime()) as unknown as T
-  }
+  // 循环引用检测
+  if (cache.has(source)) return cache.get(source) as T & S
 
-  if (obj instanceof Array) {
-    return obj.map(item => deepClone(item)) as unknown as T
-  }
+  // 创建结果对象（保持原型链）
+  const result: any = Array.isArray(source) ? [] : Object.create(Object.getPrototypeOf(target))
 
-  if (obj instanceof Object) {
-    const cloned = {} as T
-    for (const key in obj) {
-      if (Object.prototype.hasOwnProperty.call(obj, key)) {
-        cloned[key] = deepClone(obj[key])
-      }
+  cache.set(source, result)
+
+  // 合并 source 属性（优先）
+  Reflect.ownKeys(source).forEach(key => {
+    // 原型污染防护
+    if (key === '__proto__' || key === 'constructor') return
+
+    const srcVal = (source as any)[key]
+    const tgtVal = (target as any)[key]
+
+    // 仅当双方都是纯对象时递归合并，否则取 source 值（克隆）
+    result[key] =
+      isPlainObject(srcVal) && isPlainObject(tgtVal)
+        ? deepMerge(tgtVal, srcVal, cache)
+        : isObject(srcVal)
+          ? deepClone(srcVal, cache)
+          : srcVal
+  })
+
+  // 补充 target 独有的属性（克隆）
+  Reflect.ownKeys(target).forEach(key => {
+    if (!(key in result)) {
+      const val = (target as any)[key]
+      result[key] = isObject(val) ? deepClone(val, cache) : val
     }
-    return cloned
-  }
+  })
 
-  return obj
-}
-
-/**
- * Deep merge objects
- */
-export function deepMerge<T extends object>(target: T, ...sources: DeepPartial<T>[]): T {
-  if (!sources.length) return target
-
-  const source = sources.shift()
-
-  if (isObject(target) && isObject(source)) {
-    for (const key in source) {
-      if (isObject(source[key])) {
-        if (!target[key]) {
-          Object.assign(target, { [key]: {} })
-        }
-        deepMerge(target[key] as any, source[key] as any)
-      } else {
-        Object.assign(target, { [key]: source[key] })
-      }
-    }
-  }
-
-  return deepMerge(target, ...sources)
-}
-
-/**
- * Check if value is a plain object
- */
-export function isObject(item: unknown): item is Record<string, unknown> {
-  return item !== null && typeof item === 'object' && !Array.isArray(item)
+  return result
 }
 
 /**
@@ -90,21 +115,18 @@ export function omit<T extends object, K extends keyof T>(obj: T, keys: K[]): Om
   return result
 }
 
-/**
- * Get nested property value
- */
-export function get<T = unknown>(obj: Record<string, unknown>, path: string, defaultValue?: T): T | undefined {
-  const keys = path.split('.')
-  let result: unknown = obj
+export function get<T extends object, K extends keyof T>(obj: T, path: K): T[K] | undefined {
+  const keys = (path as string).split('.')
+  let result = obj as T[K]
 
   for (const key of keys) {
-    if (result === null || result === undefined) {
-      return defaultValue
+    if (result == null) {
+      break
     }
-    result = (result as Record<string, unknown>)[key]
+    result = (result as any)[key]
   }
 
-  return (result as T) ?? defaultValue
+  return result
 }
 
 /**
@@ -127,22 +149,44 @@ export function set<T extends Record<string, unknown>>(obj: T, path: string, val
   return obj
 }
 
-const hasOwn = (obj: object, key: string) => Object.prototype.hasOwnProperty.call(obj, key)
+export const hasOwn = (obj: object, key: string) => Object.prototype.hasOwnProperty.call(obj, key)
 
 /**
- * Compare two objects for equality (shallow)
+ * 1. 基本类型/同引用：使用 Object.is（兼容 NaN）
+ * 2. 对象类型：比较第一层属性的数量和值
  */
-export function shallowEqual(obj1: unknown, obj2: unknown): boolean {
-  if (obj1 === obj2) return true
-  if (obj1 === null || obj2 === null) return false
-  if (typeof obj1 !== 'object' || typeof obj2 !== 'object') return false
+export function shallowEqual(objA: unknown, objB: unknown): boolean {
+  // 1. 严格相等或同为 NaN
+  if (Object.is(objA, objB)) {
+    return true
+  }
 
-  const keys1 = Object.keys(obj1 as object)
-  const keys2 = Object.keys(obj2 as object)
+  // 2. 如果其中一方不是对象（处理 null，因为 typeof null === 'object'），则返回 false
+  if (typeof objA !== 'object' || objA === null || typeof objB !== 'object' || objB === null) {
+    return false
+  }
 
-  if (keys1.length !== keys2.length) return false
+  // 3. 比较第一层键的数量和值
+  const keysA = keys(objA)
+  const keysB = keys(objB)
 
-  return keys1.every(
-    key => hasOwn(obj2, key) && (obj1 as Record<string, unknown>)[key] === (obj2 as Record<string, unknown>)[key],
-  )
+  // 键数量不同，直接返回 false
+  if (keysA.length !== keysB.length) {
+    return false
+  }
+
+  // 4. 遍历检查 key 是否存在且值相等
+  for (let i = 0; i < keysA.length; i++) {
+    const key = keysA[i]
+    if (
+      !hasOwn(objB, key) || // 检查 key 是否存在
+      !Object.is(objA[key], objB[key]) // 检查值是否相等
+    ) {
+      return false
+    }
+  }
+
+  return true
 }
+
+export const keys = <T extends object>(obj: T) => Object.keys(obj) as (keyof T)[]

@@ -2,7 +2,7 @@
  * Linker (Connection) Element Model
  */
 
-import { generateId } from 'packages/shared'
+import { generateId } from '@diagen/shared'
 import type { LinkerType } from '../constants'
 import type { BaseElement, LineStyle, FontStyle, DataAttribute } from './types'
 

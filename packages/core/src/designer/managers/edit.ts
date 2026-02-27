@@ -1,11 +1,11 @@
-import { generateId } from '@diagen/shared'
-import { deepClone } from '@diagen/shared/'
+import { ensureArray, generateId } from '@diagen/shared'
+import { deepClone, keys } from '@diagen/shared'
 import { batch } from 'solid-js'
 import type { DiagramElement } from '../../model'
 import { CreateMethods, type ElementManager } from './element'
 import type { Command, HistoryManager } from './history'
 import { type SelectionManager } from './selection'
-import { StoreContext } from './types'
+import { DesignerContext } from './types'
 
 class AddCommand implements Command {
   id = generateId()
@@ -67,21 +67,35 @@ class UpdateCommand implements Command {
   id = generateId()
   name = 'update_els'
   readonly timestamp = Date.now()
-  previous: DiagramElement
+  patches: Record<string, Partial<DiagramElement>>
   constructor(
     private readonly deps: EditDeps,
-    private readonly element: DiagramElement,
+    private readonly ids: string[],
     private readonly patch: Partial<DiagramElement>,
   ) {
-    this.previous = deepClone(element)
+    const _keys = keys(patch);
+    this.patches = ids.reduce(
+      (acc, id) => {
+        const el = deps.element.getById(id)
+        acc[id] = _keys.reduce((acc, cur) => {
+          acc[cur] = deepClone(el[cur])
+          return acc
+        }, {} as any)
+        return acc
+      },
+      {} as Record<string, Partial<DiagramElement>>,
+    )
   }
-  // TODO solid-store只有更改没有覆盖，这里有问题
   execute() {
-    this.deps.element.update(this.element.id, this.patch)
+    this.deps.element.update(this.ids, this.patch)
   }
   undo() {
     // 使用 setState 的对象覆盖模式来恢复旧状态，因为 update 是合并操作
-    this.deps.element.update(this.element.id, this.previous)
+    batch(() => {
+      this.ids.forEach(id => {
+        this.deps.element.update([id], this.patches[id])
+      })
+    })
   }
   redo() {
     this.execute()
@@ -131,7 +145,7 @@ class ClearCommand implements Command {
   private readonly orderList: string[]
 
   constructor(
-    private readonly ctx: StoreContext,
+    private readonly ctx: DesignerContext,
     private readonly deps: EditDeps,
   ) {
     const { element } = deps
@@ -161,7 +175,7 @@ interface EditDeps {
   history: HistoryManager
 }
 
-export function createEditManager(ctx: StoreContext, deps: EditDeps) {
+export function createEditManager(ctx: DesignerContext, deps: EditDeps) {
   const { element, selection, history } = deps
 
   function add(elements: DiagramElement[], options: { select?: boolean; record?: boolean } = {}): void {
@@ -193,7 +207,8 @@ export function createEditManager(ctx: StoreContext, deps: EditDeps) {
     return createdElement as any
   }
 
-  function remove(ids: string[], options: { record?: boolean } = {}): void {
+  function remove(id: string | string[], options: { record?: boolean } = {}): void {
+    const ids = ensureArray(id)
     const { record = true } = options
     const els = ids.map(id => element.getById(id))
     if (!record) {
@@ -206,15 +221,15 @@ export function createEditManager(ctx: StoreContext, deps: EditDeps) {
     history.execute(cmd)
   }
 
-  function update(id: string, patch: Partial<DiagramElement>, options: { record?: boolean } = {}): void {
+  function update(id: string | string[], patch: Partial<DiagramElement>, options: { record?: boolean } = {}): void {
     const { record = true } = options
-    const el = element.getById(id)
+    const ids = ensureArray(id)
 
     if (!record) {
-      element.update(id, patch)
+      element.update(ids, patch)
       return
     }
-    const cmd = new UpdateCommand(deps, el, patch)
+    const cmd = new UpdateCommand(deps, ids, patch)
     history.execute(cmd)
   }
 

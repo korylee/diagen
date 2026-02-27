@@ -28,7 +28,10 @@
     }
   },
   "scripts": {
-    "build": "tsdown"
+    "build": "tsdown",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage"
   },
   "author": "",
   "license": "ISC",
@@ -38,5 +41,8 @@
     "solid-js": "^1.9.11"
   },
   "devDependencies": {
+    "vitest": "^4.0.18",
+    "@vitest/ui": "^4.0.18",
+    "@vitest/coverage-v8": "^4.0.18"
   }
 }

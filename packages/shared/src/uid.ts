@@ -25,9 +25,6 @@ export function generateId(prefix?: string): string {
   return parts.join('_');
 }
 
-/**
- * Generates a random string of specified length
- */
 function _generateRandomString(length: number): string {
   let result = '';
   for (let i = 0; i < length; i++) {
