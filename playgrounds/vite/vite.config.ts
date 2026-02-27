@@ -8,7 +8,8 @@ export default defineConfig({
     alias: {
       '@diagen/core': path.resolve(__dirname, '../../packages/core/src'),
       '@diagen/shared': path.resolve(__dirname, '../../packages/shared/src'),
+      '@diagen/primitives': path.resolve(__dirname, '../../packages/primitives/src'),
       '@diagen/renderer': path.resolve(__dirname, '../../packages/renderer/src'),
-    }
+    },
   },
-});
+})

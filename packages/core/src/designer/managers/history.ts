@@ -125,7 +125,13 @@ export function createHistoryManager(ctx: DesignerContext) {
     const enrichedCommand = Object.assign(command, meta)
 
     if (state.transaction) {
-      state.transaction.commands.push(enrichedCommand)
+      setState(
+        'transaction',
+        'commands',
+        produce(commands => {
+          commands.push(enrichedCommand)
+        }),
+      )
       enrichedCommand.execute()
       return
     }
@@ -151,7 +157,6 @@ export function createHistoryManager(ctx: DesignerContext) {
         s.transaction = { name, commands: [] }
       }),
     )
-    emit('history:transaction-start', { name })
   }
 
   function commitTransaction() {
@@ -167,10 +172,9 @@ export function createHistoryManager(ctx: DesignerContext) {
     if (transaction.commands.length > 0) {
       pushCommand(new CompositeCommand(transaction.name, transaction.commands))
     }
-    emit('history:transaction-commit', { name: transaction.name })
   }
 
-  function rollbackTransaction() {
+  function abortTransaction() {
     const { transaction } = state
     if (!transaction) return
 
@@ -180,7 +184,6 @@ export function createHistoryManager(ctx: DesignerContext) {
         s.transaction = undefined
       }),
     )
-    emit('history:transaction-rollback')
   }
 
   async function transaction<T>(name: string, fn: () => Promise<T> | T): Promise<T> {
@@ -190,7 +193,7 @@ export function createHistoryManager(ctx: DesignerContext) {
       commitTransaction()
       return result
     } catch (error) {
-      rollbackTransaction()
+      abortTransaction()
       throw error
     }
   }
@@ -268,10 +271,12 @@ export function createHistoryManager(ctx: DesignerContext) {
     clear,
 
     // 事务系统
-    startTransaction,
-    commitTransaction,
-    rollbackTransaction,
-    transaction,
+    transaction: {
+      begin: startTransaction,
+      commit: commitTransaction,
+      abort: abortTransaction,
+      run: transaction,
+    },
 
     // 配置
     setMaxHistory: (max: number) =>

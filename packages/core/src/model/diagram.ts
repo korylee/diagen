@@ -1,16 +1,16 @@
 /**
- * Diagram Model
- * The root data structure for a complete diagram
+ * 图表模型 - 根数据结构
  */
 
 import type { ShapeElement } from './shape'
 import type { LinkerElement } from './linker'
-import type { PageConfig } from './page'
+import { createPage, DiagramPage } from './page'
 import type { Theme } from './types'
+import { DeepPartial, generateId } from '@diagen/shared'
 
 export type DiagramElement = ShapeElement | LinkerElement
 
-/** Comments on the diagram */
+/** 图表评论 */
 export interface DiagramComment {
   id: string
   text: string
@@ -21,81 +21,59 @@ export interface DiagramComment {
   resolved?: boolean
 }
 
-/** Complete diagram model */
+/** 完整图表模型 */
 export interface Diagram {
   id: string
   name: string
   version: string
 
-  // Elements - normalized storage
+  /** 元素映射表（规范化存储） */
   elements: Record<string, DiagramElement>
 
-  // Z-order list for rendering
+  /** 渲染顺序列表 */
   orderList: string[]
 
-  // Page configuration
-  page: PageConfig
+  /** 页面配置 */
+  page: DiagramPage
 
-  // Theme
+  /** 主题 */
   theme?: Theme
 
-  // Metadata
+  /** 元数据 */
   createdAt: number
   updatedAt: number
   createdBy?: string
 
-  // Comments
+  /** 评论列表 */
   comments?: DiagramComment[]
 
-  // Custom properties
+  /** 自定义属性 */
   properties?: Record<string, unknown>
 }
 
-/** Create empty diagram */
-export function createEmptyDiagram(id: string, options: Partial<Diagram> = {}): Diagram {
+export function createDiagram(overrides: DeepPartial<Diagram> = {}) {
+  const id = overrides.id || generateId('diagram')
   const now = Date.now()
-
   return {
     id,
     name: 'Untitled Diagram',
     version: '1.0.0',
     elements: {},
     orderList: [],
-    page: {
-      id: `page_${id}`,
-      name: 'Page 1',
-      backgroundColor: 'transparent',
-      width: 1050,
-      height: 1000,
-      padding: 20,
-      showGrid: true,
-      gridSize: 15,
-      gridColor: '#e0e0e0',
-      gridStyle: 'line',
-      orientation: 'portrait',
-      lineJumps: false,
-    },
     createdAt: now,
     updatedAt: now,
     comments: [],
-    ...options,
-  }
+    ...overrides,
+    page: createPage(overrides.page),
+  } as Diagram
 }
 
-/** Get children of a container shape */
-export function getChildrenOfShape(diagram: Diagram, shapeId: string): DiagramElement[] {
-  const shape = diagram.elements[shapeId]
-  if (!shape || shape.type !== 'shape') return []
-
-  return shape.children.map(id => diagram.elements[id]).filter(Boolean)
-}
-
-/** Serialize diagram to JSON */
+/** 序列化图表 */
 export function serializeDiagram(diagram: Diagram): string {
   return JSON.stringify(diagram)
 }
 
-/** Deserialize diagram from JSON */
+/** 反序列化图表 */
 export function deserializeDiagram(json: string): Diagram {
   return JSON.parse(json)
 }

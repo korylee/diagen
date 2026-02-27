@@ -1,5 +1,5 @@
 /**
- * Shape Element Model
+ * 形状元素模型
  */
 
 import { generateId } from '@diagen/shared'
@@ -18,38 +18,38 @@ import type {
   TextBlock
 } from './types'
 
-/** Shape element */
+/** 形状元素 */
 export interface ShapeElement extends BaseElement {
   type: 'shape'
   title: string
-  link?: string // Hyperlink URL
+  link?: string  // 超链接
 
-  // Geometry
+  /** 几何属性 */
   props: BoxProps
 
-  // Styles
+  /** 样式 */
   shapeStyle: ShapeStyle
   lineStyle: LineStyle
   fillStyle: FillStyle
   fontStyle: FontStyle
 
-  // Content
+  /** 文本内容 */
   textBlock: TextBlock[]
 
-  // Connection
+  /** 连接锚点 */
   anchors: Anchor[]
 
-  // Path
+  /** 路径定义 */
   path: PathDefinition[]
 
-  // Attributes
+  /** 行为属性 */
   attribute: ElementAttribute
 
-  // Custom data
+  /** 自定义数据 */
   dataAttributes: DataAttribute[]
   data: Record<string, unknown>
 
-  // Theme
+  /** 主题 */
   theme?: string
 }
 
@@ -96,27 +96,27 @@ export function isShape(element?: BaseElement): element is ShapeElement {
   return element?.type === 'shape'
 }
 
-/** Check if shape is container */
+/** 是否为容器形状 */
 export function isContainerShape(shape: ShapeElement): boolean {
   return shape.attribute.container
 }
 
-/** Check if shape can be resized */
+/** 是否可调整大小 */
 export function isResizable(shape: ShapeElement): boolean {
   return shape.attribute.resizable && !shape.locked
 }
 
-/** Check if shape can be moved */
+/** 是否可移动 */
 export function isMovable(shape: ShapeElement): boolean {
   return shape.attribute.movable && !shape.locked
 }
 
-/** Check if shape can be rotated */
+/** 是否可旋转 */
 export function isRotatable(shape: ShapeElement): boolean {
   return shape.attribute.rotatable && !shape.locked
 }
 
-/** Check if shape can have connections */
+/** 是否可连接 */
 export function isLinkable(shape: ShapeElement): boolean {
   return shape.attribute.linkable && !shape.locked
 }

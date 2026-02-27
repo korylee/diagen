@@ -1,40 +1,41 @@
 /**
- * Linker (Connection) Element Model
+ * 连线元素模型
  */
 
 import { generateId } from '@diagen/shared'
 import type { LinkerType } from '../constants'
 import type { BaseElement, LineStyle, FontStyle, DataAttribute } from './types'
 
+/** 连线端点 */
 export interface LinkerEndpoint {
-  id?: string | null // Connected shape ID
+  id?: string | null   // 连接的形状 ID
   x: number
   y: number
   anchorIndex?: number
   angle?: number
 }
 
-/** Linker element (connection between shapes) */
+/** 连线元素（形状之间的连接） */
 export interface LinkerElement extends BaseElement {
   type: 'linker'
   text: string
   linkerType: LinkerType
 
-  // Connection endpoints
+  /** 连接端点 */
   from: LinkerEndpoint
   to: LinkerEndpoint
 
-  // Control points for custom routing
+  /** 自定义路由控制点 */
   points: Array<{ x: number; y: number }>
 
-  // Routing (calculated)
+  /** 计算后的路由点 */
   routePoints?: Array<{ x: number; y: number }>
 
-  // Style
+  /** 样式 */
   lineStyle: LineStyle
   fontStyle: FontStyle
 
-  // Custom data
+  /** 自定义数据 */
   dataAttributes: DataAttribute[]
   data: Record<string, unknown>
 }
@@ -92,21 +93,22 @@ export function isLinker(element?: BaseElement): element is LinkerElement {
   return element?.type === 'linker'
 }
 
-/** Check if linker is connected to shapes on both ends */
+/** 两端是否都已连接 */
 export function isLinkerConnected(linker: LinkerElement): boolean {
   return linker.from.id !== null && linker.to.id !== null
 }
 
-/** Check if linker has broken connection */
+/** 是否有断开的连接 */
 export function isLinkerBroken(linker: LinkerElement): boolean {
   return linker.from.id === null || linker.to.id === null
 }
 
-export function isLinkerFree(linker: LinkerElement){
+/** 是否为自由连线（两端都未连接） */
+export function isLinkerFree(linker: LinkerElement): boolean {
   return linker.from.id === null && linker.to.id === null
 }
 
-/** Check if linker is locked */
+/** 是否锁定 */
 export function isLinkerLocked(linker: LinkerElement): boolean {
   return linker.locked
 }

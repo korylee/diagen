@@ -1,0 +1,37 @@
+:root {
+    /* 选择框 */
+  --dg-selection-color: #2196f3;
+  --dg-selection-border: 2px solid #2196f3;
+  --dg-selection-background: transparent;
+
+  --dg-anchor-size: 8px;
+  --dg-anchor-color: #2196f3;
+  --dg-anchor-background: #ffffff;
+  --dg-anchor-border: 1px solid #2196f3;
+  --dg-anchor-radius: 1px;
+
+  /*resize 手柄*/
+  --dg-handle-size: 8px;
+  --dg-handle-color: #2196f3;
+  --dg-handle-background: #ffffff;
+  --dg-handle-border: 1px solid #2196f3;
+
+  /*旋转手柄*/
+  --dg-rotate-size: 12px;
+  --dg-rotate-color: #2196f3;
+  --dg-rotate-background: #ffffff;
+  --dg-rotate-border: 1px solid #2196f3;
+
+  /*选择框*/
+  --dg-boxselect-border: 1px dashed #2196f3;
+  --dg-boxselect-background: rgba(33, 150, 243, 0.1);
+
+  --dg-grid-color: rgb(242, 242, 242);
+  --dg-grid-color-alt: rgb(229, 229, 229);
+
+  --dg-page-background: #ffffff;
+  --dg-page-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+
+  --dg-linker-color: #2196f3;
+  --dg-linker-color-inactive: #999999;
+}

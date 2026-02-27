@@ -1,5 +1,4 @@
-import { ensureArray, generateId } from '@diagen/shared'
-import { deepClone, keys } from '@diagen/shared'
+import { deepClone, ensureArray, generateId, keys } from '@diagen/shared'
 import { batch } from 'solid-js'
 import type { DiagramElement } from '../../model'
 import { CreateMethods, type ElementManager } from './element'
@@ -67,14 +66,14 @@ class UpdateCommand implements Command {
   id = generateId()
   name = 'update_els'
   readonly timestamp = Date.now()
-  patches: Record<string, Partial<DiagramElement>>
+  cahce: Record<string, Partial<DiagramElement>>
   constructor(
     private readonly deps: EditDeps,
     private readonly ids: string[],
-    private readonly patch: Partial<DiagramElement>,
+    private readonly overrides: Partial<DiagramElement>,
   ) {
-    const _keys = keys(patch);
-    this.patches = ids.reduce(
+    const _keys = keys(overrides)
+    this.cahce = ids.reduce(
       (acc, id) => {
         const el = deps.element.getById(id)
         acc[id] = _keys.reduce((acc, cur) => {
@@ -87,13 +86,16 @@ class UpdateCommand implements Command {
     )
   }
   execute() {
-    this.deps.element.update(this.ids, this.patch)
-  }
-  undo() {
-    // 使用 setState 的对象覆盖模式来恢复旧状态，因为 update 是合并操作
     batch(() => {
       this.ids.forEach(id => {
-        this.deps.element.update([id], this.patches[id])
+        this.deps.element.update(id, deepClone(this.overrides))
+      })
+    })
+  }
+  undo() {
+    batch(() => {
+      this.ids.forEach(id => {
+        this.deps.element.update(id, deepClone(this.cahce[id]))
       })
     })
   }
@@ -149,7 +151,7 @@ class ClearCommand implements Command {
     private readonly deps: EditDeps,
   ) {
     const { element } = deps
-    this.elements = deepClone(element.elementMap())
+    this.elements = element.elementMap()
     this.orderList = element.orderList().slice()
   }
 

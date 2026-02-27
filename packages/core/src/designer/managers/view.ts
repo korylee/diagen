@@ -1,25 +1,27 @@
 import { DesignerContext } from './types'
-import { Point } from '@diagen/shared'
+import { Point, Rect } from '@diagen/shared'
 import { isShape } from '../../model'
 import type { ElementManager } from './element'
 import { createMemo } from 'solid-js'
+import { canvasToScreen, screenToCanvas } from '../../utils'
 
+/** 视图管理器 */
 export function createViewManager(ctx: DesignerContext, deps: { element: ElementManager }) {
   const { state, setState } = ctx
   const { element } = deps
 
   const viewport = createMemo(() => state.viewport)
-  const canvasSize = createMemo(() => state.canvasSize)
+  const zoom = createMemo(() => viewport().zoom)
+  const diagramPage = createMemo(() => state.diagram.page)
 
-  function setZoom(zoom: number, center?: Point): void {
+  function setZoom(val: number, center?: Point): void {
     const minZoom = 0.1
     const maxZoom = 5
-    const newZoom = Math.max(minZoom, Math.min(maxZoom, zoom))
+    const newZoom = Math.max(minZoom, Math.min(maxZoom, val))
 
     if (center) {
-      const oldZoom = viewport().zoom
+      const oldZoom = zoom()
       const scale = newZoom / oldZoom
-
       setState('viewport', {
         zoom: newZoom,
         x: center.x - (center.x - viewport().x) * scale,
@@ -38,63 +40,39 @@ export function createViewManager(ctx: DesignerContext, deps: { element: Element
     setPan(viewport().x + deltaX, viewport().y + deltaY)
   }
 
-  /**
-   * Screen coordinate to Canvas (World) coordinate
-   */
-  function toWorld(point: Point): Point {
-    const { x, y, zoom } = viewport()
-    return {
-      x: (point.x - x) / zoom,
-      y: (point.y - y) / zoom,
-    }
+  /** 屏幕坐标 → 画布坐标 */
+  function toCanvas(point: Point): Point {
+    return screenToCanvas(point, viewport())
   }
 
-  /**
-   * Canvas (World) coordinate to Screen coordinate
-   */
+  /** 画布坐标 → 屏幕坐标 */
   function toScreen(point: Point): Point {
-    const { x, y, zoom } = viewport()
-    return {
-      x: point.x * zoom + x,
-      y: point.y * zoom + y,
-    }
+    return canvasToScreen(point, viewport())
   }
 
-  /**
-   * Zoom to a specific area
-   */
-  function zoomToRect(rect: { x: number; y: number; w: number; h: number }, padding = 50): void {
-    const viewportWidth = canvasSize().width
-    const viewportHeight = canvasSize().height
-
-    const zoomX = (viewportWidth - padding * 2) / rect.w
-    const zoomY = (viewportHeight - padding * 2) / rect.h
+  function zoomToRect(rect: Rect): void {
+    const { width, height } = diagramPage()
+    const zoomX = (width) / rect.w
+    const zoomY = (height) / rect.h
     const newZoom = Math.max(0.1, Math.min(5, Math.min(zoomX, zoomY)))
 
     setState('viewport', {
       zoom: newZoom,
-      x: (viewportWidth - rect.w * newZoom) / 2 - rect.x * newZoom,
-      y: (viewportHeight - rect.h * newZoom) / 2 - rect.y * newZoom,
+      x: (width - rect.w * newZoom) / 2 - rect.x * newZoom,
+      y: (height - rect.h * newZoom) / 2 - rect.y * newZoom,
     })
   }
 
-  /**
-   * Center the viewport to a point
-   */
   function centerTo(point: Point): void {
-    const viewportWidth = canvasSize().width
-    const viewportHeight = canvasSize().height
-    const { zoom } = state.viewport
-
+    const { width, height } = diagramPage()
     setState('viewport', {
-      x: viewportWidth / 2 - point.x * zoom,
-      y: viewportHeight / 2 - point.y * zoom,
+      x: width / 2 - point.x * zoom(),
+      y: height / 2 - point.y * zoom(),
     })
   }
 
-  function zoomToFit(padding = 50): void {
+  function zoomToFit(): void {
     const els = element.elements().filter(isShape)
-
     if (els.length === 0) {
       setZoom(1)
       return
@@ -104,7 +82,6 @@ export function createViewManager(ctx: DesignerContext, deps: { element: Element
       minY = Infinity
     let maxX = -Infinity,
       maxY = -Infinity
-
     for (const el of els) {
       const { x, y, w, h } = el.props
       minX = Math.min(minX, x)
@@ -115,35 +92,33 @@ export function createViewManager(ctx: DesignerContext, deps: { element: Element
 
     const contentWidth = maxX - minX
     const contentHeight = maxY - minY
-    const viewportWidth = canvasSize().width
-    const viewportHeight = canvasSize().height
-
-    const zoomX = (viewportWidth - padding * 2) / contentWidth
-    const zoomY = (viewportHeight - padding * 2) / contentHeight
+    const { width, height } = diagramPage()
+    const zoomX = (width) / contentWidth
+    const zoomY = (height) / contentHeight
     const newZoom = Math.min(zoomX, zoomY, 1)
 
     setState('viewport', {
       zoom: newZoom,
-      x: (viewportWidth - contentWidth * newZoom) / 2 - minX * newZoom,
-      y: (viewportHeight - contentHeight * newZoom) / 2 - minY * newZoom,
+      x: (width - contentWidth * newZoom) / 2 - minX * newZoom,
+      y: (height - contentHeight * newZoom) / 2 - minY * newZoom,
     })
   }
 
   function zoomIn(): void {
-    setZoom(viewport().zoom * 1.2)
+    setZoom(zoom() * 1.2)
   }
-
   function zoomOut(): void {
-    setZoom(viewport().zoom / 1.2)
+    setZoom(zoom() / 1.2)
   }
 
-  function setCanvasSize(width: number, height: number) {
-    setState('canvasSize', { width, height })
+  function setPageSize(width: number, height: number): void {
+    setState('diagram', 'page', { width, height })
   }
 
   return {
+    page: diagramPage,
     viewport,
-    canvasSize,
+    zoom,
 
     setZoom,
     setPan,
@@ -153,8 +128,8 @@ export function createViewManager(ctx: DesignerContext, deps: { element: Element
     zoomToRect,
     pan,
     centerTo,
-    toWorld,
+    toCanvas,
     toScreen,
-    setCanvasSize,
+    setPageSize,
   }
 }

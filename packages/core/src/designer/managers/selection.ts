@@ -33,7 +33,7 @@ export function createSelectionManager(
         }
       }),
     )
-    emit('selection:replace', {
+    emit('selection:replaced', {
       previous,
       ids,
     })
@@ -52,7 +52,7 @@ export function createSelectionManager(
           }
         }
         changed &&
-          emit('selection:select', {
+          emit('selection:selected', {
             previous,
             ids,
           })
@@ -79,6 +79,11 @@ export function createSelectionManager(
           })
       }),
     )
+  }
+
+  function selectAll() {
+    const ids = element.elements().map(elem => elem.id)
+    select(ids)
   }
 
   function clear() {
@@ -125,6 +130,7 @@ export function createSelectionManager(
     select,
     deselect,
     clear,
+    selectAll,
   }
 }
 

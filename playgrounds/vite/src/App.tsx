@@ -1,30 +1,23 @@
 /**
  * Playground App
- * Demonstrates the usage of DesignerStore with StoreProvider and CanvasRenderer
+ * Demonstrates the usage of Designer with DesignerProvider and CanvasRenderer
  */
 
-import { createSignal, onMount } from 'solid-js'
-import type { ShapeElement } from '@diagen/core'
-import { createDesignerStore, Schema } from '@diagen/core'
-import { CanvasRenderer, StoreProvider, useStore } from '@diagen/renderer'
+import { batch, createMemo, onMount } from 'solid-js'
+import type { LinkerElement, ShapeElement } from '@diagen/core'
+import { createDesigner, Schema } from '@diagen/core'
+import { DesignerProvider, Renderer, useDesigner } from '@diagen/renderer'
 import { generateId } from '@diagen/shared'
 
 /**
  * Toolbar Component
- * Uses useStore to interact with the diagram
+ * Uses useDesigner to interact with the diagram
  */
 function Toolbar() {
-  const store = useStore()
-  const { selection, element } = store
-  const { selectedIds } = selection
-  const { getElementById } = element
-  ;(window as any).store = store
-  const [zoomDisplay, setZoomDisplay] = createSignal(100)
-
-  // Update zoom display when viewport changes
-  const updateZoomDisplay = () => {
-    setZoomDisplay(Math.round(store.state.viewport.zoom * 100))
-  }
+  const designer = useDesigner()
+  const { getElementById, selection, element, view } = designer
+  ;(window as any).designer = designer
+  const zoomDisplay = createMemo(() => view.zoom() * 100)
 
   const addShape = () => {
     const shape = Schema.createShape(
@@ -37,11 +30,11 @@ function Toolbar() {
       },
     )!
 
-    store.addElement(shape, { select: true })
+    designer.edit.add([shape])
   }
 
   const addLinker = () => {
-    const selected = selectedIds()
+    const selected = selection.selectedIds()
     if (selected.length < 2) {
       alert('Select at least 2 shapes to connect')
       return
@@ -57,7 +50,8 @@ function Toolbar() {
       return
     }
 
-    const linker = store.createLinker(
+    const linker = Schema.createLinker(
+      'linker',
       {
         id: fromId,
         x: (fromShape as ShapeElement).props.x + (fromShape as ShapeElement).props.w / 2,
@@ -68,59 +62,55 @@ function Toolbar() {
         x: (toShape as ShapeElement).props.x + (toShape as ShapeElement).props.w / 2,
         y: (toShape as ShapeElement).props.y + (toShape as ShapeElement).props.h / 2,
       },
-      'broken',
-    )
+    )!
 
+    designer.edit.add([linker])
     console.log('Created linker:', linker.id)
   }
 
   const deleteSelected = () => {
-    const ids = selectedIds()
+    const ids = selection.selectedIds()
     if (ids.length === 0) return
-    store.removeElements(ids)
+    designer.removeElements(ids)
   }
 
   const zoomIn = () => {
-    store.zoomIn()
-    updateZoomDisplay()
+    designer.view.zoomIn()
   }
 
   const zoomOut = () => {
-    store.zoomOut()
-    updateZoomDisplay()
+    designer.view.zoomOut()
   }
 
   const fitToScreen = () => {
-    store.zoomToFit()
-    updateZoomDisplay()
+    designer.view.zoomToFit()
   }
 
   const undo = () => {
-    store.undo()
+    designer.undo()
   }
 
   const redo = () => {
-    store.redo()
+    designer.redo()
   }
 
   const groupSelected = () => {
-    const ids = selectedIds()
+    const ids = selection.selectedIds()
     if (ids.length < 2) {
       alert('Select at least 2 elements to group')
       return
     }
-    const groupId = store.group(ids)
+    const groupId = designer.element.group(ids)
     console.log('Created group:', groupId)
   }
 
   const ungroupSelected = () => {
     // Get unique groups from selection
-    const groups = store.getGroupsFromElements(selectedIds())
-    groups.forEach(groupId => store.ungroup(groupId))
+    const groups = designer.getGroupsFromElements(selection.selectedIds())
+    groups.forEach(groupId => designer.element.ungroup(groupId))
   }
 
   const toggleGrid = () => {
-    store.toggleGrid()
   }
 
   return (
@@ -193,23 +183,15 @@ function Toolbar() {
 
       <div class="toolbar-section">
         <span class="status-text">
-          Selected: {selectedIds().length} | Total: {store.elementCount}
+          Selected: {selection.selectedIds().length} | Total: {element.elementCount()}
         </span>
       </div>
     </div>
   )
 }
 
-/**
- * Main Editor Component
- * Contains the CanvasRenderer
- */
 function Editor() {
-  return (
-    <div class="editor-container">
-      <CanvasRenderer />
-    </div>
-  )
+  return <Renderer />
 }
 
 /**
@@ -217,7 +199,7 @@ function Editor() {
  * Loads initial sample data into the store
  */
 function SampleDataLoader() {
-  const store = useStore()
+  const designer = useDesigner()
 
   onMount(() => {
     // Add sample shapes
@@ -230,6 +212,7 @@ function SampleDataLoader() {
         'rectangle',
         { x: 100, y: 150, w: 150, h: 100, angle: 0 },
         {
+          id: shape1Id,
           title: '开始',
           textBlock: [{ position: { x: 10, y: 0, w: 'w-20', h: 'h' }, text: '开始' }],
         },
@@ -238,6 +221,7 @@ function SampleDataLoader() {
         'rectangle',
         { x: 400, y: 150, w: 150, h: 100, angle: 0 },
         {
+          id: shape2Id,
           title: '处理',
           textBlock: [{ position: { x: 10, y: 0, w: 'w-20', h: 'h' }, text: '处理' }],
         },
@@ -246,30 +230,23 @@ function SampleDataLoader() {
         'rectangle',
         { x: 700, y: 150, w: 150, h: 100, angle: 0 },
         {
+          id: shape3Id,
           title: '结束',
           textBlock: [{ position: { x: 10, y: 0, w: 'w-20', h: 'h' }, text: '结束' }],
         },
       )!,
     ]
+    const linkers: LinkerElement[] = [
+      Schema.createLinker('linker', { id: shape1Id, x: 250, y: 200 }, { id: shape2Id, x: 400, y: 200 })!,
+      Schema.createLinker('linker', { id: shape2Id, x: 550, y: 200 }, { id: shape3Id, x: 700, y: 200 })!,
+    ]
 
-    // Add shapes without history and without auto-select
-    shapes.forEach(shape => {
-      store.element.add([shape], { recordHistory: false, select: false })
+    batch(() => {
+      designer.element.add(shapes)
+      designer.element.add(linkers)
     })
-
-    // Create linkers between shapes
-    store.createLinker({ id: shape1Id, x: 250, y: 200 }, { id: shape2Id, x: 400, y: 200 }, 'broken', {
-      recordHistory: false,
-      select: false,
-    })
-
-    store.createLinker({ id: shape2Id, x: 550, y: 200 }, { id: shape3Id, x: 700, y: 200 }, 'broken', {
-      recordHistory: false,
-      select: false,
-    })
-
     // Select first shape
-    store.selection.select(shape1Id)
+    designer.selection.select(shape1Id)
   })
 
   return null
@@ -277,29 +254,25 @@ function SampleDataLoader() {
 
 /**
  * App Component
- * Creates the DesignerStore and provides it to the tree
+ * Creates the Designer and provides it to the tree
  */
 export default function App() {
   // Create the store instance
-  const store = createDesignerStore({
-    id: 'playground',
-    initialDiagram: {
-      name: 'Playground Diagram',
-      page: {
-        width: 1200,
-        height: 900,
-        backgroundColor: '255,255,255',
-      },
+  const designer = createDesigner({
+    page: {
+      width: 1200,
+      height: 900,
+      backgroundColor: 'rgb(255,255,255)',
     },
   })
 
   return (
-    <StoreProvider store={store}>
-      <div class="app">
+    <DesignerProvider designer={designer}>
+      <div style="width: 100%">
         <SampleDataLoader />
         <Toolbar />
         <Editor />
       </div>
-    </StoreProvider>
+    </DesignerProvider>
   )
 }

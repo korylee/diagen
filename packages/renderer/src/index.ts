@@ -1,10 +1,11 @@
-// Store Provider (JSX - in renderer package)
-export * from './components/StoreProvider'
+// ============================================================================
+// Renderer Package - 图形渲染与交互
+// ============================================================================
 
-export { ShapeCanvas } from './components/element/ShapeCanvas'
-export { LinkerCanvas } from './components/element/LinkerCanvas'
-export { CanvasRenderer } from './components/CanvasRenderer'
-export { SelectionBox } from './components/SelectionBox'
+import './theme/theme.css'
 
-// Utilities
 export * from './utils'
+export * from './components'
+export * from './canvas'
+export * from './primitives'
+export * from './theme'

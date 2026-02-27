@@ -1,3 +1,6 @@
 export * from './router'
 export * from './transform'
 export * from './geometry'
+export * from './expression'
+export * from './anchors'
+export * from './keypoints'

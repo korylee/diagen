@@ -1,12 +1,10 @@
 import { createStore } from 'solid-js/store'
 
-import type { Viewport } from '../utils'
-import { createEmitter, generateId } from '@diagen/shared'
+import type { CanvasSize, Viewport } from '../utils'
+import { createEmitter, DeepPartial, generateId, pick } from '@diagen/shared'
 
 import { createMemo } from 'solid-js'
-import { ToolType } from '../constants'
-import type { Diagram, DiagramElement } from '../model'
-import { createEmptyDiagram } from '../model'
+import { createDiagram, Diagram, DiagramElement } from '../model'
 import {
   type Command,
   createEditManager,
@@ -18,70 +16,88 @@ import {
 import { DesignerContext } from './managers/types'
 
 // ============================================================================
+// 坐标系统说明
+// ============================================================================
+//
+// 1. 画布尺寸：由 page.width/height 定义，表示图表的逻辑大小
+// 2. 视口变换：由 viewport 定义，描述画布到屏幕的变换（偏移 + 缩放）
+//
+// 坐标转换：
+//   屏幕坐标 = 画布坐标 * zoom + viewportOffset
+//   画布坐标 = (屏幕坐标 - viewportOffset) / zoom
+//
+// ============================================================================
+
+// ============================================================================
 // Store State Types
 // ============================================================================
 
-interface UIState {
-  showGrid: boolean
-  showRulers: boolean
-  showMiniMap: boolean
-  snapToGrid: boolean
-  gridSize: number
+interface Config {
+  panelItemWidth?: number
+  panelItemHeight?: number
+  anchorSize?: number
+  rotaterSize?: number
+  anchorColor?: string
+  selectorColor?: string
 }
 
+/** 编辑器状态 */
 export interface EditorState {
+  /** 图表数据 */
   diagram: Diagram
+  /** 视口变换参数：x, y 为偏移，zoom 为缩放级别 */
   viewport: Viewport
-  canvasSize: {
-    width: number
-    height: number
-  }
-  activeTool: ToolType
-  ui: UIState
-  performance: {
-    disableLineJumps: boolean
-  }
+  /** 渲染容器尺寸 */
+  canvasSize: CanvasSize
+
+  /** ui及性能配置 */
+  config: Config
 }
 
 // ============================================================================
 // Designer Store Options
 // ============================================================================
 
-export interface DesignerOptions {
-  id?: string
-  initialDiagram?: Partial<Diagram>
-  initialViewport?: Partial<Viewport>
+interface Persistence extends Config, DeepPartial<Pick<Diagram, 'id' | 'name' | 'page'>> {
+  viewport?: Partial<Viewport>
 }
+
+export interface DesignerOptions extends Persistence {}
 
 // ============================================================================
 // Helper Functions
 // ============================================================================
 
 function createInitialState(options: DesignerOptions): EditorState {
-  const diagram = createEmptyDiagram(options.id || generateId('diagram'), options.initialDiagram)
+  const diagram = createDiagram(pick(options, ['id', 'name', 'page']))
 
   return {
+    // 持久化储存
     diagram,
     viewport: {
       x: 0,
       y: 0,
       zoom: 1,
-      ...options.initialViewport,
+      ...options.viewport,
     },
     canvasSize: {
       width: 800,
       height: 600,
     },
-    activeTool: 'select',
-    ui: {
-      showGrid: true,
-      showRulers: false,
-      showMiniMap: false,
-      snapToGrid: true,
-      gridSize: 15,
-    },
-    performance: {
-      disableLineJumps: false,
+    config: {
+      panelItemWidth: 50,
+      panelItemHeight: 50,
+      anchorSize: 8,
+      rotaterSize: 9,
+      anchorColor: '#067bef',
+      selectorColor: '#067bef',
+      ...pick(options, [
+        'panelItemWidth',
+        'panelItemHeight',
+        'anchorSize',
+        'anchorColor',
+        'selectorColor',
+      ]),
     },
   }
 }
@@ -111,7 +127,6 @@ export function createDesigner(options: DesignerOptions = {}) {
 
   const { getById: getElementById, elements } = element
   const page = createMemo(() => state.diagram.page)
-  const activeTool = createMemo(() => state.activeTool)
 
   // function moveElements(
   //   ids: string[],
@@ -256,28 +271,6 @@ export function createDesigner(options: DesignerOptions = {}) {
   //   }
   // }
 
-  function setCanvasSize(width: number, height: number): void {
-    setState('canvasSize', { width, height })
-  }
-
-  function setTool(tool: ToolType): void {
-    setState('activeTool', tool)
-  }
-
-  function toggleGrid(): void {
-    const value = !state.ui.showGrid
-    setState('ui', 'showGrid', value)
-    emitter.emit('ui:showGrid', value)
-  }
-
-  function toggleSnapToGrid(): void {
-    setState('ui', 'snapToGrid', !state.ui.snapToGrid)
-  }
-
-  function setGridSize(size: number): void {
-    setState('ui', 'gridSize', size)
-  }
-
   function serialize(): string {
     return JSON.stringify(state.diagram, null, 2)
   }
@@ -313,118 +306,6 @@ export function createDesigner(options: DesignerOptions = {}) {
     }
 
     selection.clear()
-  }
-
-  function group(ids: string[], options: { recordHistory?: boolean } = {}): string | null {
-    const { recordHistory = true } = options
-
-    if (ids.length < 2) {
-      console.warn('Need at least 2 elements to form a group')
-      return null
-    }
-
-    const elements = ids.map(id => state.diagram.elements[id]).filter(Boolean)
-    if (elements.length !== ids.length) {
-      console.warn('Some elements not found')
-      return null
-    }
-
-    const groupId = generateId('group')
-
-    const previousGroups: Record<string, string | null> = {}
-    for (const id of ids) {
-      const el = state.diagram.elements[id]
-      if (el) {
-        previousGroups[id] = el.group
-      }
-    }
-
-    const command: Command = {
-      id: generateId('cmd_group'),
-      name: `Group ${ids.length} elements`,
-      timestamp: Date.now(),
-
-      execute: () => {
-        for (const id of ids) {
-          setState('diagram', 'elements', id, (el: DiagramElement) => ({
-            ...el,
-            group: groupId,
-          }))
-        }
-      },
-
-      undo: () => {
-        for (const id of ids) {
-          setState('diagram', 'elements', id, (el: DiagramElement) => ({
-            ...el,
-            group: previousGroups[id],
-          }))
-        }
-      },
-
-      redo: () => {
-        command.execute()
-      },
-    }
-
-    if (recordHistory) {
-      history.execute(command)
-    } else {
-      command.execute()
-    }
-
-    return groupId
-  }
-
-  function ungroup(groupId: string, options: { recordHistory?: boolean } = {}): void {
-    const { recordHistory = true } = options
-
-    const groupElements = getGroupShapes(groupId)
-    if (groupElements.length === 0) {
-      console.warn(`Group ${groupId} not found or empty`)
-      return
-    }
-
-    const ids = groupElements.map(el => el.id)
-
-    const previousGroups: Record<string, string | null> = {}
-    for (const el of groupElements) {
-      previousGroups[el.id] = el.group
-    }
-
-    const command: Command = {
-      id: generateId('cmd_ungroup'),
-      name: `Ungroup ${ids.length} elements`,
-      timestamp: Date.now(),
-
-      execute: () => {
-        for (const id of ids) {
-          setState('diagram', 'elements', id, (el: DiagramElement) => ({
-            ...el,
-            group: null,
-          }))
-        }
-      },
-
-      undo: () => {
-        for (const id of ids) {
-          setState('diagram', 'elements', id, (el: DiagramElement) => ({
-            ...el,
-            group: previousGroups[id],
-          }))
-        }
-      },
-
-      redo: () => {
-        command.execute()
-      },
-    }
-
-    if (recordHistory) {
-      // history.execute(command)
-    } else {
-      command.execute()
-    }
   }
 
   function getGroupShapes(groupId: string): DiagramElement[] {
@@ -498,17 +379,9 @@ export function createDesigner(options: DesignerOptions = {}) {
     canRedo: history.canRedo,
 
     page,
-    activeTool,
 
-    setCanvasSize,
-    setTool,
-    toggleGrid,
-    toggleSnapToGrid,
-    setGridSize,
     serialize,
     loadFromJSON,
-    group,
-    ungroup,
     getGroupShapes,
     isInSameGroup,
     getGroupsFromElements,

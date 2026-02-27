@@ -4,27 +4,26 @@
   "type": "module",
   "main": "index.js",
   "module": "dist/index.mjs",
+  "keywords": [
+    "utils"
+  ],
   "files": [
     "dist",
-    "index.js",
-    "index.mjs"
+    "index.js"
   ],
   "types": "dist/index.d.ts",
+  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": {
-        "default": "./dist/index.mjs",
-        "node": "./index.mjs"
-      },
-      "require": {
-        "node": {
-          "production": "./dist/index.min.js",
-          "development": "./dist/index.js",
-          "default": "./index.js"
-        },
+      "node": {
+        "production": "./dist/index.min.js",
+        "development": "./dist/index.js",
         "default": "./index.js"
-      }
+      },
+      "module": "./dist/index.mjs",
+      "import": "./dist/index.mjs",
+      "require": "./index.js"
     }
   },
   "scripts": {

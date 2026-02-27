@@ -1,47 +1,42 @@
 import { isObject, isPlainObject } from './is'
 
 export function deepClone<T>(obj: T, cache = new WeakMap<object, any>()): T {
-  // 基础类型和 null 直接返回
+  // 1. 基础类型直接返回
   if (obj === null || typeof obj !== 'object') return obj
 
-  // 处理循环引用
+  // 2. 循环引用检查
   if (cache.has(obj as object)) return cache.get(obj as object)
 
-  // 处理包装对象
-  if (obj instanceof Date) return new Date(obj.getTime()) as unknown as T
+  // 3. 特殊对象实例化
+  if (obj instanceof Date) return new Date(obj) as unknown as T
   if (obj instanceof RegExp) return new RegExp(obj.source, obj.flags) as unknown as T
-
-  // 处理 Map/Set
   if (obj instanceof Map) {
     const cloned = new Map()
-    cache.set(obj, cloned)
+    cache.set(obj as object, cloned)
     obj.forEach((v, k) => cloned.set(deepClone(k, cache), deepClone(v, cache)))
     return cloned as unknown as T
   }
-
   if (obj instanceof Set) {
     const cloned = new Set()
-    cache.set(obj, cloned)
+    cache.set(obj as object, cloned)
     obj.forEach(v => cloned.add(deepClone(v, cache)))
     return cloned as unknown as T
   }
+  // 简化：二进制数据直接利用构造函数复制
+  if (ArrayBuffer.isView(obj) || obj instanceof ArrayBuffer) {
+    return new (obj.constructor as any)(obj) as T
+  }
 
-  // 处理 TypedArray/ArrayBuffer
-  if (ArrayBuffer.isView(obj)) return new (obj.constructor as any)(obj) as T
-  if (obj instanceof ArrayBuffer) return obj.slice(0) as T
+  // 4. 普通对象/数组
+  const cloned = Object.create(Object.getPrototypeOf(obj))
+  cache.set(obj as object, cloned) // 注意：需在递归前缓存
 
-  // 创建目标对象，保持原型链
-  const cloned = Array.isArray(obj) ? [] : Object.create(Object.getPrototypeOf(obj))
-
-  cache.set(obj as object, cloned)
-
-  // 复制所有属性（包括不可枚举和 Symbol）
-  Reflect.ownKeys(obj as object).forEach(key => {
-    const desc = Object.getOwnPropertyDescriptor(obj as object, key)!
-    Object.defineProperty(cloned, key, {
-      ...desc,
-      value: deepClone(desc.value, cache),
-    })
+  // 5. 复制所有属性（统一逻辑）
+  Reflect.ownKeys(obj).forEach(key => {
+    const desc = Object.getOwnPropertyDescriptor(obj, key)!
+    // 如果是数据属性，递归克隆；如果是访问器属性，直接复用描述符
+    if ('value' in desc) desc.value = deepClone(desc.value, cache)
+    Object.defineProperty(cloned, key, desc)
   })
 
   return cloned
@@ -91,17 +86,15 @@ export function deepMerge<T extends object, S extends object>(
   return result
 }
 
-/**
- * Pick properties from object
- */
-export function pick<T extends object, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> {
-  const result = {} as Pick<T, K>
-  for (const key of keys) {
-    if (key in obj) {
-      result[key] = obj[key]
-    }
-  }
-  return result
+export const pick = <T extends object, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> => {
+  if (!obj) return {} as Pick<T, K>
+  return keys.reduce(
+    (acc, key) => {
+      if (hasOwn(obj, key)) acc[key] = obj[key]
+      return acc
+    },
+    {} as Pick<T, K>,
+  )
 }
 
 /**
@@ -115,41 +108,8 @@ export function omit<T extends object, K extends keyof T>(obj: T, keys: K[]): Om
   return result
 }
 
-export function get<T extends object, K extends keyof T>(obj: T, path: K): T[K] | undefined {
-  const keys = (path as string).split('.')
-  let result = obj as T[K]
-
-  for (const key of keys) {
-    if (result == null) {
-      break
-    }
-    result = (result as any)[key]
-  }
-
-  return result
-}
-
-/**
- * Set nested property value
- */
-export function set<T extends Record<string, unknown>>(obj: T, path: string, value: unknown): T {
-  const keys = path.split('.')
-  const lastKey = keys.pop()!
-
-  let current: Record<string, unknown> = obj
-
-  for (const key of keys) {
-    if (!(key in current) || !isObject(current[key])) {
-      current[key] = {}
-    }
-    current = current[key] as Record<string, unknown>
-  }
-
-  current[lastKey] = value
-  return obj
-}
-
-export const hasOwn = (obj: object, key: string) => Object.prototype.hasOwnProperty.call(obj, key)
+export const hasOwn = <T extends object, K extends keyof T>(val: T, key: K): key is K =>
+  Object.prototype.hasOwnProperty.call(val, key)
 
 /**
  * 1. 基本类型/同引用：使用 Object.is（兼容 NaN）
@@ -189,4 +149,6 @@ export function shallowEqual(objA: unknown, objB: unknown): boolean {
   return true
 }
 
-export const keys = <T extends object>(obj: T) => Object.keys(obj) as (keyof T)[]
+export const entries = Object.entries as <T extends object>(obj: T) => [keyof T, T[keyof T]][]
+
+export const keys = Object.keys as <T extends object>(object: T) => (keyof T)[]

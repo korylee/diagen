@@ -94,35 +94,22 @@ export const TextOrientation = {
 } as const
 export type TextOrientation = (typeof TextOrientation)[keyof typeof TextOrientation]
 
-// Tool Types
-export const ToolType = {
-  SELECT: 'select',
-  PAN: 'pan',
-  ZOOM_IN: 'zoomIn',
-  ZOOM_OUT: 'zoomOut',
-  TEXT: 'text',
-  SHAPE: 'shape',
-  LINKER: 'linker',
-  ERASER: 'eraser',
-} as const
-export type ToolType = (typeof ToolType)[keyof typeof ToolType]
-
 // Default Values
 export const DEFAULTS = {
-  // Canvas
+  // config
   GRID_SIZE: 15,
   GRID_COLOR: '#e0e0e0',
   DEFAULT_ZOOM: 1,
   MIN_ZOOM: 0.1,
   MAX_ZOOM: 5,
   ZOOM_STEP: 0.1,
+  SHOW_GRID: true,
 
   // Page
   PAGE_WIDTH: 1050,
   PAGE_HEIGHT: 1000,
   PAGE_BACKGROUND: 'transparent',
   PAGE_PADDING: 20,
-  SHOW_GRID: true,
   LINE_JUMPS: false,
 
   // Shape

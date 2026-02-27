@@ -1,0 +1,43 @@
+{
+  "name": "@diagen/primitives",
+  "version": "1.0.0",
+  "type": "module",
+  "files": [
+    "dist",
+    "index.js"
+  ],
+  "keywords": [
+    "solid",
+    "primitives"
+  ],
+  "sideEffects": false,
+  "main": "index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "node": {
+        "production": "./dist/index.min.js",
+        "development": "./dist/index.js",
+        "default": "./index.js"
+      },
+      "module": "./dist/index.mjs",
+      "import": "./dist/index.mjs",
+      "require": "./index.js"
+    }
+  },
+  "scripts": {
+    "dev": "tsdown --watch",
+    "build": "tsdown"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@diagen/shared": "workspace:^"
+  },
+  "peerDependencies": {
+    "solid-js": "^1.9.11"
+  }
+}

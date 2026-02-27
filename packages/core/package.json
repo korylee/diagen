@@ -4,45 +4,40 @@
   "type": "module",
   "main": "index.js",
   "module": "dist/index.mjs",
+  "keywords": [
+    "solid",
+    "diagen"
+  ],
   "files": [
     "dist",
-    "index.js",
-    "index.mjs"
+    "index.js"
   ],
   "types": "dist/index.d.ts",
+  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": {
-        "default": "./dist/index.mjs",
-        "node": "./index.mjs"
-      },
-      "require": {
-        "node": {
-          "production": "./dist/index.min.js",
-          "development": "./dist/index.js",
-          "default": "./index.js"
-        },
+      "node": {
+        "production": "./dist/index.min.js",
+        "development": "./dist/index.js",
         "default": "./index.js"
-      }
+      },
+      "module": "./dist/index.mjs",
+      "import": "./dist/index.mjs",
+      "require": "./index.js"
     }
   },
   "scripts": {
-    "build": "tsdown",
-    "test": "vitest",
-    "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage"
+    "build": "tsdown"
   },
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@diagen/shared": "workspace:^",
+    "@diagen/shared": "workspace:^"
+  },
+  "peerDependencies": {
     "solid-js": "^1.9.11"
   },
-  "devDependencies": {
-    "vitest": "^4.0.18",
-    "@vitest/ui": "^4.0.18",
-    "@vitest/coverage-v8": "^4.0.18"
-  }
+  "devDependencies": {}
 }

@@ -26,12 +26,6 @@
     "isolatedDeclarations": false,
     "composite": true
   },
-  "include": [
-    "packages/global.d.ts",
-    "packages/*/src",
-    "packages/*/__tests__",
-    "playgrounds/*/src",
-    "scripts/*",
-    "rollup.*.js"
-  ],
+  "include": ["*.ts", "packages", "playgrounds"],
+  "exclude": ["node_modules", "dist", "**/*.md", "packages/.test"]
 }
