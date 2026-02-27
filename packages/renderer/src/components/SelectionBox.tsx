@@ -1,7 +1,7 @@
+import type { Viewport } from '@diagen/core'
+import { canvasToScreen } from '@diagen/core'
 import { createMemo, For } from 'solid-js'
-import type { Rect, Viewport } from '@diagen/shared'
-import { canvasToScreen } from '@diagen/shared'
-import { useStore } from './StoreProvider'
+import { useDesigner } from './DesignerProvider'
 
 export interface SelectionBoxProps {
   viewport: Viewport
@@ -22,7 +22,7 @@ const RESIZE_HANDLES = [
 ]
 
 export function SelectionBox(props: SelectionBoxProps) {
-  const { selection } = useStore()
+  const { selection } = useDesigner()
   const { getSelectionBounds } = selection
 
   const getScreenBounds = createMemo(() => {

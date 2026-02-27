@@ -1,9 +1,9 @@
 import { onMount, createEffect, on } from 'solid-js';
-import type { ShapeElement } from '@diagen/core';
-import type { Rect, Viewport } from '@diagen/shared';
-import { isRectVisible } from '@diagen/shared';
+import type { ShapeElement, Viewport } from '@diagen/core';
+import type { Rect } from '@diagen/shared';
+import { isRectVisible } from '@diagen/core';
 import { renderShape } from '../../utils';
-import { useStore } from '../StoreProvider'
+import { useDesigner } from '../../components/DesignerProvider'
 
 export interface ShapeCanvasProps {
   shape: ShapeElement;
@@ -18,7 +18,7 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
   let canvasRef: HTMLCanvasElement | undefined;
   let containerRef: HTMLDivElement | undefined
 
-  const { selection } = useStore()
+  const { selection } = useDesigner()
   const { isSelected } = selection
 
   const padding = 4;

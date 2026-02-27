@@ -1,9 +1,9 @@
 import { onMount, createEffect, on } from 'solid-js'
-import type { LinkerElement, ShapeElement } from '@diagen/core'
-import type { Rect, Viewport } from '@diagen/shared'
-import { isRectVisible } from '@diagen/shared'
+import type { LinkerElement, ShapeElement, Viewport } from '@diagen/core'
+import type { Rect } from '@diagen/shared'
+import { isRectVisible } from '@diagen/core'
 import { calculateLinkerRoute, getLinkerBounds, renderLinker } from '../../utils'
-import { useStore } from '../StoreProvider'
+import { useDesigner } from '../../components/DesignerProvider'
 
 export interface LinkerCanvasProps {
   linker: LinkerElement
@@ -18,13 +18,12 @@ export function LinkerCanvas(props: LinkerCanvasProps) {
   let canvasRef: HTMLCanvasElement | undefined
   let containerRef: HTMLDivElement | undefined
 
-  const { selection, element } = useStore()
-  const { isSelected } = selection
-  const { getElementById } = element
+  const store = useDesigner()
+  const { isSelected } = store.selection
 
   const padding = 20
 
-  const getRoute = () => calculateLinkerRoute(props.linker, getElementById as any)
+  const getRoute = () => calculateLinkerRoute(props.linker, store.getElementById as any)
 
   const getBounds = (): Rect => getLinkerBounds(getRoute())
 

@@ -1,8 +1,7 @@
 import { createMemo, createSignal, For, onMount } from 'solid-js'
 import { LinkerCanvas, ShapeCanvas } from './element'
-import { SelectionBox } from './SelectionBox'
-import { isLinker, isShape, type ShapeElement, type LinkerElement, Schema } from '@diagen/core'
-import { useStore } from './StoreProvider'
+import { SelectionBox, useDesigner } from '../components'
+import { isLinker, isShape, type LinkerElement, Schema, type ShapeElement } from '@diagen/core'
 import type { Point } from '@diagen/shared'
 
 export interface CanvasRendererProps {
@@ -14,13 +13,13 @@ export interface CanvasRendererProps {
 
 /**
  * Canvas Renderer Component
- * Renders the diagram using reactive subscription to DesignerStore
+ * Renders the diagram using reactive subscription to Designer
  * All interactions delegate to store methods
  */
 export function CanvasRenderer(props: CanvasRendererProps) {
-  const store = useStore()
-  const { element, selection } = store
-  const { elements, getElementById } = element
+  const designer = useDesigner()
+  const { element, selection } = designer
+  const { elements, getById: getElementById } = element
   const { isSelected, selectedIds } = selection
   let containerRef: HTMLDivElement | undefined
 
@@ -50,8 +49,8 @@ export function CanvasRenderer(props: CanvasRendererProps) {
 
   // Viewport calculations
   const pageStyle = createMemo(() => {
-    const { page } = store.state.diagram
-    const { viewport } = store.state
+    const { page } = designer.state.diagram
+    const { viewport } = designer.state
     return {
       width: `${page.width}px`,
       height: `${page.height}px`,
@@ -71,14 +70,14 @@ export function CanvasRenderer(props: CanvasRendererProps) {
     if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
       setIsPanning(true)
       setDragStart({ x: e.clientX, y: e.clientY })
-      setViewportStart({ x: store.state.viewport.x, y: store.state.viewport.y })
+      setViewportStart({ x: designer.state.viewport.x, y: designer.state.viewport.y })
       e.preventDefault()
       return
     }
 
     // Left click - clear selection and start box selection
     if (e.button === 0) {
-      store.selection.clear()
+      designer.selection.clear()
     }
   }
 
@@ -89,12 +88,12 @@ export function CanvasRenderer(props: CanvasRendererProps) {
     if (e.ctrlKey || e.metaKey) {
       if (isSelected(id)) {
         // Deselect
-        store.selection.deselect(id)
+        designer.selection.deselect(id)
       } else {
-        store.selection.select(id)
+        designer.selection.select(id)
       }
     } else {
-      store.selection.replace([id])
+      designer.selection.replace([id])
     }
 
     // Start drag operation
@@ -112,21 +111,21 @@ export function CanvasRenderer(props: CanvasRendererProps) {
     setSelectedStartPositions(startPositions)
 
     // Begin batch for history
-    store.history.startTransaction()
+    designer.history.startTransaction()
   }
 
   const handleMouseMove = (e: MouseEvent) => {
     if (isPanning()) {
       const dx = e.clientX - dragStart().x
       const dy = e.clientY - dragStart().y
-      store.viewport.pan(viewportStart().x + dx, viewportStart().y + dy)
+      designer.view.pan(viewportStart().x + dx, viewportStart().y + dy)
       return
     }
 
     if (!isDragging()) return
 
-    const dx = (e.clientX - dragStart().x) / store.state.viewport.zoom
-    const dy = (e.clientY - dragStart().y) / store.state.viewport.zoom
+    const dx = (e.clientX - dragStart().x) / designer.state.viewport.zoom
+    const dy = (e.clientY - dragStart().y) / designer.state.viewport.zoom
 
     // Move all selected elements
     for (const id of selectedIds()) {
@@ -136,7 +135,7 @@ export function CanvasRenderer(props: CanvasRendererProps) {
         if (isShape(el)) {
           // Use updateElement for individual moves during drag (no history)
           // This will be replaced with proper drag handling
-          store.updateElement(
+          designer.updateElement(
             id,
             {
               props: {
@@ -155,7 +154,7 @@ export function CanvasRenderer(props: CanvasRendererProps) {
   const handleMouseUp = () => {
     if (isDragging()) {
       // Commit the batch operation
-      store.history.commitTransaction()
+      designer.history.commitTransaction()
     }
 
     if (isPanning()) {
@@ -178,9 +177,9 @@ export function CanvasRenderer(props: CanvasRendererProps) {
 
     // Calculate zoom
     const delta = e.deltaY > 0 ? -0.1 : 0.1
-    const newZoom = Math.max(0.1, Math.min(5, store.state.viewport.zoom + delta))
+    const newZoom = Math.max(0.1, Math.min(5, designer.state.viewport.zoom + delta))
 
-    store.viewport.setZoom(newZoom, { x: mouseX, y: mouseY })
+    designer.view.setZoom(newZoom, { x: mouseX, y: mouseY })
   }
 
   onMount(() => {
@@ -221,7 +220,7 @@ export function CanvasRenderer(props: CanvasRendererProps) {
               return (
                 <ShapeCanvas
                   shape={element}
-                  viewport={store.state.viewport}
+                  viewport={designer.state.viewport}
                   viewportSize={viewportSize()}
                   onMouseDown={e => handleShapeMouseDown(e, element.id)}
                 />
@@ -230,14 +229,14 @@ export function CanvasRenderer(props: CanvasRendererProps) {
             if (isLinker(element)) {
               // 确保 Linker 使用 Schema 中的定义（如果存在）
               const definition = (Schema as any).getLinker?.(element.name)
-              const linkerWithDef = definition 
-                ? { ...element, linkerType: element.linkerType || definition.linkerType } 
+              const linkerWithDef = definition
+                ? { ...element, linkerType: element.linkerType || definition.linkerType }
                 : element
 
               return (
                 <LinkerCanvas
                   linker={linkerWithDef as LinkerElement}
-                  viewport={store.state.viewport}
+                  viewport={designer.state.viewport}
                   viewportSize={viewportSize()}
                   onMouseDown={e => handleShapeMouseDown(e, element.id)}
                 />
@@ -250,11 +249,11 @@ export function CanvasRenderer(props: CanvasRendererProps) {
 
       {/* Selection Box Overlay */}
       <SelectionBox
-        viewport={store.state.viewport}
+        viewport={designer.state.viewport}
         onResize={(id, width, height) => {
           const shape = getShapeById(id)
           if (shape) {
-            store.updateElement(id, {
+            designer.updateElement(id, {
               props: { ...shape.props, w: width, h: height },
             })
           }
