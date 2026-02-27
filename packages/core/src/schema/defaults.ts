@@ -14,16 +14,17 @@ export const DEFAULT_FILL_STYLE: FillStyle = {
 };
 
 export const DEFAULT_FONT_STYLE: FontStyle = {
-  fontFamily: 'Arial, sans-serif',
+  fontFamily: '微软雅黑, Arial, sans-serif',
   size: 13,
+  lineHeight: 1.25,
   color: '50,50,50',
   bold: false,
   italic: false,
   underline: false,
   textAlign: 'center',
   vAlign: 'middle',
-  lineHeight: 1.25,
-};
+  orientation: 'horizontal',
+}
 
 export const DEFAULT_ATTRIBUTE: ElementAttribute = {
   container: false,

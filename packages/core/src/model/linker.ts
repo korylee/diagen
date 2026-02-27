@@ -2,11 +2,12 @@
  * Linker (Connection) Element Model
  */
 
+import { generateId } from 'packages/shared'
 import type { LinkerType } from '../constants'
 import type { BaseElement, LineStyle, FontStyle, DataAttribute } from './types'
 
 export interface LinkerEndpoint {
-  id: string | null // Connected shape ID
+  id?: string | null // Connected shape ID
   x: number
   y: number
   anchorIndex?: number
@@ -38,11 +39,8 @@ export interface LinkerElement extends BaseElement {
   data: Record<string, unknown>
 }
 
-/** Create default linker element */
-export function createDefaultLinker(id: string, options: Partial<LinkerElement> = {}): LinkerElement {
+export function createLinker(patch: Partial<LinkerElement>):LinkerElement {
   return {
-    id,
-    name: 'linker',
     type: 'linker',
     text: '',
     zIndex: 0,
@@ -84,7 +82,9 @@ export function createDefaultLinker(id: string, options: Partial<LinkerElement> 
     },
     dataAttributes: [],
     data: {},
-    ...options,
+    ...patch,
+    id: patch.id || generateId('linker'),
+    name: patch.name || 'unknown'
   }
 }
 
@@ -100,6 +100,10 @@ export function isLinkerConnected(linker: LinkerElement): boolean {
 /** Check if linker has broken connection */
 export function isLinkerBroken(linker: LinkerElement): boolean {
   return linker.from.id === null || linker.to.id === null
+}
+
+export function isLinkerFree(linker: LinkerElement){
+  return linker.from.id === null && linker.to.id === null
 }
 
 /** Check if linker is locked */

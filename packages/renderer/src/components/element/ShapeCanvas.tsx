@@ -2,8 +2,8 @@ import { onMount, createEffect, on } from 'solid-js';
 import type { ShapeElement } from '@diagen/core';
 import type { Rect, Viewport } from '@diagen/shared';
 import { isRectVisible } from '@diagen/shared';
-import { renderShape } from './render-utils';
-import { useStore } from './StoreProvider'
+import { renderShape } from '../../utils';
+import { useStore } from '../StoreProvider'
 
 export interface ShapeCanvasProps {
   shape: ShapeElement;

@@ -96,7 +96,7 @@ export function createSelectionManager(
       maxY = -Infinity
 
     for (const id of ids) {
-      const el = element.getElementById(id)
+      const el = element.getById(id)
       const b = el && getElementBounds(el)
       if (b) {
         const nb = normalizeRect(b) // 添加规范化

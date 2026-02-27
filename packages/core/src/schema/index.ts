@@ -1,3 +1,3 @@
+export * from './Schema';
 export * from './types';
-export * from './defaults';
-export { Schema, SchemaRegistry } from './Schema';
+export type { SchemaRegistry } from './Schema';

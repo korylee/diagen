@@ -5,7 +5,7 @@
 
 import { createSignal, onMount } from 'solid-js'
 import type { ShapeElement } from '@diagen/core'
-import { createDefaultShape, createDesignerStore } from '@diagen/core'
+import { createDesignerStore, Schema } from '@diagen/core'
 import { CanvasRenderer, StoreProvider, useStore } from '@diagen/renderer'
 import { generateId } from '@diagen/shared'
 
@@ -27,18 +27,15 @@ function Toolbar() {
   }
 
   const addShape = () => {
-    const id = generateId('shape')
-    const shape: ShapeElement = {
-      ...createDefaultShape(id, 'Rectangle'),
-      props: {
-        x: 200 + Math.random() * 200,
-        y: 200 + Math.random() * 200,
-        w: 120,
-        h: 80,
-        angle: 0,
+    const shape = Schema.createShape(
+      'rectangle',
+      { x: 200 + Math.random() * 200, y: 200 + Math.random() * 200, w: 120, h: 80, angle: 0 },
+      {
+        name: 'Rectangle',
+        title: '结束',
+        textBlock: [{ position: { x: 10, y: 0, w: 'w-20', h: 'h' }, text: 'ew Shape' }],
       },
-      textBlock: [{ position: { x: 10, y: 0, w: 'w-20', h: 'h' }, text: 'New Shape' }],
-    }
+    )!
 
     store.addElement(shape, { select: true })
   }
@@ -229,24 +226,30 @@ function SampleDataLoader() {
     const shape3Id = generateId('shape')
 
     const shapes: ShapeElement[] = [
-      {
-        ...createDefaultShape(shape1Id, 'Rectangle'),
-        props: { x: 100, y: 150, w: 150, h: 100, angle: 0 },
-        title: 'Start',
-        textBlock: [{ position: { x: 10, y: 0, w: 'w-20', h: 'h' }, text: '开始' }],
-      },
-      {
-        ...createDefaultShape(shape2Id, 'Rectangle'),
-        props: { x: 400, y: 150, w: 150, h: 100, angle: 0 },
-        title: 'Process',
-        textBlock: [{ position: { x: 10, y: 0, w: 'w-20', h: 'h' }, text: '处理' }],
-      },
-      {
-        ...createDefaultShape(shape3Id, 'Rectangle'),
-        props: { x: 700, y: 150, w: 150, h: 100, angle: 0 },
-        title: 'End',
-        textBlock: [{ position: { x: 10, y: 0, w: 'w-20', h: 'h' }, text: '结束' }],
-      },
+      Schema.createShape(
+        'rectangle',
+        { x: 100, y: 150, w: 150, h: 100, angle: 0 },
+        {
+          title: '开始',
+          textBlock: [{ position: { x: 10, y: 0, w: 'w-20', h: 'h' }, text: '开始' }],
+        },
+      )!,
+      Schema.createShape(
+        'rectangle',
+        { x: 400, y: 150, w: 150, h: 100, angle: 0 },
+        {
+          title: '处理',
+          textBlock: [{ position: { x: 10, y: 0, w: 'w-20', h: 'h' }, text: '处理' }],
+        },
+      )!,
+      Schema.createShape(
+        'rectangle',
+        { x: 700, y: 150, w: 150, h: 100, angle: 0 },
+        {
+          title: '结束',
+          textBlock: [{ position: { x: 10, y: 0, w: 'w-20', h: 'h' }, text: '结束' }],
+        },
+      )!,
     ]
 
     // Add shapes without history and without auto-select

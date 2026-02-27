@@ -1,8 +1,7 @@
 import { createMemo, createSignal, For, onMount } from 'solid-js'
-import { ShapeCanvas } from './ShapeCanvas'
-import { LinkerCanvas } from './LinkerCanvas'
+import { LinkerCanvas, ShapeCanvas } from './element'
 import { SelectionBox } from './SelectionBox'
-import { isLinker, isShape, type ShapeElement } from '@diagen/core'
+import { isLinker, isShape, type ShapeElement, type LinkerElement, Schema } from '@diagen/core'
 import { useStore } from './StoreProvider'
 import type { Point } from '@diagen/shared'
 
@@ -79,7 +78,7 @@ export function CanvasRenderer(props: CanvasRendererProps) {
 
     // Left click - clear selection and start box selection
     if (e.button === 0) {
-      store.clearSelection()
+      store.selection.clear()
     }
   }
 
@@ -113,14 +112,14 @@ export function CanvasRenderer(props: CanvasRendererProps) {
     setSelectedStartPositions(startPositions)
 
     // Begin batch for history
-    store.history.beginBatch()
+    store.history.startTransaction()
   }
 
   const handleMouseMove = (e: MouseEvent) => {
     if (isPanning()) {
       const dx = e.clientX - dragStart().x
       const dy = e.clientY - dragStart().y
-      store.pan(viewportStart().x + dx, viewportStart().y + dy)
+      store.viewport.pan(viewportStart().x + dx, viewportStart().y + dy)
       return
     }
 
@@ -146,7 +145,7 @@ export function CanvasRenderer(props: CanvasRendererProps) {
                 y: startPos.y + dy,
               },
             },
-            { recordHistory: false },
+            { record: false },
           )
         }
       }
@@ -156,7 +155,7 @@ export function CanvasRenderer(props: CanvasRendererProps) {
   const handleMouseUp = () => {
     if (isDragging()) {
       // Commit the batch operation
-      store.history.commitBatch()
+      store.history.commitTransaction()
     }
 
     if (isPanning()) {
@@ -181,7 +180,7 @@ export function CanvasRenderer(props: CanvasRendererProps) {
     const delta = e.deltaY > 0 ? -0.1 : 0.1
     const newZoom = Math.max(0.1, Math.min(5, store.state.viewport.zoom + delta))
 
-    store.setZoom(newZoom, { x: mouseX, y: mouseY })
+    store.viewport.setZoom(newZoom, { x: mouseX, y: mouseY })
   }
 
   onMount(() => {
@@ -229,9 +228,15 @@ export function CanvasRenderer(props: CanvasRendererProps) {
               )
             }
             if (isLinker(element)) {
+              // 确保 Linker 使用 Schema 中的定义（如果存在）
+              const definition = (Schema as any).getLinker?.(element.name)
+              const linkerWithDef = definition 
+                ? { ...element, linkerType: element.linkerType || definition.linkerType } 
+                : element
+
               return (
                 <LinkerCanvas
-                  linker={element}
+                  linker={linkerWithDef as LinkerElement}
                   viewport={store.state.viewport}
                   viewportSize={viewportSize()}
                   onMouseDown={e => handleShapeMouseDown(e, element.id)}

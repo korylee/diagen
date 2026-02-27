@@ -1,19 +1,10 @@
-/**
- * Renderer Package
- * React components and hooks for rendering diagrams
- */
-
 // Store Provider (JSX - in renderer package)
-export * from './StoreProvider'
+export * from './components/StoreProvider'
 
-// Components
-export { ShapeCanvas } from './ShapeCanvas'
-export { LinkerCanvas } from './LinkerCanvas'
-export { CanvasRenderer } from './CanvasRenderer'
-export { SelectionBox } from './SelectionBox'
+export { ShapeCanvas } from './components/element/ShapeCanvas'
+export { LinkerCanvas } from './components/element/LinkerCanvas'
+export { CanvasRenderer } from './components/CanvasRenderer'
+export { SelectionBox } from './components/SelectionBox'
 
 // Utilities
-export * from './render-utils'
-export * from './linker-utils'
-export * from './expression-compiler'
-export * from './path-cache'
+export * from './utils'

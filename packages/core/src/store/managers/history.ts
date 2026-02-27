@@ -122,7 +122,7 @@ export function createHistoryManager(ctx: StoreContext) {
   }
 
   function execute(command: Command, meta?: CommandMeta) {
-    const enrichedCommand = { ...command, ...meta }
+    const enrichedCommand = Object.assign(command, meta)
 
     if (state.transaction) {
       state.transaction.commands.push(enrichedCommand)

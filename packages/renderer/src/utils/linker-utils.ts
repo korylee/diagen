@@ -1,4 +1,4 @@
-import type { LinkerElement, ShapeElement } from '@diagen/core/model';
+import type { LinkerElement, ShapeElement } from '@diagen/core';
 import type { Point, Rect } from '@diagen/shared';
 import { resolveAnchors, evaluateExpression, applyLineStyle, applyFontStyle, drawArrow, parseColor } from './render-utils';
 

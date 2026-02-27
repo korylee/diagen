@@ -1,7 +1,30 @@
 import { batch, createMemo } from 'solid-js'
 import { StoreContext } from './types'
-import { DiagramElement, isLinker, isShape } from '../../model'
+import {
+  BoxProps,
+  DiagramElement,
+  isLinker,
+  isLinkerFree,
+  isShape,
+  LinkerElement,
+  LinkerEndpoint,
+  ShapeElement,
+} from '../../model'
 import { deepMerge } from '@diagen/shared'
+import { Schema } from '../../schema'
+
+const CreateMethods = {
+  shape: (schemaId: string, box: BoxProps, overrides?: Partial<ShapeElement>): ShapeElement | null =>
+    Schema.createShape(schemaId, box, overrides),
+  linker: (
+    schemaId: string,
+    from: LinkerEndpoint,
+    to: LinkerEndpoint,
+    overrides?: Partial<LinkerElement>,
+  ): LinkerElement | null => Schema.createLinker(schemaId, from, to, overrides),
+  custom: (element: DiagramElement) => element,
+} as const
+export type CreateMethods = typeof CreateMethods
 
 export const createElementManager = (ctx: StoreContext) => {
   const { state } = ctx
@@ -12,7 +35,9 @@ export const createElementManager = (ctx: StoreContext) => {
       .map(id => elementMap()[id])
       .filter(Boolean),
   )
-  const getElementById = (id: string) => elementMap()[id]
+  const shapes = createMemo(() => elements().filter(el => isShape(el)))
+
+  const getById = (id: string) => elementMap()[id]
 
   function add(elements: DiagramElement[]) {
     const ids: string[] = []
@@ -39,17 +64,17 @@ export const createElementManager = (ctx: StoreContext) => {
       ctx.setState('diagram', 'orderList', list => list.filter(id => !ids.includes(id)))
     })
 
-    ctx.emit('element:removed', ids)
+    ctx.emit('element:removed', { ids })
   }
 
-  function update(id: string, patch: Partial<DiagramElement>) {
+  function update(id: string, overrides: Partial<DiagramElement>) {
     ctx.setState('diagram', 'elements', id, el => {
-      return deepMerge(el, patch)
+      return deepMerge(el, overrides)
     })
 
     ctx.emit('element:updated', {
       id,
-      patch,
+      overrides,
     })
   }
 
@@ -59,62 +84,65 @@ export const createElementManager = (ctx: StoreContext) => {
       ctx.setState('diagram', 'elements', {})
       ctx.setState('diagram', 'orderList', [])
     })
-    ctx.emit('element:cleared', list)
+    ctx.emit('element:cleared', { elements: list })
   }
 
   function move(elements: DiagramElement[], dx: number, dy: number) {
     batch(() => {
       for (const element of elements) {
         if (isShape(element)) {
-          const updatedShape = {
-            ...element,
+          ctx.setState('diagram', 'elements', element.id, (el: any) => ({
+            ...el,
             props: {
-              ...element.props,
-              x: element.props.x + dx,
-              y: element.props.y + dy,
+              ...el.props,
+              x: el.props.x + dx,
+              y: el.props.y + dy,
             },
-          }
-          ctx.setState('diagram', 'elements', element.id, updatedShape)
-          return
-        }
-        if (isLinker(element)) {
-          const isFreeLinker = element.from.id === null && element.to.id === null
-          if (isFreeLinker) {
-            const updatedLinker = {
-              ...element,
+          }))
+        } else if (isLinker(element)) {
+          if (isLinkerFree(element)) {
+            ctx.setState('diagram', 'elements', element.id, (el: any) => ({
+              ...el,
               from: {
-                ...element.from,
-                x: element.from.x + dx,
-                y: element.from.y + dy,
+                ...el.from,
+                x: el.from.x + dx,
+                y: el.from.y + dy,
               },
               to: {
-                ...element.to,
-                x: element.to.x + dx,
-                y: element.to.y + dy,
+                ...el.to,
+                x: el.to.x + dx,
+                y: el.to.y + dy,
               },
-              points: element.points.map(p => ({
+              points: el.points.map((p: any) => ({
                 x: p.x + dx,
                 y: p.y + dy,
               })),
-            }
-            ctx.setState('diagram', 'elements', element.id, updatedLinker)
+            }))
           }
-
-          return
         }
       }
     })
 
-    ctx.emit('element:moved', elements)
+    ctx.emit('element:moved', { elements, dx, dy })
+  }
+
+  function create<K extends keyof CreateMethods>(
+    type: K,
+    ...args: Parameters<CreateMethods[K]>
+  ): ReturnType<CreateMethods[K]> {
+    const method = CreateMethods[type] as any
+    return method(...args)
   }
 
   return {
     elementMap,
     elements,
     orderList,
+    shapes,
 
-    getElementById,
+    getById,
 
+    create,
     add,
     remove,
     update,

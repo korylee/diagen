@@ -9,18 +9,23 @@ export default defineConfig(() => {
   }
   const formats = ['cjs', 'esm']
   formats.forEach(format => {
+    const isEs = format === 'esm'
+    const ext = isEs ? 'mjs' : 'js'
     const config = {
       ...baseConfig,
       format,
-      dts: true,
+      dts: !isEs,
+      outExtensions: () => ({
+        js: `.${ext}`,
+      }),
     }
     configs.push(config)
     configs.push({
       ...config,
       dts: false,
       minify: true,
-      outExtensions: context => ({
-        js: `.min.${context.format === 'es' ? 'mjs' : 'js'}`,
+      outExtensions: () => ({
+        js: `.min.${ext}`,
       }),
     })
   })

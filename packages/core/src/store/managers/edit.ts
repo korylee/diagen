@@ -1,11 +1,11 @@
-import { StoreContext } from './types'
-import { type ElementManager } from './element'
-import { Command, HistoryManager } from './history'
-import { DiagramElement } from '../../model'
 import { generateId } from '@diagen/shared'
-import { type SelectionManager } from './selection'
 import { deepClone } from '@diagen/shared/'
 import { batch } from 'solid-js'
+import type { DiagramElement } from '../../model'
+import { CreateMethods, type ElementManager } from './element'
+import type { Command, HistoryManager } from './history'
+import { type SelectionManager } from './selection'
+import { StoreContext } from './types'
 
 class AddCommand implements Command {
   id = generateId()
@@ -80,10 +80,46 @@ class UpdateCommand implements Command {
     this.deps.element.update(this.element.id, this.patch)
   }
   undo() {
+    // 使用 setState 的对象覆盖模式来恢复旧状态，因为 update 是合并操作
     this.deps.element.update(this.element.id, this.previous)
   }
   redo() {
     this.execute()
+  }
+}
+
+class MoveCommand implements Command {
+  id = generateId()
+  name = 'move_els'
+  readonly timestamp = Date.now()
+  constructor(
+    private readonly deps: EditDeps,
+    private readonly elements: DiagramElement[],
+    private dx: number,
+    private dy: number,
+  ) {}
+
+  execute() {
+    this.deps.element.move(this.elements, this.dx, this.dy)
+  }
+  undo() {
+    this.deps.element.move(this.elements, -this.dx, -this.dy)
+  }
+  redo() {
+    this.execute()
+  }
+  canMergeWith(next: Command): boolean {
+    return (
+      next instanceof MoveCommand &&
+      next.elements.length === this.elements.length &&
+      next.elements.every((el, i) => el.id === this.elements[i].id)
+    )
+  }
+  merge(next: Command) {
+    if (!(next instanceof MoveCommand)) return null
+    this.dx += next.dx
+    this.dy += next.dy
+    return this
   }
 }
 
@@ -140,9 +176,26 @@ export function createEditManager(ctx: StoreContext, deps: EditDeps) {
     history.execute(cmd)
   }
 
+  function create<T extends keyof CreateMethods>(
+    type: T,
+    ...args: [...Parameters<CreateMethods[T]>, options?: { select?: boolean; record?: boolean }]
+  ): ReturnType<CreateMethods[T]> {
+    const lastArg = args[args.length - 1]
+    const hasOptions = typeof lastArg === 'object' && lastArg !== null && ('select' in lastArg || 'record' in lastArg)
+
+    const options = (hasOptions ? lastArg : {}) as { select?: boolean; record?: boolean }
+    const createArgs = (hasOptions ? args.slice(0, -1) : args) as any
+
+    const createdElement = element.create(type, ...createArgs)
+
+    if (!createdElement) return null as any
+    add([createdElement], options)
+    return createdElement as any
+  }
+
   function remove(ids: string[], options: { record?: boolean } = {}): void {
     const { record = true } = options
-    const els = ids.map(id => element.getElementById(id))
+    const els = ids.map(id => element.getById(id))
     if (!record) {
       element.remove(ids)
       selection.deselect(ids)
@@ -155,7 +208,7 @@ export function createEditManager(ctx: StoreContext, deps: EditDeps) {
 
   function update(id: string, patch: Partial<DiagramElement>, options: { record?: boolean } = {}): void {
     const { record = true } = options
-    const el = element.getElementById(id)
+    const el = element.getById(id)
 
     if (!record) {
       element.update(id, patch)
@@ -176,10 +229,25 @@ export function createEditManager(ctx: StoreContext, deps: EditDeps) {
     history.execute(cmd)
   }
 
+  function move(ids: string[], dx: number, dy: number, options: { record?: boolean } = {}): void {
+    const { record = true } = options
+    const els = ids.map(id => element.getById(id)).filter(Boolean) as DiagramElement[]
+    if (els.length === 0) return
+
+    if (!record) {
+      element.move(els, dx, dy)
+      return
+    }
+    const cmd = new MoveCommand(deps, els, dx, dy)
+    history.execute(cmd)
+  }
+
   return {
     add,
+    create,
     remove,
     update,
     clear,
+    move,
   }
 }

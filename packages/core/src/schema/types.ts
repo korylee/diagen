@@ -1,4 +1,5 @@
-import type { ShapeElement, LineStyle, FillStyle, FontStyle, PathDefinition, Anchor, TextBlock, ElementAttribute } from '../model';
+import type { LineStyle, FillStyle, FontStyle, PathDefinition, Anchor, TextBlock, ElementAttribute } from '../model';
+import type { LinkerType } from '../constants';
 
 export interface ShapeDefinition {
   id: string;
@@ -20,6 +21,15 @@ export interface ShapeDefinition {
   attribute?: Partial<ElementAttribute>;
 }
 
+export interface LinkerDefinition {
+  id: string;
+  name: string;
+  title: string;
+  linkerType: LinkerType;
+  lineStyle?: Partial<LineStyle>;
+  fontStyle?: Partial<FontStyle>;
+}
+
 export interface CategoryDefinition {
   id: string;
   name: string;
@@ -38,6 +48,7 @@ export interface ThemeDefinition {
 
 export interface SchemaConfig {
   shapes: Record<string, ShapeDefinition>;
+  linkers: Record<string, LinkerDefinition>;
   categories: Record<string, CategoryDefinition>;
   themes: Record<string, ThemeDefinition>;
   defaultLineStyle: LineStyle;

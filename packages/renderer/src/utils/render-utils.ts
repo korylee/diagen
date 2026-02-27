@@ -1,4 +1,4 @@
-import type { ShapeElement, LineStyle, FillStyle, FontStyle, PathDefinition } from '@diagen/core/model';
+import { Schema, type ShapeElement, type LineStyle, type FillStyle, type FontStyle, type PathDefinition } from '@diagen/core';
 import type { Point } from '@diagen/shared';
 import { evaluateExpression, compileExpression, evaluateCompiled, type CompiledExpression } from './expression-compiler';
 
@@ -90,20 +90,30 @@ export function evaluateCompiledPathAction(action: CompiledPathAction, w: number
 }
 
 export function resolvePathActions(
-  actions: PathDefinition['actions'],
+  actions: PathDefinition['actions'] | { ref: string },
   w: number,
   h: number
 ): ResolvedPathAction[] {
-  return actions.map(action => {
+  if (actions && !Array.isArray(actions) && 'ref' in (actions as any)) {
+    const globalActions = (Schema as any).getGlobalCommand((actions as any).ref);
+    if (globalActions) {
+      return resolvePathActions(globalActions as any, w, h);
+    }
+    return [];
+  }
+
+  const actionArray = Array.isArray(actions) ? actions : [actions];
+
+  return (actionArray as any[]).map(action => {
     const resolved: ResolvedPathAction = { action: action.action };
-    if ('x' in action && action.x !== undefined) resolved.x = resolveValue(action.x, w, h);
-    if ('y' in action && action.y !== undefined) resolved.y = resolveValue(action.y, w, h);
-    if ('w' in action && action.w !== undefined) resolved.w = resolveValue(action.w, w, h);
-    if ('h' in action && action.h !== undefined) resolved.h = resolveValue(action.h, w, h);
-    if ('x1' in action && action.x1 !== undefined) resolved.x1 = resolveValue(action.x1, w, h);
-    if ('y1' in action && action.y1 !== undefined) resolved.y1 = resolveValue(action.y1, w, h);
-    if ('x2' in action && action.x2 !== undefined) resolved.x2 = resolveValue(action.x2, w, h);
-    if ('y2' in action && action.y2 !== undefined) resolved.y2 = resolveValue(action.y2, w, h);
+    if (action.x !== undefined) resolved.x = resolveValue(action.x, w, h);
+    if (action.y !== undefined) resolved.y = resolveValue(action.y, w, h);
+    if (action.w !== undefined) resolved.w = resolveValue(action.w, w, h);
+    if (action.h !== undefined) resolved.h = resolveValue(action.h, w, h);
+    if (action.x1 !== undefined) resolved.x1 = resolveValue(action.x1, w, h);
+    if (action.y1 !== undefined) resolved.y1 = resolveValue(action.y1, w, h);
+    if (action.x2 !== undefined) resolved.x2 = resolveValue(action.x2, w, h);
+    if (action.y2 !== undefined) resolved.y2 = resolveValue(action.y2, w, h);
     return resolved;
   });
 }

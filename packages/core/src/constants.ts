@@ -1,6 +1,13 @@
-import type { Anchor } from './model'
-
 // Element Types
+import {
+  DEFAULT_ANCHORS,
+  DEFAULT_ATTRIBUTE,
+  DEFAULT_FILL_STYLE,
+  DEFAULT_FONT_STYLE,
+  DEFAULT_TEXT_BLOCK,
+  RECTANGLE_PATH,
+} from './schema/defaults'
+
 export const ElementType = {
   SHAPE: 'shape',
   LINKER: 'linker',
@@ -121,12 +128,12 @@ export const DEFAULTS = {
   // Shape
   DEFAULT_SHAPE_WIDTH: 120,
   DEFAULT_SHAPE_HEIGHT: 80,
-  DEFAULT_ANCHORS: [
-    { x: 'w/2', y: '0' },
-    { x: 'w/2', y: 'h' },
-    { x: '0', y: 'h/2' },
-    { x: 'w', y: 'h/2' },
-  ],
+  DEFAULT_ANCHORS: DEFAULT_ANCHORS,
+  DEFAULT_PATH: RECTANGLE_PATH,
+  DEFAULT_TEXT_BLOCK: DEFAULT_TEXT_BLOCK,
+  DEFAULT_ATTRIBUTE: DEFAULT_ATTRIBUTE,
+  DEFAULT_FONT_STYLE: DEFAULT_FONT_STYLE,
+  DEFAULT_FILL_STYLE: DEFAULT_FILL_STYLE,
 
   // Line
   DEFAULT_LINE_WIDTH: 2,

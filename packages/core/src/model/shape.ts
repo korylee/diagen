@@ -2,19 +2,20 @@
  * Shape Element Model
  */
 
+import { generateId } from 'packages/shared'
 import { DEFAULTS } from '../constants'
 import type {
+  Anchor,
   BaseElement,
   BoxProps,
-  ShapeStyle,
-  LineStyle,
+  DataAttribute,
+  ElementAttribute,
   FillStyle,
   FontStyle,
-  ElementAttribute,
-  Anchor,
+  LineStyle,
   PathDefinition,
-  TextBlock,
-  DataAttribute,
+  ShapeStyle,
+  TextBlock
 } from './types'
 
 /** Shape element */
@@ -52,11 +53,8 @@ export interface ShapeElement extends BaseElement {
   theme?: string
 }
 
-/** Create default shape element */
-export function createDefaultShape(id: string, name: string, options: Partial<ShapeElement> = {}): ShapeElement {
+export function createShape(patch: Partial<ShapeElement>): ShapeElement {
   return {
-    id,
-    name,
     type: 'shape',
     title: '',
     zIndex: 0,
@@ -80,54 +78,17 @@ export function createDefaultShape(id: string, name: string, options: Partial<Sh
       lineColor: '50,50,50',
       lineStyle: 'solid',
     },
-    fillStyle: {
-      type: 'solid',
-      color: '255,255,255',
-    },
-    fontStyle: {
-      fontFamily: '微软雅黑, Arial, sans-serif',
-      size: 13,
-      lineHeight: 1.25,
-      color: '50,50,50',
-      bold: false,
-      italic: false,
-      underline: false,
-      textAlign: 'center',
-      vAlign: 'middle',
-      orientation: 'horizontal',
-    },
-    textBlock: [
-      {
-        position: { x: 10, y: 0, w: 'w-20', h: 'h' },
-        text: '',
-      },
-    ],
-    anchors: DEFAULTS.DEFAULT_ANCHORS.slice(),
-    path: [
-      {
-        actions: [
-          { action: 'move', x: '0', y: '0' },
-          { action: 'line', x: 'w', y: '0' },
-          { action: 'line', x: 'w', y: 'h' },
-          { action: 'line', x: '0', y: 'h' },
-          { action: 'close' },
-        ],
-      },
-    ],
-    attribute: {
-      container: false,
-      visible: true,
-      rotatable: true,
-      linkable: true,
-      collapsable: false,
-      collapsed: false,
-      markerOffset: 5,
-      resizable: true,
-      movable: true,
-    },
+    fillStyle: DEFAULTS.DEFAULT_FILL_STYLE,
+    fontStyle: DEFAULTS.DEFAULT_FONT_STYLE,
+    textBlock: [DEFAULTS.DEFAULT_TEXT_BLOCK],
+    anchors: DEFAULTS.DEFAULT_ANCHORS,
+    path: DEFAULTS.DEFAULT_PATH,
+    attribute: DEFAULTS.DEFAULT_ATTRIBUTE,
     dataAttributes: [],
     data: {},
-    ...options,
+    ...patch,
+    id: patch.id || generateId('shape'),
+    name: patch.name || 'unknown',
   }
 }
 

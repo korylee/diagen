@@ -1,0 +1,80 @@
+import type { ShapeDefinition, CategoryDefinition } from './types';
+import {
+  RECTANGLE_PATH,
+  ROUNDED_RECTANGLE_PATH,
+  CIRCLE_PATH,
+  DIAMOND_PATH,
+  PARALLELOGRAM_PATH,
+  ELLIPSE_PATH,
+  DEFAULT_ANCHORS,
+} from './defaults';
+
+export const BASIC_SHAPES: ShapeDefinition[] = [
+  {
+    id: 'rectangle',
+    name: 'Rectangle',
+    title: '矩形',
+    category: 'basic',
+    props: { w: 120, h: 80 },
+    path: RECTANGLE_PATH,
+    anchors: DEFAULT_ANCHORS,
+    textBlock: [{ position: { x: 10, y: 0, w: 'w-20', h: 'h' }, text: '' }],
+  },
+  {
+    id: 'roundedRectangle',
+    name: 'RoundedRectangle',
+    title: '圆角矩形',
+    category: 'basic',
+    props: { w: 120, h: 80 },
+    path: ROUNDED_RECTANGLE_PATH,
+    anchors: DEFAULT_ANCHORS,
+    textBlock: [{ position: { x: 10, y: 0, w: 'w-20', h: 'h' }, text: '' }],
+  },
+  {
+    id: 'circle',
+    name: 'Circle',
+    title: '圆形',
+    category: 'basic',
+    props: { w: 100, h: 100 },
+    path: CIRCLE_PATH,
+    anchors: DEFAULT_ANCHORS,
+    textBlock: [{ position: { x: 10, y: 0, w: 'w-20', h: 'h' }, text: '' }],
+  },
+  {
+    id: 'diamond',
+    name: 'Diamond',
+    title: '菱形',
+    category: 'basic',
+    props: { w: 100, h: 100 },
+    path: DIAMOND_PATH,
+    anchors: DEFAULT_ANCHORS,
+    textBlock: [{ position: { x: 10, y: 0, w: 'w-20', h: 'h' }, text: '' }],
+  },
+  {
+    id: 'parallelogram',
+    name: 'Parallelogram',
+    title: '平行四边形',
+    category: 'basic',
+    props: { w: 120, h: 80 },
+    path: PARALLELOGRAM_PATH,
+    anchors: DEFAULT_ANCHORS,
+    textBlock: [{ position: { x: 10, y: 0, w: 'w-20', h: 'h' }, text: '' }],
+  },
+  {
+    id: 'ellipse',
+    name: 'Ellipse',
+    title: '椭圆',
+    category: 'basic',
+    props: { w: 140, h: 80 },
+    path: ELLIPSE_PATH,
+    anchors: DEFAULT_ANCHORS,
+    textBlock: [{ position: { x: 10, y: 0, w: 'w-20', h: 'h' }, text: '' }],
+  },
+];
+
+export const BASIC_SHAPE_CATEGORY: CategoryDefinition = {
+  id: 'basic',
+  name: '基础图形',
+  order: 0,
+  shapes: BASIC_SHAPES.map(s => s.id),
+};

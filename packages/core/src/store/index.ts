@@ -6,23 +6,22 @@
 
 import { createStore } from 'solid-js/store'
 
-import type { Point, Viewport } from '@diagen/shared'
+import type { Viewport } from '@diagen/shared'
 import { createEmitter, generateId } from '@diagen/shared'
 
-import type { Diagram, DiagramElement, LinkerElement, LinkerEndpoint, ShapeElement } from '../model'
-import { createDefaultLinker, createEmptyDiagram, isLinker, isShape } from '../model'
-import type { LinkerType } from '../constants'
-import { ToolType } from '../constants'
 import { createMemo } from 'solid-js'
+import { ToolType } from '../constants'
+import type { Diagram, DiagramElement } from '../model'
+import { createEmptyDiagram } from '../model'
 import {
   type Command,
   createEditManager,
   createElementManager,
   createHistoryManager,
   createSelectionManager,
+  createViewportManager,
 } from './managers'
 import { StoreContext } from './managers/types'
-import { createViewportManager } from './managers/viewport'
 
 // ============================================================================
 // Store State Types
@@ -108,158 +107,159 @@ export function createDesignerStore(options: DesignerStoreOptions = {}) {
     setState,
     emit: emitter.emit,
   }
+  // managers 分层
   const element = createElementManager(ctx)
   const history = createHistoryManager(ctx)
   const selection = createSelectionManager(ctx, { element })
   const viewport = createViewportManager(ctx, { element })
   const edit = createEditManager(ctx, { element, selection, history })
 
-  const { orderList, getElementById, elements } = element
+  const { getById: getElementById, elements } = element
   const page = createMemo(() => state.diagram.page)
   const activeTool = createMemo(() => state.activeTool)
 
-  function moveElements(
-    ids: string[],
-    deltaX: number,
-    deltaY: number,
-    options: { recordHistory?: boolean } = {},
-  ): void {
-    const { recordHistory = true } = options
+  // function moveElements(
+  //   ids: string[],
+  //   deltaX: number,
+  //   deltaY: number,
+  //   options: { recordHistory?: boolean } = {},
+  // ): void {
+  //   const { recordHistory = true } = options
 
-    if (ids.length === 0 || (deltaX === 0 && deltaY === 0)) return
+  //   if (ids.length === 0 || (deltaX === 0 && deltaY === 0)) return
 
-    const expandedIds = expandSelectionToGroups(ids)
+  //   const expandedIds = expandSelectionToGroups(ids)
 
-    const previousShapePositions: Record<string, Point> = {}
-    const previousLinkerState: Record<
-      string,
-      {
-        from: Point
-        to: Point
-        points: Array<Point>
-      }
-    > = {}
+  //   const previousShapePositions: Record<string, Point> = {}
+  //   const previousLinkerState: Record<
+  //     string,
+  //     {
+  //       from: Point
+  //       to: Point
+  //       points: Array<Point>
+  //     }
+  //   > = {}
 
-    for (const id of expandedIds) {
-      const element = getElementById(id)
-      if (!element) continue
+  //   for (const id of expandedIds) {
+  //     const element = getElementById(id)
+  //     if (!element) continue
 
-      if (isShape(element)) {
-        previousShapePositions[id] = {
-          x: element.props.x,
-          y: element.props.y,
-        }
-      } else if (isLinker(element)) {
-        const isFreeLinker = element.from.id === null && element.to.id === null
-        if (isFreeLinker) {
-          previousLinkerState[id] = {
-            from: { x: element.from.x, y: element.from.y },
-            to: { x: element.to.x, y: element.to.y },
-            points: element.points.map(p => ({ x: p.x, y: p.y })),
-          }
-        }
-      }
-    }
+  //     if (isShape(element)) {
+  //       previousShapePositions[id] = {
+  //         x: element.props.x,
+  //         y: element.props.y,
+  //       }
+  //     } else if (isLinker(element)) {
+  //       const isFreeLinker = element.from.id === null && element.to.id === null
+  //       if (isFreeLinker) {
+  //         previousLinkerState[id] = {
+  //           from: { x: element.from.x, y: element.from.y },
+  //           to: { x: element.to.x, y: element.to.y },
+  //           points: element.points.map(p => ({ x: p.x, y: p.y })),
+  //         }
+  //       }
+  //     }
+  //   }
 
-    const command: Command = {
-      id: generateId('cmd_move'),
-      name: `Move ${expandedIds.length} element(s)`,
-      timestamp: Date.now(),
+  //   const command: Command = {
+  //     id: generateId('cmd_move'),
+  //     name: `Move ${expandedIds.length} element(s)`,
+  //     timestamp: Date.now(),
 
-      execute: () => {
-        for (const id of expandedIds) {
-          const element = getElementById(id)
-          if (!element) continue
+  //     execute: () => {
+  //       for (const id of expandedIds) {
+  //         const element = getElementById(id)
+  //         if (!element) continue
 
-          if (isShape(element)) {
-            const shape = element as ShapeElement
-            const updatedShape: ShapeElement = {
-              ...shape,
-              props: {
-                ...shape.props,
-                x: shape.props.x + deltaX,
-                y: shape.props.y + deltaY,
-              },
-            }
-            setState('diagram', 'elements', id, updatedShape)
-          } else if (isLinker(element)) {
-            const linker = element as LinkerElement
-            const isFreeLinker = linker.from.id === null && linker.to.id === null
-            if (isFreeLinker) {
-              const updatedLinker: LinkerElement = {
-                ...linker,
-                from: {
-                  ...linker.from,
-                  x: linker.from.x + deltaX,
-                  y: linker.from.y + deltaY,
-                },
-                to: {
-                  ...linker.to,
-                  x: linker.to.x + deltaX,
-                  y: linker.to.y + deltaY,
-                },
-                points: linker.points.map(p => ({
-                  x: p.x + deltaX,
-                  y: p.y + deltaY,
-                })),
-              }
-              setState('diagram', 'elements', id, updatedLinker)
-            }
-          }
-        }
-      },
+  //         if (isShape(element)) {
+  //           const shape = element as ShapeElement
+  //           const updatedShape: ShapeElement = {
+  //             ...shape,
+  //             props: {
+  //               ...shape.props,
+  //               x: shape.props.x + deltaX,
+  //               y: shape.props.y + deltaY,
+  //             },
+  //           }
+  //           setState('diagram', 'elements', id, updatedShape)
+  //         } else if (isLinker(element)) {
+  //           const linker = element as LinkerElement
+  //           const isFreeLinker = linker.from.id === null && linker.to.id === null
+  //           if (isFreeLinker) {
+  //             const updatedLinker: LinkerElement = {
+  //               ...linker,
+  //               from: {
+  //                 ...linker.from,
+  //                 x: linker.from.x + deltaX,
+  //                 y: linker.from.y + deltaY,
+  //               },
+  //               to: {
+  //                 ...linker.to,
+  //                 x: linker.to.x + deltaX,
+  //                 y: linker.to.y + deltaY,
+  //               },
+  //               points: linker.points.map(p => ({
+  //                 x: p.x + deltaX,
+  //                 y: p.y + deltaY,
+  //               })),
+  //             }
+  //             setState('diagram', 'elements', id, updatedLinker)
+  //           }
+  //         }
+  //       }
+  //     },
 
-      undo: () => {
-        for (const id in previousShapePositions) {
-          const element = getElementById(id)
-          if (!element || !isShape(element)) continue
-          const shape = element as ShapeElement
-          const pos = previousShapePositions[id]
-          const restoredShape: ShapeElement = {
-            ...shape,
-            props: {
-              ...shape.props,
-              x: pos.x,
-              y: pos.y,
-            },
-          }
-          setState('diagram', 'elements', id, restoredShape)
-        }
+  //     undo: () => {
+  //       for (const id in previousShapePositions) {
+  //         const element = getElementById(id)
+  //         if (!element || !isShape(element)) continue
+  //         const shape = element as ShapeElement
+  //         const pos = previousShapePositions[id]
+  //         const restoredShape: ShapeElement = {
+  //           ...shape,
+  //           props: {
+  //             ...shape.props,
+  //             x: pos.x,
+  //             y: pos.y,
+  //           },
+  //         }
+  //         setState('diagram', 'elements', id, restoredShape)
+  //       }
 
-        for (const id in previousLinkerState) {
-          const element = getElementById(id)
-          if (!isLinker(element)) continue
-          const linker = element as LinkerElement
-          const state = previousLinkerState[id]
-          const restoredLinker: LinkerElement = {
-            ...linker,
-            from: {
-              ...linker.from,
-              x: state.from.x,
-              y: state.from.y,
-            },
-            to: {
-              ...linker.to,
-              x: state.to.x,
-              y: state.to.y,
-            },
-            points: state.points,
-          }
-          setState('diagram', 'elements', id, restoredLinker)
-        }
-      },
+  //       for (const id in previousLinkerState) {
+  //         const element = getElementById(id)
+  //         if (!isLinker(element)) continue
+  //         const linker = element as LinkerElement
+  //         const state = previousLinkerState[id]
+  //         const restoredLinker: LinkerElement = {
+  //           ...linker,
+  //           from: {
+  //             ...linker.from,
+  //             x: state.from.x,
+  //             y: state.from.y,
+  //           },
+  //           to: {
+  //             ...linker.to,
+  //             x: state.to.x,
+  //             y: state.to.y,
+  //           },
+  //           points: state.points,
+  //         }
+  //         setState('diagram', 'elements', id, restoredLinker)
+  //       }
+  //     },
 
-      redo: () => {
-        command.execute()
-      },
-    }
+  //     redo: () => {
+  //       command.execute()
+  //     },
+  //   }
 
-    if (recordHistory) {
-      // history.execute(command)
-    } else {
-      command.execute()
-    }
-  }
+  //   if (recordHistory) {
+  //     // history.execute(command)
+  //   } else {
+  //     command.execute()
+  //   }
+  // }
 
   function setCanvasSize(width: number, height: number): void {
     setState('canvasSize', { width, height })
@@ -318,40 +318,6 @@ export function createDesignerStore(options: DesignerStoreOptions = {}) {
     }
 
     selection.clear()
-  }
-
-  function createLinker(from: LinkerEndpoint, to: LinkerEndpoint, type: LinkerType = 'broken'): LinkerElement {
-    const linker = createDefaultLinker(generateId('linker'), {
-      from: { ...from },
-      to: { ...to },
-      linkerType: type,
-    })
-    const command: Command = {
-      id: generateId('cmd_create_linker'),
-      name: 'Create linker',
-      timestamp: Date.now(),
-
-      execute: () => {
-        setState('diagram', 'elements', linker.id, linker)
-        setState('diagram', 'orderList', list => [...list, linker.id])
-      },
-
-      undo: () => {
-        setState('diagram', 'elements', els => {
-          const { [linker.id]: _, ...rest } = els
-          return rest
-        })
-        setState('diagram', 'orderList', list => list.filter(id => id !== linker.id))
-      },
-
-      redo: () => {
-        command.execute()
-      },
-    }
-
-    // history.execute(command)
-
-    return linker
   }
 
   function group(ids: string[], options: { recordHistory?: boolean } = {}): string | null {
@@ -512,7 +478,10 @@ export function createDesignerStore(options: DesignerStoreOptions = {}) {
 
   return {
     id: id,
+    // state
     state,
+
+    // managers
     element,
     history,
     selection,
@@ -525,18 +494,16 @@ export function createDesignerStore(options: DesignerStoreOptions = {}) {
     removeElements: edit.remove,
     updateElement: edit.update,
     clearElements: edit.clear,
+    moveElements: edit.move,
 
     undo: history.undo,
     redo: history.redo,
     canUndo: history.canUndo,
     canRedo: history.canRedo,
 
-    orderList,
     page,
     viewport,
     activeTool,
-
-    moveElements,
 
     setCanvasSize,
     setTool,
@@ -545,7 +512,6 @@ export function createDesignerStore(options: DesignerStoreOptions = {}) {
     setGridSize,
     serialize,
     loadFromJSON,
-    createLinker,
     group,
     ungroup,
     getGroupShapes,
