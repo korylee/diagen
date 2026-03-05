@@ -24,7 +24,14 @@
     "rootDir": ".",
     "paths": {},
     "isolatedDeclarations": false,
-    "composite": true
+    "composite": true,
+    "emitDeclarationOnly": true,
+    "allowImportingTsExtensions": true,
+    "strictFunctionTypes": true,
+    "strictNullChecks": true,
+    "declaration": true,
+    "declarationDir": "./types",
+    "skipDefaultLibCheck": true,
   },
   "include": ["*.ts", "packages", "playgrounds"],
   "exclude": ["node_modules", "dist", "**/*.md", "packages/.test"]
