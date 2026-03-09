@@ -1,13 +1,13 @@
-import { createScroll } from '@diagen/primitives'
-import { CreateDrag, CreatePan, CreateResize, CreateSelection, CreateKeyboard } from '../primitives'
+import { createScroll, createKeyboard, createPan } from '@diagen/primitives'
+import { CreateDrag, CreateResize, CreateSelection } from '../primitives'
 import { createContext, JSX, useContext } from 'solid-js'
 
 type Interaction = {
   drag: CreateDrag
   resize: CreateResize
-  pan: CreatePan
+  pan: ReturnType<typeof createPan>
   boxSelect: CreateSelection
-  keyboard: CreateKeyboard
+  keyboard: ReturnType<typeof createKeyboard>
   scroll: ReturnType<typeof createScroll>
 }
 
