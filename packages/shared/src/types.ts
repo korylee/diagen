@@ -31,3 +31,5 @@ export type KeyOf<T> = number extends keyof T
         ? number
         : keyof T
   : keyof T
+
+export type ValueOf<T> = T[KeyOf<T>]

@@ -1,3 +1,4 @@
+import { ValueOf } from '@diagen/shared'
 // Element Types
 import {
   DEFAULT_ANCHORS,
@@ -16,7 +17,7 @@ export const ElementType = {
   IMAGE: 'image',
   GRID: 'grid',
 } as const
-export type ElementType = (typeof ElementType)[keyof typeof ElementType]
+export type ElementType = ValueOf<typeof ElementType>
 
 // Shape Categories (similar to ProcessOn)
 export const ShapeCategory = {
@@ -27,7 +28,7 @@ export const ShapeCategory = {
   UML: 'uml',
   CUSTOM: 'custom',
 } as const
-export type ShapeCategory = (typeof ShapeCategory)[keyof typeof ShapeCategory]
+export type ShapeCategory = ValueOf<typeof ShapeCategory>
 
 // Linker Types
 export const LinkerType = {
@@ -36,7 +37,7 @@ export const LinkerType = {
   CURVED: 'curved',
   ORTHOGONAL: 'orthogonal',
 } as const
-export type LinkerType = (typeof LinkerType)[keyof typeof LinkerType]
+export type LinkerType = ValueOf<typeof LinkerType>
 
 // Arrow Styles
 export const ArrowStyle = {
@@ -46,7 +47,7 @@ export const ArrowStyle = {
   CIRCLE: 'circle',
   OPEN_ARROW: 'openArrow',
 } as const
-export type ArrowStyle = (typeof ArrowStyle)[keyof typeof ArrowStyle]
+export type ArrowStyle = ValueOf<typeof ArrowStyle>
 
 // Line Styles
 export const LineStyleType = {
@@ -54,7 +55,7 @@ export const LineStyleType = {
   DASHED: 'dashed',
   DOTTED: 'dotted',
 } as const
-export type LineStyleType = (typeof LineStyleType)[keyof typeof LineStyleType]
+export type LineStyleType = ValueOf<typeof LineStyleType>
 
 // Fill Types
 export const FillType = {
@@ -63,14 +64,14 @@ export const FillType = {
   GRADIENT: 'gradient',
   IMAGE: 'image',
 } as const
-export type FillType = (typeof FillType)[keyof typeof FillType]
+export type FillType = ValueOf<typeof FillType>
 
 // Gradient Types
 export const GradientType = {
   LINEAR: 'linear',
   RADIAL: 'radial',
 } as const
-export type GradientType = (typeof GradientType)[keyof typeof GradientType]
+export type GradientType = ValueOf<typeof GradientType>
 
 // Text Alignments
 export const TextAlign = {
@@ -78,21 +79,21 @@ export const TextAlign = {
   CENTER: 'center',
   RIGHT: 'right',
 } as const
-export type TextAlign = (typeof TextAlign)[keyof typeof TextAlign]
+export type TextAlign = ValueOf<typeof TextAlign>
 
 export const VerticalAlign = {
   TOP: 'top',
   MIDDLE: 'middle',
   BOTTOM: 'bottom',
 } as const
-export type VerticalAlign = (typeof VerticalAlign)[keyof typeof VerticalAlign]
+export type VerticalAlign = ValueOf<typeof VerticalAlign>
 
 // Text Orientation
 export const TextOrientation = {
   HORIZONTAL: 'horizontal',
   VERTICAL: 'vertical',
 } as const
-export type TextOrientation = (typeof TextOrientation)[keyof typeof TextOrientation]
+export type TextOrientation = ValueOf<typeof TextOrientation>
 
 // Default Values
 export const DEFAULTS = {
@@ -145,7 +146,7 @@ export const DEFAULTS = {
 
 // Resize Directions
 export const RESIZE_DIRECTIONS = ['tl', 't', 'tr', 'l', 'r', 'bl', 'b', 'br'] as const
-export type ResizeDirection = (typeof RESIZE_DIRECTIONS)[number]
+export type ResizeDirection = ValueOf<typeof RESIZE_DIRECTIONS>
 
 // Event Types for Editor
 export const EditorEventType = {
@@ -169,4 +170,4 @@ export const EditorEventType = {
   ZOOM_CHANGED: 'zoomChanged',
   PANE_CHANGED: 'paneChanged',
 } as const
-export type EditorEventType = (typeof EditorEventType)[keyof typeof EditorEventType]
+export type EditorEventType = ValueOf<typeof EditorEventType>
