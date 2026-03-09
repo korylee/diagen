@@ -1,10 +1,10 @@
 import { SelectionBox, SelectionLayer } from './InteractionOverlay'
 import { useDesigner } from './DesignerProvider'
-import { createDrag, createKeyboard, createPan, createResize, createSelection } from '../primitives'
+import { createDrag, createPan, createResize, createSelection } from '../primitives'
 import { Point } from '@diagen/shared'
 import { createMemo, createSignal, JSX, onMount, Show } from 'solid-js'
 import { InteractionProvider } from './InteractionProvider'
-import { createEventListener, createScroll } from '@diagen/primitives'
+import { createEventListener, createScroll, createKeyboard } from '@diagen/primitives'
 import { DesignerGrids } from './DesignerGrids'
 
 export function RendererContainer(props: {

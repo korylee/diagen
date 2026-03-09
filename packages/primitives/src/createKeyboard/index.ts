@@ -1,4 +1,4 @@
-import { ensureArray } from '@diagen/shared'
+import { ensureArray, ValueOf } from '@diagen/shared'
 import { onCleanup, onMount } from 'solid-js'
 
 export type KeyCombo = string | string[]
@@ -21,7 +21,7 @@ const MODIFIER_ALIASES = {
   alt: 'alt',
 } as const
 
-type Modifier = typeof MODIFIER_ALIASES[keyof typeof MODIFIER_ALIASES]
+type Modifier = ValueOf<typeof MODIFIER_ALIASES>
 
 const MODIFIER_STATE: Record<Modifier, (e: KeyboardEvent) => boolean> = {
   ctrl: e => e.ctrlKey,
