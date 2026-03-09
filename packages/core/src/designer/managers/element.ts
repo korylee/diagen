@@ -1,10 +1,9 @@
 import { batch, createMemo } from 'solid-js'
-import { generateId } from '@diagen/shared'
+import { ensureArray, generateId, KeyOf } from '@diagen/shared'
 import { DesignerContext } from './types'
 import { BoxProps, DiagramElement, isLinker, isShape, LinkerElement, LinkerEndpoint, ShapeElement } from '../../model'
 import { Schema } from '../../schema'
-import { produce, SetStoreFunction } from 'solid-js/store'
-import { EditorState } from '../index'
+import { produce, StoreSetter } from 'solid-js/store'
 
 const CreateMethods = {
   shape: (schemaId: string, box: BoxProps, overrides?: Partial<ShapeElement>): ShapeElement | null =>
@@ -50,11 +49,12 @@ export const createElementManager = (ctx: DesignerContext) => {
       }
       ctx.setState('diagram', 'orderList', list => [...list, ...ids])
     })
-    ctx.emit('element:added', elements)
+    ctx.emit('element:added', { elements })
   }
 
   function remove(els: (string | DiagramElement)[]) {
     const ids = els.map(el => (typeof el === 'string' ? el : el.id))
+    const elements = ids.map(id => getById(id)).filter(Boolean)
     batch(() => {
       ctx.setState(
         'diagram',
@@ -68,12 +68,27 @@ export const createElementManager = (ctx: DesignerContext) => {
       ctx.setState('diagram', 'orderList', list => list.filter(id => !ids.includes(id)))
     })
 
-    ctx.emit('element:removed', { ids })
+    ctx.emit('element:removed', { elements })
   }
 
-  const update: SetStoreFunction<EditorState['diagram']['elements']> = (...args: unknown[]) => {
-    ctx.setState('diagram', 'elements', ...(args as [any]))
-    ctx.emit('element:updated')
+  function update<K1 extends KeyOf<DiagramElement>, K2 extends KeyOf<DiagramElement[K1]>>(
+    id: string,
+    k1: K1,
+    k2: K2,
+    setter: StoreSetter<DiagramElement[K1][K2], [K2, K1]>,
+  ): void
+  function update<K1 extends KeyOf<DiagramElement>>(
+    id: string,
+    k1: K1,
+    setter: StoreSetter<DiagramElement[K1], [K1]>,
+  ): void
+  function update(id: string | string[], setter: StoreSetter<DiagramElement>): void
+  function update(id: string | string[], ...args: unknown[]) {
+    ctx.setState('diagram', 'elements', id, ...(args as [any]))
+    const elements = ensureArray(id)
+      .map(id => getById(id))
+      .filter(Boolean)
+    ctx.emit('element:updated', { elements })
   }
 
   function clear() {
@@ -85,34 +100,32 @@ export const createElementManager = (ctx: DesignerContext) => {
     ctx.emit('element:cleared', { elements: list })
   }
 
-  function move(elements: DiagramElement[], dx: number, dy: number) {
+  function move(elements: (string | DiagramElement)[], dx: number, dy: number) {
     if (dx === 0 && dy === 0) return
+    const ids = elements.map(el => (typeof el === 'string' ? el : el.id))
 
     batch(() => {
       ctx.setState(
         'diagram',
         'elements',
-        produce(els => {
-          for (const element of elements) {
-            const el = els[element.id]
-            if (!el) continue
-
-            if (isShape(el)) {
-              el.props.x += dx
-              el.props.y += dy
-            } else if (isLinker(el)) {
-              // 整体移动连线：只有自由连线或者手动触发的整体移动才更新端点
-              // 如果端点绑定了 ID，则由端点跟随 Shape 的逻辑处理（后续扩展）
-              el.from.x += dx
-              el.from.y += dy
-              el.to.x += dx
-              el.to.y += dy
-              if (el.points) {
-                el.points = el.points.map((p: any) => ({
-                  x: p.x + dx,
-                  y: p.y + dy,
-                }))
-              }
+        ids,
+        produce(el => {
+          if (!el) return
+          if (isShape(el)) {
+            el.props.x += dx
+            el.props.y += dy
+          } else if (isLinker(el)) {
+            // 整体移动连线：只有自由连线或者手动触发的整体移动才更新端点
+            // 如果端点绑定了 ID，则由端点跟随 Shape 的逻辑处理（后续扩展）
+            el.from.x += dx
+            el.from.y += dy
+            el.to.x += dx
+            el.to.y += dy
+            if (el.points) {
+              el.points = el.points.map(p => ({
+                x: p.x + dx,
+                y: p.y + dy,
+              }))
             }
           }
         }),

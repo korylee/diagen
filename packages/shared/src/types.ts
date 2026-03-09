@@ -21,3 +21,13 @@ export type Awaited<T> = T extends null | undefined
 export type Promisify<T> = Promise<Awaited<T>>
 
 export type PromisifyFn<T extends AnyFn> = (...args: Parameters<T>) => Promisify<ReturnType<T>>
+
+export type KeyOf<T> = number extends keyof T
+  ? 0 extends 1 & T
+    ? keyof T
+    : [T] extends [never]
+      ? never
+      : [T] extends [readonly unknown[]]
+        ? number
+        : keyof T
+  : keyof T
