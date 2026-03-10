@@ -1,3 +1,5 @@
+import { KeyOf } from './types'
+
 export type EventType = string | symbol
 
 // 处理器类型
@@ -11,7 +13,7 @@ export type WildcardHandler<Events extends Record<EventType, any>> = <Key extend
 // 内部类型
 type AnyHandler = ((event: any) => void) | WildcardHandler<any>
 type HandlerList = AnyHandler[]
-type EventHandlerMap<Events extends Record<EventType, any>> = Map<keyof Events | '*', HandlerList>
+type EventHandlerMap<Events extends Record<EventType, any>> = Map<KeyOf<Events> | '*', HandlerList>
 
 export function createEmitter<Events extends Record<EventType, any> = Record<EventType, any>>(
   all?: EventHandlerMap<Events>,
@@ -96,4 +98,4 @@ export function createEmitter<Events extends Record<EventType, any> = Record<Eve
   }
 }
 
-export type Emitter = ReturnType<typeof createEmitter>
+export type Emitter<T extends Record<EventType, any> = any> = ReturnType<typeof createEmitter<T>>

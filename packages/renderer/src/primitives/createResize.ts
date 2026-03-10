@@ -1,7 +1,8 @@
 import { batch, createSignal, onCleanup } from 'solid-js'
-import type { Point, Rect } from '@diagen/shared'
-import { useDesigner } from '../components'
 import { isShape } from '@diagen/core'
+import type { Bounds, Point } from '@diagen/shared'
+import { useDesigner } from '../components'
+import { resolveCanvasDelta, type EventToCanvas } from './resolveCanvasDelta'
 
 // ============================================================================
 // 调整大小 Hook - 与 Designer 集成
@@ -15,15 +16,18 @@ export function createResize(
   options: {
     minWidth?: number
     minHeight?: number
+    eventToCanvas?: EventToCanvas
   } = {},
 ) {
-  const { minWidth = 20, minHeight = 20 } = options
+  const { minWidth = 20, minHeight = 20, eventToCanvas } = options
   const { element, history, selection, view, edit } = useDesigner()
+  const transaction = history.transaction.createScope('调整尺寸')
 
   const [targetId, setTargetId] = createSignal<string | null>(null)
   const [direction, setDirection] = createSignal<ResizeDirection | null>(null)
-  const [startBounds, setStartBounds] = createSignal<Rect | null>(null)
+  const [startBounds, setStartBounds] = createSignal<Bounds | null>(null)
   const [startMouse, setStartMouse] = createSignal<Point | null>(null)
+  const [startPointerCanvas, setStartPointerCanvas] = createSignal<Point | null>(null)
   const [ratio, setRatio] = createSignal(1)
 
   const isResizing = () => targetId() !== null
@@ -31,18 +35,23 @@ export function createResize(
   const start = (id: string, dir: ResizeDirection, e: MouseEvent) => {
     const el = element.getById(id)
     if (!el || !isShape(el)) return
+    if (!transaction.begin()) return
 
-    const bounds: Rect = { x: el.props.x, y: el.props.y, w: el.props.w, h: el.props.h }
+    const bounds = view.getElementBounds(el)
+
+    if (!bounds) {
+      transaction.abort()
+      return
+    }
 
     batch(() => {
       setTargetId(id)
       setDirection(dir)
       setStartBounds(bounds)
       setStartMouse({ x: e.clientX, y: e.clientY })
+      setStartPointerCanvas(eventToCanvas ? eventToCanvas(e) : null)
       setRatio(bounds.w / bounds.h)
     })
-
-    history.transaction.begin()
   }
 
   const move = (e: MouseEvent) => {
@@ -53,8 +62,19 @@ export function createResize(
     if (!start || !bounds || !dir || !id) return
 
     const zoom = view.viewport().zoom
-    const dx = (e.clientX - start.x) / zoom
-    const dy = (e.clientY - start.y) / zoom
+    const delta = resolveCanvasDelta({
+      moveState: {
+        dx: e.clientX - start.x,
+        dy: e.clientY - start.y,
+        shouldUpdate: true,
+      },
+      zoom,
+      startPointerCanvas: startPointerCanvas(),
+      event: e,
+      eventToCanvas,
+    })
+    const dx = delta.x
+    const dy = delta.y
 
     let { x, y, w, h } = bounds
     const keepRatio = e.shiftKey
@@ -96,16 +116,18 @@ export function createResize(
     const el = element.getById(id)
     if (el && isShape(el)) {
       edit.update(id, { props: { ...el.props, x, y, w, h } })
+      view.scheduleAutoGrow({ x, y, w, h })
     }
   }
 
   const end = () => {
-    history.transaction.commit()
+    view.flushAutoGrow()
+    transaction.commit()
     reset()
   }
 
   const cancel = () => {
-    history.transaction.abort()
+    transaction.abort()
     reset()
   }
 
@@ -115,6 +137,7 @@ export function createResize(
       setDirection(null)
       setStartBounds(null)
       setStartMouse(null)
+      setStartPointerCanvas(null)
     })
   }
 

@@ -1,47 +1,46 @@
-import { createEffect } from 'solid-js'
 import type { LinkerElement } from '@diagen/core'
-import { isRectVisible } from '@diagen/core'
-import type { Rect } from '@diagen/shared'
-import { calculateLinkerRoute, getLinkerBounds, renderLinker } from '../../utils'
-import { useDesigner } from '../../components'
+import { isBoundsVisible } from '@diagen/core'
 import { createDevicePixelRatio } from '@diagen/primitives'
+import { createEffect, createMemo } from 'solid-js'
+import { useDesigner } from '../../components'
+import { renderLinker } from '../../utils'
 
 export interface LinkerCanvasProps {
   linker: LinkerElement
-  onMouseDown?: (event: MouseEvent) => void
+  onMouseDown?: (event: MouseEvent) => boolean
 }
 
 export function LinkerCanvas(props: LinkerCanvasProps) {
-  const { view, selection, getElementById } = useDesigner()
+  const { view, selection } = useDesigner()
   const pixelRatio = createDevicePixelRatio()
+  const layout = createMemo(() => {
+    return view.getLinkerLayout(props.linker)
+  })
+  const route = createMemo(() => layout().route)
+  const bounds = createMemo(() => layout().bounds)
 
   let canvasRef: HTMLCanvasElement | undefined
   let containerRef: HTMLDivElement | undefined
 
   const padding = 20
 
-  const getRoute = () => calculateLinkerRoute(props.linker, getElementById as any)
-
-  /** 画布坐标系中的边界 */
-  const getBounds = (): Rect => getLinkerBounds(getRoute())
-
   /** 屏幕坐标系中的位置（DOM 定位用） */
-  const getScreenRect = () => {
+  const getScreenBounds = createMemo(() => {
     const vp = view.viewport()
-    const bounds = getBounds()
+    const b = bounds()
     return {
-      x: bounds.x * vp.zoom + vp.x - padding,
-      y: bounds.y * vp.zoom + vp.y - padding,
-      w: bounds.w * vp.zoom + padding * 2,
-      h: bounds.h * vp.zoom + padding * 2,
+      x: b.x * vp.zoom + vp.x - padding,
+      y: b.y * vp.zoom + vp.y - padding,
+      w: b.w * vp.zoom + padding * 2,
+      h: b.h * vp.zoom + padding * 2,
     }
-  }
+  })
 
   /** 是否在可见区域内 */
   const isVisible = () => {
     const vp = view.viewport()
-    const pg = view.page()
-    return isRectVisible(getBounds(), vp, { width: pg.width, height: pg.height })
+    const vpSize = view.viewportSize()
+    return isBoundsVisible(bounds(), vp, { width: vpSize.width, height: vpSize.height })
   }
 
   const doRender = () => {
@@ -50,17 +49,18 @@ export function LinkerCanvas(props: LinkerCanvasProps) {
     if (!ctx) return
 
     const vp = view.viewport()
-    const rect = getScreenRect()
+    const rect = getScreenBounds()
     const width = Math.max(1, Math.ceil(rect.w))
     const height = Math.max(1, Math.ceil(rect.h))
-    const bounds = getBounds()
+    const b = bounds()
+    const linkerRoute = route()
 
     ctx.clearRect(0, 0, width * pixelRatio(), height * pixelRatio())
     ctx.save()
     ctx.scale(pixelRatio(), pixelRatio())
     ctx.scale(vp.zoom, vp.zoom)
-    ctx.translate(-bounds.x + padding / vp.zoom, -bounds.y + padding / vp.zoom)
-    renderLinker(ctx, props.linker, getRoute())
+    ctx.translate(-b.x + padding / vp.zoom, -b.y + padding / vp.zoom)
+    renderLinker(ctx, props.linker, linkerRoute)
     ctx.restore()
   }
 
@@ -71,7 +71,7 @@ export function LinkerCanvas(props: LinkerCanvasProps) {
     }
     if (containerRef) containerRef.style.display = 'block'
 
-    const rect = getScreenRect()
+    const rect = getScreenBounds()
     const width = Math.max(1, Math.ceil(rect.w))
     const height = Math.max(1, Math.ceil(rect.h))
     if (canvasRef) {
@@ -81,35 +81,36 @@ export function LinkerCanvas(props: LinkerCanvasProps) {
     doRender()
   }
 
-  createEffect(() => updateCanvas())
+  createEffect(() => {
+    // 路径变化但外包框不变时，仍需强制重绘。
+    route()
+    updateCanvas()
+  })
 
   const handleMouseDown = (e: MouseEvent) => {
-    e.stopPropagation()
     props.onMouseDown?.(e)
   }
-
-  const screenRect = () => getScreenRect()
 
   return (
     <div
       ref={containerRef}
       style={{
         position: 'absolute',
-        left: `${screenRect().x}px`,
-        top: `${screenRect().y}px`,
-        width: `${screenRect().w}px`,
-        height: `${screenRect().h}px`,
+        left: `${getScreenBounds().x}px`,
+        top: `${getScreenBounds().y}px`,
+        width: `${getScreenBounds().w}px`,
+        height: `${getScreenBounds().h}px`,
         cursor: selection.isSelected(props.linker.id) ? 'move' : 'pointer',
         'pointer-events': 'auto',
       }}
     >
       <canvas
         ref={canvasRef}
-        width={screenRect().w * pixelRatio()}
-        height={screenRect().h * pixelRatio()}
+        width={getScreenBounds().w * pixelRatio()}
+        height={getScreenBounds().h * pixelRatio()}
         style={{
-          width: `${screenRect().w}px`,
-          height: `${screenRect().h}px`,
+          width: `${getScreenBounds().w}px`,
+          height: `${getScreenBounds().h}px`,
         }}
         onMouseDown={handleMouseDown}
       />

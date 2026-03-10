@@ -1,46 +1,42 @@
-import { createEffect } from 'solid-js'
 import type { ShapeElement } from '@diagen/core'
-import { pick, type Rect } from '@diagen/shared'
-import { isRectVisible } from '@diagen/core'
-import { renderShape } from '../../utils'
+import { isBoundsVisible } from '@diagen/core'
+import { createDevicePixelRatio } from '@diagen/primitives'
+import { createEffect, createMemo } from 'solid-js'
 import { useDesigner } from '../../components'
+import { renderShape } from '../../utils'
 
 export interface ShapeCanvasProps {
   shape: ShapeElement
   onMouseDown?: (event: MouseEvent) => void
 }
 
-const DPR = window.devicePixelRatio || 1
-
 export function ShapeCanvas(props: ShapeCanvasProps) {
   let canvasRef: HTMLCanvasElement | undefined
   let containerRef: HTMLDivElement | undefined
 
   const { selection, view } = useDesigner()
-  const { isSelected } = selection
+  const pixelRatio = createDevicePixelRatio()
+  const bounds = createMemo(() => view.getShapeBounds(props.shape))
 
   const padding = 4
 
-  /** 画布坐标系中的边界 */
-  const getBounds = (): Rect => pick(props.shape.props, ['x', 'y', 'w', 'h'])
-
   /** 屏幕坐标系中的位置（DOM 定位用） */
-  const getScreenRect = () => {
+  const getScreenBounds = () => {
     const vp = view.viewport()
-    const bounds = getBounds()
+    const b = bounds()
     return {
-      x: bounds.x * vp.zoom + vp.x - padding,
-      y: bounds.y * vp.zoom + vp.y - padding,
-      w: bounds.w * vp.zoom + padding * 2,
-      h: bounds.h * vp.zoom + padding * 2,
+      x: b.x * vp.zoom + vp.x - padding,
+      y: b.y * vp.zoom + vp.y - padding,
+      w: b.w * vp.zoom + padding * 2,
+      h: b.h * vp.zoom + padding * 2,
     }
   }
 
   /** 是否在可见区域内 */
   const isVisible = () => {
     const vp = view.viewport()
-    const pg = view.page()
-    return isRectVisible(getBounds(), vp, { width: pg.width, height: pg.height })
+    const vpSize = view.viewportSize()
+    return isBoundsVisible(bounds(), vp, { width: vpSize.width, height: vpSize.height })
   }
 
   const doRender = () => {
@@ -49,13 +45,13 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
     if (!ctx) return
 
     const vp = view.viewport()
-    const rect = getScreenRect()
-    const width = Math.max(1, Math.ceil(rect.w))
-    const height = Math.max(1, Math.ceil(rect.h))
+    const bounds = getScreenBounds()
+    const width = Math.max(1, Math.ceil(bounds.w))
+    const height = Math.max(1, Math.ceil(bounds.h))
 
-    ctx.clearRect(0, 0, width * DPR, height * DPR)
+    ctx.clearRect(0, 0, width * pixelRatio(), height * pixelRatio())
     ctx.save()
-    ctx.scale(DPR, DPR)
+    ctx.scale(pixelRatio(), pixelRatio())
     ctx.scale(vp.zoom, vp.zoom)
     ctx.translate(padding / vp.zoom, padding / vp.zoom)
     renderShape(ctx, props.shape)
@@ -69,12 +65,12 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
     }
     if (containerRef) containerRef.style.display = 'block'
 
-    const rect = getScreenRect()
+    const rect = getScreenBounds()
     const width = Math.max(1, Math.ceil(rect.w))
     const height = Math.max(1, Math.ceil(rect.h))
     if (canvasRef) {
-      canvasRef.width = width * DPR
-      canvasRef.height = height * DPR
+      canvasRef.width = width * pixelRatio()
+      canvasRef.height = height * pixelRatio()
     }
     doRender()
   }
@@ -86,28 +82,26 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
     props.onMouseDown?.(e)
   }
 
-  const screenRect = () => getScreenRect()
-
   return (
     <div
       ref={containerRef}
       style={{
         position: 'absolute',
-        left: `${screenRect().x}px`,
-        top: `${screenRect().y}px`,
-        width: `${screenRect().w}px`,
-        height: `${screenRect().h}px`,
-        cursor: isSelected(props.shape.id) ? 'move' : 'pointer',
+        left: `${getScreenBounds().x}px`,
+        top: `${getScreenBounds().y}px`,
+        width: `${getScreenBounds().w}px`,
+        height: `${getScreenBounds().h}px`,
+        cursor: selection.isSelected(props.shape.id) ? 'move' : 'pointer',
         'pointer-events': 'auto',
       }}
     >
       <canvas
         ref={canvasRef}
-        width={screenRect().w * DPR}
-        height={screenRect().h * DPR}
+        width={getScreenBounds().w * pixelRatio()}
+        height={getScreenBounds().h * pixelRatio()}
         style={{
-          width: `${screenRect().w}px`,
-          height: `${screenRect().h}px`,
+          width: `${getScreenBounds().w}px`,
+          height: `${getScreenBounds().h}px`,
         }}
         onMouseDown={handleMouseDown}
       />

@@ -1,4 +1,5 @@
-import { Point, Rect, Size } from '@diagen/shared'
+import { Bounds, clamp, Point, Size } from '@diagen/shared'
+import { DEFAULTS } from '../constants.ts'
 
 // ============================================================================
 // 坐标系统说明
@@ -24,127 +25,68 @@ export interface Viewport extends Point {
   zoom: number
 }
 
-/** 渲染容器尺寸 */
-export interface CanvasSize extends Size {}
-
 // ============================================================================
 // 坐标转换函数
 // ============================================================================
 
 /**
- * 将屏幕坐标转换为画布坐标
- *
- * @param screenPoint - 屏幕坐标点（相对于渲染容器左上角）
- * @param viewport - 当前视口状态
- * @param canvasOffset - 画布偏移量（默认为 { x: 0, y: 0 }），用于嵌套场景
- * @returns 画布坐标系中的点
- *
- * @example
- * // 用户点击屏幕位置 (250, 230)
- * // 视口状态为 { x: 50, y: 30, zoom: 2 }
- * // 转换结果：画布坐标 = { x: (250 - 50) / 2, y: (230 - 30) / 2 } = { x: 100, y: 100 }
+ * 将屏幕矩形/坐标转换为画布矩形/坐标
  */
-export function screenToCanvas(screenPoint: Point, viewport: Viewport, canvasOffset: Point = { x: 0, y: 0 }): Point {
-  return {
-    x: (screenPoint.x - canvasOffset.x - viewport.x) / viewport.zoom,
-    y: (screenPoint.y - canvasOffset.y - viewport.y) / viewport.zoom,
-  }
-}
-
-/**
- * 将画布坐标转换为屏幕坐标
- *
- * @param canvasPoint - 画布坐标系中的点
- * @param viewport - 当前视口状态
- * @param canvasOffset - 画布偏移量（默认为 { x: 0, y: 0 }），用于嵌套场景
- * @returns 屏幕坐标系中的点（相对于渲染容器左上角）
- *
- * @example
- * // 画布上的点 (100, 100)
- * // 视口状态为 { x: 50, y: 30, zoom: 2 }
- * // 转换结果：屏幕坐标 = { x: 100 * 2 + 50, y: 100 * 2 + 30 } = { x: 250, y: 230 }
- */
-export function canvasToScreen(canvasPoint: Point, viewport: Viewport, canvasOffset: Point = { x: 0, y: 0 }): Point {
-  return {
-    x: canvasPoint.x * viewport.zoom + viewport.x + canvasOffset.x,
-    y: canvasPoint.y * viewport.zoom + viewport.y + canvasOffset.y,
-  }
-}
-
-// ============================================================================
-// 矩形转换函数
-// ============================================================================
-
-/**
- * 将画布矩形转换为屏幕矩形
- *
- * @param rect - 画布坐标系中的矩形 { x, y, w, h }
- * @param viewport - 当前视口状态
- * @param canvasOffset - 画布偏移量（默认为 { x: 0, y: 0 }）
- * @returns 屏幕坐标系中的矩形
- */
-export function canvasRectToScreen(rect: Rect, viewport: Viewport, canvasOffset: Point = { x: 0, y: 0 }): Rect {
+export function screenToCanvas<T extends Point | Bounds>(
+  val: T,
+  viewport: Viewport,
+  canvasOffset: Point = { x: 0, y: 0 },
+): T extends Bounds ? Bounds : Point {
   const { zoom, x, y } = viewport
   const { x: ox, y: oy } = canvasOffset
-  return {
-    x: rect.x * zoom + x + ox,
-    y: rect.y * zoom + y + oy,
-    w: rect.w * zoom,
-    h: rect.h * zoom,
+
+  const bounds = val as unknown as Bounds
+  if (bounds.w != null) {
+    return {
+      x: (bounds.x - ox - x) / zoom,
+      y: (bounds.y - oy - y) / zoom,
+      w: bounds.w / zoom,
+      h: bounds.h / zoom,
+    } as any
   }
-}
 
-// ============================================================================
-// 缩放计算函数
-// ============================================================================
-
-/** 计算适应内容的缩放级别（不超过 100%） */
-export function calculateZoomToFit(contentBounds: Rect, canvasSize: CanvasSize, padding: number = 50): number {
-  if (contentBounds.w === 0 || contentBounds.h === 0) return 1
-  const availableWidth = canvasSize.width - padding * 2
-  const availableHeight = canvasSize.height - padding * 2
-  return Math.min(availableWidth / contentBounds.w, availableHeight / contentBounds.h, 1)
-}
-
-/** 计算内容居中时的视口偏移 */
-export function calculateCenterOffset(contentBounds: Rect, canvasSize: CanvasSize, zoom: number): Point {
   return {
-    x: (canvasSize.width - contentBounds.w * zoom) / 2 - contentBounds.x * zoom,
-    y: (canvasSize.height - contentBounds.h * zoom) / 2 - contentBounds.y * zoom,
+    x: (val.x - ox - x) / zoom,
+    y: (val.y - oy - y) / zoom,
+  } as any
+} 
+
+/**
+ * 将画布矩形/坐标转换为屏幕矩形/坐标
+ * @returns 屏幕坐标系中的矩形/坐标
+ */
+export function canvasToScreen<T extends Point | Bounds>(
+  val: T,
+  viewport: Viewport,
+  canvasOffset: Point = { x: 0, y: 0 },
+): T extends Bounds ? Bounds : Point {
+  const { zoom, x, y } = viewport
+  const { x: ox, y: oy } = canvasOffset
+  const bounds = val as unknown as Bounds
+
+  if (bounds.w != null) {
+    return {
+      x: bounds.x * zoom + x + ox,
+      y: bounds.y * zoom + y + oy,
+      w: bounds.w * zoom,
+      h: bounds.h * zoom,
+    } as any
   }
+
+  return {
+    x: val.x * zoom + x + ox,
+    y: val.y * zoom + y + oy,
+  } as any
 }
-
-// ============================================================================
-// 缩放常量与工具函数
-// ============================================================================
-
-/** 默认最小缩放级别 */
-export const DEFAULT_MIN_ZOOM = 0.1
-
-/** 默认最大缩放级别 */
-export const DEFAULT_MAX_ZOOM = 5
 
 /** 限制缩放级别在有效范围内 */
-export function clampZoom(zoom: number, min: number = DEFAULT_MIN_ZOOM, max: number = DEFAULT_MAX_ZOOM): number {
-  return Math.max(min, Math.min(max, zoom))
-}
-
-/** 以指定点为中心进行缩放 */
-export function zoomAtPoint(
-  currentZoom: number,
-  delta: number,
-  point: Point,
-  viewport: Viewport,
-): { zoom: number; offset: Point } {
-  const newZoom = clampZoom(currentZoom + delta)
-  const scale = newZoom / currentZoom
-  return {
-    zoom: newZoom,
-    offset: {
-      x: point.x - (point.x - viewport.x) * scale,
-      y: point.y - (point.y - viewport.y) * scale,
-    },
-  }
+export function clampZoom(zoom: number, min: number = DEFAULTS.MIN_ZOOM, max: number = DEFAULTS.MAX_ZOOM): number {
+  return clamp(zoom, min, max)
 }
 
 // ============================================================================
@@ -152,29 +94,29 @@ export function zoomAtPoint(
 // ============================================================================
 
 /** 判断矩形是否在视口中可见 */
-export function isRectVisible(
-  rect: Rect,
+export function isBoundsVisible(
+  bounds: Bounds,
   viewport: Viewport,
-  canvasSize: CanvasSize,
+  viewportSize: Size,
   canvasOffset: Point = { x: 0, y: 0 },
 ): boolean {
-  const screenRect = canvasRectToScreen(rect, viewport, canvasOffset)
+  const screenBounds = canvasToScreen(bounds, viewport, canvasOffset)
   return !(
-    screenRect.x + screenRect.w < 0 ||
-    screenRect.y + screenRect.h < 0 ||
-    screenRect.x > canvasSize.width ||
-    screenRect.y > canvasSize.height
+    screenBounds.x + screenBounds.w < 0 ||
+    screenBounds.y + screenBounds.h < 0 ||
+    screenBounds.x > viewportSize.width ||
+    screenBounds.y > viewportSize.height
   )
 }
 
 /** 获取当前视口可见的画布区域 */
 export function getVisibleCanvasArea(
   viewport: Viewport,
-  canvasSize: CanvasSize,
+  viewportSize: Size,
   canvasOffset: Point = { x: 0, y: 0 },
-): Rect {
+): Bounds {
   const topLeft = screenToCanvas({ x: 0, y: 0 }, viewport, canvasOffset)
-  const bottomRight = screenToCanvas({ x: canvasSize.width, y: canvasSize.height }, viewport, canvasOffset)
+  const bottomRight = screenToCanvas({ x: viewportSize.width, y: viewportSize.height }, viewport, canvasOffset)
   return {
     x: topLeft.x,
     y: topLeft.y,

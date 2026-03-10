@@ -143,31 +143,3 @@ export const DEFAULTS = {
   DISABLE_LINE_JUMPS_THRESHOLD: 400,
   ENABLE_VIRTUALIZATION_THRESHOLD: 2000,
 } as const
-
-// Resize Directions
-export const RESIZE_DIRECTIONS = ['tl', 't', 'tr', 'l', 'r', 'bl', 'b', 'br'] as const
-export type ResizeDirection = ValueOf<typeof RESIZE_DIRECTIONS>
-
-// Event Types for Editor
-export const EditorEventType = {
-  RENDER_COMPLETE: 'randerComplete',
-  INITIALIZED: 'initialized',
-  CREATE: 'create',
-  CREATED: 'created',
-  LINKER_CREATING: 'linkerCreating',
-  LINKER_CREATED: 'linkerCreated',
-  SELECT_CHANGED: 'selectChanged',
-  UNDO_STACK_CHANGED: 'undoStackChanged',
-  REDO_STACK_CHANGED: 'redoStackChanged',
-  BEFORE_RESIZE: 'beforeResize',
-  RESIZING: 'resizing',
-  BEFORE_REMOVE: 'beforeRemove',
-  REMOVED: 'removed',
-  SHAPE_CHANGED: 'shapeChanged',
-  CHANGE_LINKERS: 'changeLinkers',
-  RESET_BROKEN_LINKER: 'resetBrokenLinker',
-  SHAPE_COUNT: 'shapeCount',
-  ZOOM_CHANGED: 'zoomChanged',
-  PANE_CHANGED: 'paneChanged',
-} as const
-export type EditorEventType = ValueOf<typeof EditorEventType>

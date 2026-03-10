@@ -8,12 +8,12 @@ export interface Size {
   height: number
 }
 
-export interface Rect extends Point {
+export interface Bounds extends Point {
   w: number
   h: number
 }
 
-export interface Bounds extends Point, Size {}
+export interface Rect extends Point, Size {}
 
 export interface Line {
   x1: number
@@ -40,15 +40,15 @@ export function getDistanceSquared(p1: Point, p2: Point): number {
   return dx * dx + dy * dy
 }
 
-export function isPointInRect(point: Point, rect: Rect): boolean {
-  return point.x >= rect.x && point.x <= rect.x + rect.w && point.y >= rect.y && point.y <= rect.y + rect.h
+export function isPointInBounds(point: Point, b: Bounds): boolean {
+  return point.x >= b.x && point.x <= b.x + b.w && point.y >= b.y && point.y <= b.y + b.h
 }
 
-export function isPointInRotatedRect(point: Point, rect: Rect, angle: number): boolean {
-  if (angle === 0) return isPointInRect(point, rect)
+export function isPointInRotatedBounds(point: Point, b: Bounds, angle: number): boolean {
+  if (angle === 0) return isPointInBounds(point, b)
 
-  const cx = rect.x + rect.w / 2
-  const cy = rect.y + rect.h / 2
+  const cx = b.x + b.w / 2
+  const cy = b.y + b.h / 2
   const px = point.x - cx
   const py = point.y - cy
 
@@ -58,15 +58,15 @@ export function isPointInRotatedRect(point: Point, rect: Rect, angle: number): b
   const rx = px * cos - py * sin
   const ry = px * sin + py * cos
 
-  return rx >= -rect.w / 2 && rx <= rect.w / 2 && ry >= -rect.h / 2 && ry <= rect.h / 2
+  return rx >= -b.w / 2 && rx <= b.w / 2 && ry >= -b.h / 2 && ry <= b.h / 2
 }
 
-export function getRectCenter(rect: Rect): Point {
-  return { x: rect.x + rect.w / 2, y: rect.y + rect.h / 2 }
+export function getBoundsCenter(b: Bounds): Point {
+  return { x: b.x + b.w / 2, y: b.y + b.h / 2 }
 }
 
-export function normalizeRect(rect: Rect): Rect {
-  let { x, y, w, h } = rect
+export function normalizeBounds(bounds: Bounds): Bounds {
+  let { x, y, w, h } = bounds
   if (w < 0) {
     x += w
     w = -w
@@ -78,7 +78,7 @@ export function normalizeRect(rect: Rect): Rect {
   return { x, y, w, h }
 }
 
-export function unionRect(rect1: Rect, rect2: Rect): Rect {
+export function unionBounds(rect1: Bounds, rect2: Bounds): Bounds {
   const x = Math.min(rect1.x, rect2.x)
   const y = Math.min(rect1.y, rect2.y)
   return {
@@ -89,7 +89,7 @@ export function unionRect(rect1: Rect, rect2: Rect): Rect {
   }
 }
 
-export function isRectIntersect(rect1: Rect, rect2: Rect): boolean {
+export function isBoundsIntersect(rect1: Bounds, rect2: Bounds): boolean {
   return !(
     rect1.x + rect1.w < rect2.x ||
     rect2.x + rect2.w < rect1.x ||
@@ -98,7 +98,7 @@ export function isRectIntersect(rect1: Rect, rect2: Rect): boolean {
   )
 }
 
-export function getRectIntersection(rect1: Rect, rect2: Rect): Rect | null {
+export function getBoundsIntersection(rect1: Bounds, rect2: Bounds): Bounds | null {
   const x = Math.max(rect1.x, rect2.x)
   const y = Math.max(rect1.y, rect2.y)
   const right = Math.min(rect1.x + rect1.w, rect2.x + rect2.w)
@@ -149,24 +149,16 @@ export function scalePoint(point: Point, center: Point, scale: number): Point {
   }
 }
 
-export function boundsToRect(bounds: Bounds): Rect {
-  return { x: bounds.x, y: bounds.y, w: bounds.width, h: bounds.height }
-}
-
-export function rectToBounds(rect: Rect): Bounds {
-  return { x: rect.x, y: rect.y, width: rect.w, height: rect.h }
-}
-
 export function manhattanDistance(p1: Point, p2: Point): number {
   return Math.abs(p2.x - p1.x) + Math.abs(p2.y - p1.y)
 }
 
-export function expandRect(rect: Rect, padding: number): Rect {
+export function expandBounds(bounds: Bounds, padding: number): Bounds {
   return {
-    x: rect.x - padding,
-    y: rect.y - padding,
-    w: rect.w + padding * 2,
-    h: rect.h + padding * 2,
+    x: bounds.x - padding,
+    y: bounds.y - padding,
+    w: bounds.w + padding * 2,
+    h: bounds.h + padding * 2,
   }
 }
 
@@ -174,15 +166,15 @@ export function snapToGrid(value: number, gridSize: number): number {
   return Math.round(value / gridSize) * gridSize
 }
 
-export function lineIntersectsRect(p1: Point, p2: Point, rect: Rect): boolean {
-  if (isPointInRect(p1, rect) || isPointInRect(p2, rect)) {
+export function lineIntersectsBounds(p1: Point, p2: Point, bounds: Bounds): boolean {
+  if (isPointInBounds(p1, bounds) || isPointInBounds(p2, bounds)) {
     return true
   }
 
-  const left = rect.x
-  const right = rect.x + rect.w
-  const top = rect.y
-  const bottom = rect.y + rect.h
+  const left = bounds.x
+  const right = bounds.x + bounds.w
+  const top = bounds.y
+  const bottom = bounds.y + bounds.h
 
   return (
     lineIntersectsLine(p1, p2, { x: left, y: top }, { x: right, y: top }) ||

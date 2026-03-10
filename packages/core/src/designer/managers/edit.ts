@@ -2,78 +2,75 @@ import { deepClone, ensureArray, generateId, keys } from '@diagen/shared'
 import { batch } from 'solid-js'
 import type { DiagramElement } from '../../model'
 import { CreateMethods, type ElementManager } from './element'
-import type { Command, HistoryManager } from './history'
+import { Command, createCommand, HistoryManager } from './history'
 import { type SelectionManager } from './selection'
 import { DesignerContext } from './types'
 
-class AddCommand implements Command {
-  id = generateId()
-  name = 'add_els'
-  readonly timestamp = Date.now()
-  constructor(
-    private readonly deps: EditDeps,
-    private readonly elements: DiagramElement[],
-  ) {}
-  execute() {
-    this.deps.element.add(this.elements)
+function createAddCommand(deps: EditDeps, elements: DiagramElement[]) {
+  const { element } = deps
+  const name = 'add_els'
+
+  type AddCommand = Command & {
+    payload: DiagramElement[]
   }
-  undo() {
-    this.deps.element.remove(this.elements)
-  }
-  redo() {
-    this.execute()
-  }
-  canMergeWith(next: Command): boolean {
-    return next instanceof AddCommand && Date.now() - this.timestamp < 300
-  }
-  merge(next: Command) {
-    if (!(next instanceof AddCommand)) return null
-    return new AddCommand(this.deps, [...this.elements, ...next.elements])
-  }
+
+  return createCommand({
+    name,
+    payload: elements,
+    execute() {
+      element.add(elements)
+    },
+    undo() {
+      element.remove(elements)
+    },
+    canMergeWith(next: Command): boolean {
+      return next.name === name && Date.now() - next.timestamp < 300
+    },
+    merge<K extends Command>(next: K): K extends AddCommand ? AddCommand : null {
+      return (next.name !== name ? null : createAddCommand(deps, [...elements, ...(next as any).payload])) as any
+    },
+  }) as AddCommand
 }
 
-class RemoveCommand implements Command {
-  id = generateId()
-  name = 'remove_els'
-  readonly timestamp = Date.now()
+function createRemoveCommand(deps: EditDeps, elements: DiagramElement[]) {
+  const { element, selection } = deps
+  const name = 'remove_els'
 
-  constructor(
-    private readonly deps: EditDeps,
-    private readonly elements: DiagramElement[],
-  ) {}
-  execute() {
-    const { element, selection } = this.deps
-    element.remove(this.elements)
-    selection.deselect(this.elements.map(el => el.id))
+  type RemoveCommand = Command & {
+    payload: DiagramElement[]
   }
-  undo() {
-    const { element } = this.deps
-    element.add(this.elements)
-  }
-  redo() {
-    this.execute()
-  }
-  canMergeWith(next: Command) {
-    return next instanceof RemoveCommand && Date.now() - this.timestamp < 300
-  }
-  merge(next: Command) {
-    if (!(next instanceof RemoveCommand)) return null
-    return new RemoveCommand(this.deps, [...this.elements, ...next.elements])
-  }
+
+  return createCommand({
+    name,
+    payload: elements,
+    execute() {
+      element.remove(elements)
+      selection.deselect(elements.map(el => el.id))
+    },
+    undo() {
+      element.add(elements)
+    },
+    canMergeWith(next: Command): boolean {
+      return next.name !== name && Date.now() - next.timestamp < 300
+    },
+    merge<K extends Command>(next: K): K extends RemoveCommand ? RemoveCommand : null {
+      return (next.name !== name ? null : createRemoveCommand(deps, [...elements, ...(next as any).payload])) as any
+    },
+  })
 }
 
 class UpdateCommand implements Command {
   id = generateId()
   name = 'update_els'
   readonly timestamp = Date.now()
-  cahce: Record<string, Partial<DiagramElement>>
+  cache: Record<string, Partial<DiagramElement>>
   constructor(
     private readonly deps: EditDeps,
     private readonly ids: string[],
     private readonly overrides: Partial<DiagramElement>,
   ) {
     const _keys = keys(overrides)
-    this.cahce = ids.reduce(
+    this.cache = ids.reduce(
       (acc, id) => {
         const el = deps.element.getById(id)
         acc[id] = _keys.reduce((acc, cur) => {
@@ -95,7 +92,7 @@ class UpdateCommand implements Command {
   undo() {
     batch(() => {
       this.ids.forEach(id => {
-        this.deps.element.update(id, deepClone(this.cahce[id]))
+        this.deps.element.update(id, deepClone(this.cache[id]))
       })
     })
   }
@@ -187,7 +184,7 @@ export function createEditManager(ctx: DesignerContext, deps: EditDeps) {
       select && selection.select(elements.map(el => el.id))
       return
     }
-    const cmd = new AddCommand(deps, elements)
+    const cmd = createAddCommand(deps, elements)
 
     history.execute(cmd)
   }
@@ -218,7 +215,7 @@ export function createEditManager(ctx: DesignerContext, deps: EditDeps) {
       selection.deselect(ids)
       return
     }
-    const cmd = new RemoveCommand(deps, els)
+    const cmd = createRemoveCommand(deps, els)
 
     history.execute(cmd)
   }

@@ -1,9 +1,8 @@
 import { createStore } from 'solid-js/store'
 
-import type { CanvasSize, Viewport } from '../utils'
 import { createEmitter, DeepPartial, generateId, pick } from '@diagen/shared'
+import type { Viewport } from '../utils'
 
-import { createMemo } from 'solid-js'
 import { createDiagram, Diagram, DiagramElement } from '../model'
 import {
   type Command,
@@ -13,63 +12,53 @@ import {
   createSelectionManager,
   createViewManager,
 } from './managers'
-import { DesignerContext } from './managers/types'
+import type { DesignerContext } from './managers/types'
+import type { DesignerEmitter, EditorConfig, EditorState } from './types'
 
-// ============================================================================
-// 坐标系统说明
-// ============================================================================
-//
-// 1. 画布尺寸：由 page.width/height 定义，表示图表的逻辑大小
-// 2. 视口变换：由 viewport 定义，描述画布到屏幕的变换（偏移 + 缩放）
-//
-// 坐标转换：
-//   屏幕坐标 = 画布坐标 * zoom + viewportOffset
-//   画布坐标 = (屏幕坐标 - viewportOffset) / zoom
-//
-// ============================================================================
+export * from './types'
 
-// ============================================================================
-// Store State Types
-// ============================================================================
-
-interface Config {
-  panelItemWidth?: number
-  panelItemHeight?: number
-  anchorSize?: number
-  rotaterSize?: number
-  anchorColor?: string
-  selectorColor?: string
-}
-
-/** 编辑器状态 */
-export interface EditorState {
-  /** 图表数据 */
-  diagram: Diagram
-  /** 视口变换参数：x, y 为偏移，zoom 为缩放级别 */
-  viewport: Viewport
-  /** 渲染容器尺寸 */
-  canvasSize: CanvasSize
-
-  /** ui及性能配置 */
-  config: Config
-}
-
-// ============================================================================
-// Designer Store Options
-// ============================================================================
-
-interface Persistence extends Config, DeepPartial<Pick<Diagram, 'id' | 'name' | 'page'>> {
+interface DesignerOptions extends DeepPartial<EditorConfig>, DeepPartial<Pick<Diagram, 'id' | 'name' | 'page'>> {
   viewport?: Partial<Viewport>
 }
 
-export interface DesignerOptions extends Persistence {}
+export interface Persistence extends DesignerOptions {}
 
-// ============================================================================
-// Helper Functions
-// ============================================================================
+const DEFAULT_AUTO_GROW_CONFIG = {
+  enabled: true,
+  growPadding: 240,
+  growStep: 200,
+  maxWidth: 20000,
+  maxHeight: 20000,
+  shrink: false,
+  shrinkPadding: 320,
+}
+
+function createResolvedConfig(options: DesignerOptions): EditorConfig {
+  return {
+    panelItemWidth: 50,
+    panelItemHeight: 50,
+    anchorSize: 8,
+    rotaterSize: 9,
+    anchorColor: '#067bef',
+    selectorColor: '#067bef',
+    ...pick(options, [
+      'panelItemWidth',
+      'panelItemHeight',
+      'anchorSize',
+      'rotaterSize',
+      'anchorColor',
+      'selectorColor',
+    ]),
+    autoGrow: {
+      ...DEFAULT_AUTO_GROW_CONFIG,
+      ...options.autoGrow,
+    },
+  }
+}
 
 function createInitialState(options: DesignerOptions): EditorState {
   const diagram = createDiagram(pick(options, ['id', 'name', 'page']))
+  const { width: pageWidth, height: pageHeight } = diagram.page
 
   return {
     // 持久化储存
@@ -80,25 +69,15 @@ function createInitialState(options: DesignerOptions): EditorState {
       zoom: 1,
       ...options.viewport,
     },
-    canvasSize: {
+    viewportSize: {
       width: 800,
       height: 600,
     },
-    config: {
-      panelItemWidth: 50,
-      panelItemHeight: 50,
-      anchorSize: 8,
-      rotaterSize: 9,
-      anchorColor: '#067bef',
-      selectorColor: '#067bef',
-      ...pick(options, [
-        'panelItemWidth',
-        'panelItemHeight',
-        'anchorSize',
-        'anchorColor',
-        'selectorColor',
-      ]),
+    containerSize: {
+      width: pageWidth,
+      height: pageHeight,
     },
+    config: createResolvedConfig(options),
   }
 }
 
@@ -108,168 +87,22 @@ function createInitialState(options: DesignerOptions): EditorState {
 
 export function createDesigner(options: DesignerOptions = {}) {
   const id = options.id || generateId('editor')
-  const emitter = createEmitter()
+  const emitter: DesignerEmitter = createEmitter()
 
   const initialState = createInitialState(options)
   const [state, setState] = createStore(initialState)
   const ctx: DesignerContext = {
     state,
     setState,
-    emit: emitter.emit,
+    emitter,
   }
 
   // managers 分层
   const element = createElementManager(ctx)
   const history = createHistoryManager(ctx)
   const selection = createSelectionManager(ctx, { element })
-  const view = createViewManager(ctx, { element })
+  const view = createViewManager(ctx, { element, selection })
   const edit = createEditManager(ctx, { element, selection, history })
-
-  const { getById: getElementById, elements } = element
-  const page = createMemo(() => state.diagram.page)
-
-  // function moveElements(
-  //   ids: string[],
-  //   deltaX: number,
-  //   deltaY: number,
-  //   options: { recordHistory?: boolean } = {},
-  // ): void {
-  //   const { recordHistory = true } = options
-
-  //   if (ids.length === 0 || (deltaX === 0 && deltaY === 0)) return
-
-  //   const expandedIds = expandSelectionToGroups(ids)
-
-  //   const previousShapePositions: Record<string, Point> = {}
-  //   const previousLinkerState: Record<
-  //     string,
-  //     {
-  //       from: Point
-  //       to: Point
-  //       points: Array<Point>
-  //     }
-  //   > = {}
-
-  //   for (const id of expandedIds) {
-  //     const element = getElementById(id)
-  //     if (!element) continue
-
-  //     if (isShape(element)) {
-  //       previousShapePositions[id] = {
-  //         x: element.props.x,
-  //         y: element.props.y,
-  //       }
-  //     } else if (isLinker(element)) {
-  //       const isFreeLinker = element.from.id === null && element.to.id === null
-  //       if (isFreeLinker) {
-  //         previousLinkerState[id] = {
-  //           from: { x: element.from.x, y: element.from.y },
-  //           to: { x: element.to.x, y: element.to.y },
-  //           points: element.points.map(p => ({ x: p.x, y: p.y })),
-  //         }
-  //       }
-  //     }
-  //   }
-
-  //   const command: Command = {
-  //     id: generateId('cmd_move'),
-  //     name: `Move ${expandedIds.length} element(s)`,
-  //     timestamp: Date.now(),
-
-  //     execute: () => {
-  //       for (const id of expandedIds) {
-  //         const element = getElementById(id)
-  //         if (!element) continue
-
-  //         if (isShape(element)) {
-  //           const shape = element as ShapeElement
-  //           const updatedShape: ShapeElement = {
-  //             ...shape,
-  //             props: {
-  //               ...shape.props,
-  //               x: shape.props.x + deltaX,
-  //               y: shape.props.y + deltaY,
-  //             },
-  //           }
-  //           setState('diagram', 'elements', id, updatedShape)
-  //         } else if (isLinker(element)) {
-  //           const linker = element as LinkerElement
-  //           const isFreeLinker = linker.from.id === null && linker.to.id === null
-  //           if (isFreeLinker) {
-  //             const updatedLinker: LinkerElement = {
-  //               ...linker,
-  //               from: {
-  //                 ...linker.from,
-  //                 x: linker.from.x + deltaX,
-  //                 y: linker.from.y + deltaY,
-  //               },
-  //               to: {
-  //                 ...linker.to,
-  //                 x: linker.to.x + deltaX,
-  //                 y: linker.to.y + deltaY,
-  //               },
-  //               points: linker.points.map(p => ({
-  //                 x: p.x + deltaX,
-  //                 y: p.y + deltaY,
-  //               })),
-  //             }
-  //             setState('diagram', 'elements', id, updatedLinker)
-  //           }
-  //         }
-  //       }
-  //     },
-
-  //     undo: () => {
-  //       for (const id in previousShapePositions) {
-  //         const element = getElementById(id)
-  //         if (!element || !isShape(element)) continue
-  //         const shape = element as ShapeElement
-  //         const pos = previousShapePositions[id]
-  //         const restoredShape: ShapeElement = {
-  //           ...shape,
-  //           props: {
-  //             ...shape.props,
-  //             x: pos.x,
-  //             y: pos.y,
-  //           },
-  //         }
-  //         setState('diagram', 'elements', id, restoredShape)
-  //       }
-
-  //       for (const id in previousLinkerState) {
-  //         const element = getElementById(id)
-  //         if (!isLinker(element)) continue
-  //         const linker = element as LinkerElement
-  //         const state = previousLinkerState[id]
-  //         const restoredLinker: LinkerElement = {
-  //           ...linker,
-  //           from: {
-  //             ...linker.from,
-  //             x: state.from.x,
-  //             y: state.from.y,
-  //           },
-  //           to: {
-  //             ...linker.to,
-  //             x: state.to.x,
-  //             y: state.to.y,
-  //           },
-  //           points: state.points,
-  //         }
-  //         setState('diagram', 'elements', id, restoredLinker)
-  //       }
-  //     },
-
-  //     redo: () => {
-  //       command.execute()
-  //     },
-  //   }
-
-  //   if (recordHistory) {
-  //     // history.execute(command)
-  //   } else {
-  //     command.execute()
-  //   }
-  // }
 
   function serialize(): string {
     return JSON.stringify(state.diagram, null, 2)
@@ -365,8 +198,8 @@ export function createDesigner(options: DesignerOptions = {}) {
     view,
 
     // 快捷方式
-    elements,
-    getElementById,
+    getElementById: element.getById,
+
     addElements: edit.add,
     removeElements: edit.remove,
     updateElement: edit.update,
@@ -377,8 +210,6 @@ export function createDesigner(options: DesignerOptions = {}) {
     redo: history.redo,
     canUndo: history.canUndo,
     canRedo: history.canRedo,
-
-    page,
 
     serialize,
     loadFromJSON,

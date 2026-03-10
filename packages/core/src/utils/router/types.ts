@@ -1,4 +1,4 @@
-import type { Point, Rect } from '@diagen/shared'
+import type { Point, Bounds } from '@diagen/shared'
 
 export interface RouterConfig {
   gridSize: number
@@ -10,7 +10,7 @@ export interface RouterConfig {
 
 export interface Obstacle {
   id: string
-  bounds: Rect
+  bounds: Bounds
   padding: number
 }
 
@@ -22,6 +22,6 @@ export interface RouteResult {
 
 export interface RouterContext {
   obstacles: Obstacle[]
-  bounds: Rect
+  bounds: Bounds
   config: RouterConfig
 }

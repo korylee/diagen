@@ -1,5 +1,5 @@
-import type { ShapeElement, PathDefinition } from '@diagen/core';
-import { CompiledPathAction, compilePathActions } from './render-utils'
+import type { ShapeElement } from '@diagen/core';
+import { CompiledPathAction, compilePathActions } from './render-utils';
 
 export interface CachedPath {
   pathId: string;
@@ -15,11 +15,11 @@ export function generatePathId(shape: ShapeElement, pathIndex: number): string {
 
 export function getOrCompileShapePaths(shape: ShapeElement): CachedPath[] {
   const cachedPaths: CachedPath[] = [];
-  
+
   for (let i = 0; i < shape.path.length; i++) {
     const pathId = generatePathId(shape, i);
     const cached = pathCache.get(pathId);
-    
+
     if (cached && cached.lastModified >= (shape as any).updatedAt) {
       cachedPaths.push(cached);
     } else {
@@ -34,7 +34,7 @@ export function getOrCompileShapePaths(shape: ShapeElement): CachedPath[] {
       cachedPaths.push(newCached);
     }
   }
-  
+
   return cachedPaths;
 }
 

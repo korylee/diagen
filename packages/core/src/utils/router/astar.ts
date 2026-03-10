@@ -1,12 +1,7 @@
-import type { Point, Rect } from '@diagen/shared'
-import { createMinHeap } from '@diagen/shared'
+import type { Bounds, Point } from '@diagen/shared'
+import { createMinHeap, expandBounds, snapToGrid } from '@diagen/shared'
 import type { Obstacle, RouteResult, RouterConfig } from './types'
-import {
-  calculateBounds,
-  expandRect,
-  simplifyOrthogonalPath,
-  snapToGrid,
-} from './utils'
+import { calculateBounds, simplifyOrthogonalPath } from './utils'
 
 interface AStarNode {
   x: number
@@ -29,11 +24,12 @@ export function aStarRoute(
   to: Point,
   obstacles: Obstacle[],
   config: RouterConfig,
-  options: AStarRouteOptions = {}
+  options: AStarRouteOptions = {},
 ): RouteResult {
   const { heuristic = 'manhattan', bendPenalty = 20, weight = 1 } = options
   const { gridSize, padding, maxIterations } = config
 
+  // 搜索边界覆盖起终点与障碍，避免在无限平面上扩散。
   const bounds = calculateBounds(from, to, obstacles, padding)
 
   const startX = snapToGrid(from.x, gridSize)
@@ -41,9 +37,10 @@ export function aStarRoute(
   const endX = snapToGrid(to.x, gridSize)
   const endY = snapToGrid(to.y, gridSize)
 
+  // 障碍预先离散成栅格集合，查询成本可降为 O(1)。
   const obstacleGrid = buildObstacleGrid(obstacles, bounds, gridSize)
 
-  const openHeap = createMinHeap<AStarNode>((n) => n.f)
+  const openHeap = createMinHeap<AStarNode>(n => n.f)
   const allNodes = new Map<number, AStarNode>()
   const closedSet = new Set<number>()
 
@@ -99,6 +96,7 @@ export function aStarRoute(
       if (!isInBounds(nx, ny, bounds)) continue
       if (isBlocked(nx, ny, obstacleGrid, gridSize, bounds)) continue
 
+      // 方向变化会产生额外代价，促使结果减少无意义折线。
       const isBend = current.direction !== null && current.direction !== dir
       const bendCost = isBend ? bendPenalty : 0
       const moveCost = config.orthogonalCost * gridSize + bendCost
@@ -129,10 +127,12 @@ export function aStarRoute(
     }
   }
 
+  // 迭代上限内无解时返回直连兜底，调用方可据 success 决定是否回退算法。
   return { points: [from, to], success: false }
 }
 
 function toKey(x: number, y: number): number {
+  // 以数值键替代字符串键，减少 Map/Set 热路径上的分配。
   return x * 1000000 + y
 }
 
@@ -141,7 +141,7 @@ function heuristicFunc(
   y1: number,
   x2: number,
   y2: number,
-  type: 'manhattan' | 'euclidean' | 'diagonal'
+  type: 'manhattan' | 'euclidean' | 'diagonal',
 ): number {
   const dx = Math.abs(x2 - x1)
   const dy = Math.abs(y2 - y1)
@@ -156,17 +156,18 @@ function heuristicFunc(
   }
 }
 
-function buildObstacleGrid(obstacles: Obstacle[], bounds: Rect, gridSize: number): Set<number> {
+function buildObstacleGrid(obstacles: Obstacle[], bounds: Bounds, gridSize: number): Set<number> {
   const blocked = new Set<number>()
 
   for (const obstacle of obstacles) {
-    const expanded = expandRect(obstacle.bounds, obstacle.padding)
+    const expanded = expandBounds(obstacle.bounds, obstacle.padding)
 
     const startX = Math.floor((expanded.x - bounds.x) / gridSize)
     const startY = Math.floor((expanded.y - bounds.y) / gridSize)
     const endX = Math.ceil((expanded.x + expanded.w - bounds.x) / gridSize)
     const endY = Math.ceil((expanded.y + expanded.h - bounds.y) / gridSize)
 
+    // 这里存的是“网格索引坐标”，不是世界坐标。
     for (let gx = startX; gx <= endX; gx++) {
       for (let gy = startY; gy <= endY; gy++) {
         blocked.add(toKey(gx, gy))
@@ -177,13 +178,13 @@ function buildObstacleGrid(obstacles: Obstacle[], bounds: Rect, gridSize: number
   return blocked
 }
 
-function isBlocked(x: number, y: number, obstacleGrid: Set<number>, gridSize: number, bounds: Rect): boolean {
+function isBlocked(x: number, y: number, obstacleGrid: Set<number>, gridSize: number, bounds: Bounds): boolean {
   const gx = Math.floor((x - bounds.x) / gridSize)
   const gy = Math.floor((y - bounds.y) / gridSize)
   return obstacleGrid.has(toKey(gx, gy))
 }
 
-function isInBounds(x: number, y: number, bounds: Rect): boolean {
+function isInBounds(x: number, y: number, bounds: Bounds): boolean {
   return x >= bounds.x && x <= bounds.x + bounds.w && y >= bounds.y && y <= bounds.y + bounds.h
 }
 
@@ -199,9 +200,10 @@ function reconstructPath(node: AStarNode): Point[] {
   return path
 }
 
-function smoothPath(path: Point[], obstacleGrid: Set<number>, gridSize: number, bounds: Rect): Point[] {
+function smoothPath(path: Point[], obstacleGrid: Set<number>, gridSize: number, bounds: Bounds): Point[] {
   if (path.length <= 2) return path
 
+  // 贪心地连接当前点到最远可见点，快速去掉锯齿形中间节点。
   const smoothed: Point[] = [path[0]]
   let current = 0
 
@@ -222,7 +224,7 @@ function smoothPath(path: Point[], obstacleGrid: Set<number>, gridSize: number, 
   return smoothed
 }
 
-function hasLineOfSight(p1: Point, p2: Point, obstacleGrid: Set<number>, gridSize: number, bounds: Rect): boolean {
+function hasLineOfSight(p1: Point, p2: Point, obstacleGrid: Set<number>, gridSize: number, bounds: Bounds): boolean {
   const dx = p2.x - p1.x
   const dy = p2.y - p1.y
   const steps = Math.max(Math.abs(dx), Math.abs(dy)) / gridSize
@@ -250,6 +252,7 @@ function connectEndpoints(path: Point[], from: Point, to: Point): Point[] {
 
   const first = path[0]
   if (first.x !== from.x || first.y !== from.y) {
+    // A* 在网格点上运行，端点不在网格时需补一段正交连接。
     if (Math.abs(first.x - from.x) > Math.abs(first.y - from.y)) {
       result.push({ x: first.x, y: from.y })
     } else {
@@ -272,15 +275,15 @@ function connectEndpoints(path: Point[], from: Point, to: Point): Point[] {
   return simplifyOrthogonalPath(result)
 }
 
-export function createObstacleFromRect(id: string, rect: Rect, padding: number = 10): Obstacle {
-  return { id, bounds: rect, padding }
+export function createObstacleFromBounds(id: string, bounds: Bounds, padding: number = 10): Obstacle {
+  return { id, bounds: bounds, padding }
 }
 
 export function findRoute(
   from: Point,
   to: Point,
   obstacles: Obstacle[],
-  config: Partial<RouterConfig> = {}
+  config: Partial<RouterConfig> = {},
 ): RouteResult {
   const defaultConfig: RouterConfig = {
     gridSize: 10,

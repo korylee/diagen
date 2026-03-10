@@ -2,6 +2,7 @@
  * 核心模型类型定义
  */
 
+import { KeyOf, Mutable } from '@diagen/shared'
 import type {
   ElementType,
   ShapeCategory,
@@ -11,8 +12,9 @@ import type {
   GradientType,
   TextAlign,
   VerticalAlign,
-  TextOrientation
+  TextOrientation,
 } from '../constants'
+import { DeepMutable } from 'solid-js/store'
 
 // ============================================================================
 // 基础类型
@@ -27,9 +29,9 @@ export interface BaseElement {
   zIndex: number
   locked: boolean
   visible: boolean
-  group: string | null    // 所属分组 ID
-  parent: string | null   // 父元素 ID
-  children: string[]      // 子元素 ID 列表
+  group: string | null // 所属分组 ID
+  parent: string | null // 父元素 ID
+  children: string[] // 子元素 ID 列表
 }
 
 /** 位置和尺寸属性 */
@@ -38,7 +40,7 @@ export interface BoxProps {
   y: number
   w: number
   h: number
-  angle: number  // 旋转角度（度）
+  angle: number // 旋转角度（度）
 }
 
 // ============================================================================
@@ -75,8 +77,8 @@ export interface LineStyle {
 export interface FillStyle {
   type: FillType
   color?: string
-  beginColor?: string      // 渐变起始色
-  endColor?: string        // 渐变结束色
+  beginColor?: string // 渐变起始色
+  endColor?: string // 渐变结束色
   gradientType?: GradientType
   angle?: number
   radius?: number
@@ -141,13 +143,13 @@ export const DEFAULT_ELEMENT_ATTRIBUTE: ElementAttribute = {
   container: false,
   visible: true,
   rotatable: true,
-  linkable: true,
+  linkable: true, // 是否可连接
   collapsable: false,
   collapsed: false,
   markerOffset: 5,
   resizable: true,
-  movable: true
-}
+  movable: true,
+} as const
 
 // ============================================================================
 // 锚点类型
@@ -175,9 +177,9 @@ export interface PathAction {
   y?: number | string
   w?: number | string
   h?: number | string
-  x1?: number | string   // 控制点1
+  x1?: number | string // 控制点1
   y1?: number | string
-  x2?: number | string   // 控制点2
+  x2?: number | string // 控制点2
   y2?: number | string
 }
 

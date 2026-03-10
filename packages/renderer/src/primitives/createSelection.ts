@@ -1,5 +1,5 @@
 import { batch, createMemo, createSignal } from 'solid-js'
-import { isRectIntersect, type Point, type Rect } from '@diagen/shared'
+import { type Bounds, isBoundsIntersect, type Point } from '@diagen/shared'
 import { useDesigner } from '../components'
 
 // ============================================================================
@@ -14,7 +14,7 @@ export function createSelection(options: { minSize?: number } = {}) {
   const [startPoint, setStartPoint] = createSignal<Point | null>(null)
   const [endPoint, setEndPoint] = createSignal<Point | null>(null)
 
-  const rect = createMemo<Rect | null>(() => {
+  const bounds = createMemo<Bounds | null>(() => {
     const start = startPoint()
     const end = endPoint()
     if (!start || !end) return null
@@ -41,9 +41,9 @@ export function createSelection(options: { minSize?: number } = {}) {
   }
 
   const end = () => {
-    const r = rect()
+    const r = bounds()
     if (r && r.w >= minSize && r.h >= minSize) {
-      selectInRect(r)
+      selectInBounds(r)
     }
     reset()
   }
@@ -60,11 +60,11 @@ export function createSelection(options: { minSize?: number } = {}) {
     })
   }
 
-  const selectInRect = (r: Rect) => {
+  const selectInBounds = (r: Bounds) => {
     const ids: string[] = []
     for (const el of element.shapes()) {
       const elRect = { x: el.props.x, y: el.props.y, w: el.props.w, h: el.props.h }
-      if (isRectIntersect(r, elRect)) {
+      if (isBoundsIntersect(r, elRect)) {
         ids.push(el.id)
       }
     }
@@ -73,7 +73,7 @@ export function createSelection(options: { minSize?: number } = {}) {
     }
   }
 
-  return { isSelecting, rect, start, move, end, cancel }
+  return { isSelecting, bounds, start, move, end, cancel }
 }
 
 export type CreateSelection = ReturnType<typeof createSelection>

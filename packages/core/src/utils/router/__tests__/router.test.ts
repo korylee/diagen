@@ -1,18 +1,10 @@
+import type { Bounds, Point } from '@diagen/shared'
 import { describe, expect, it } from 'vitest'
-import { aStarRoute, findRoute, createObstacleFromRect } from '../astar'
-import { orthogonalRoute, findOrthogonalRoute } from '../orthogonal'
-import { route, createObstaclesFromElements, calculateRoutePoints } from '../index'
-import {
-  expandRect,
-  snapToGrid,
-  manhattanDistance,
-  euclideanDistance,
-  simplifyOrthogonalPath,
-  calculateRouteCost,
-  isRouteValid,
-} from '../utils'
+import { aStarRoute, createObstacleFromBounds } from '../astar'
+import { calculateRoutePoints, createObstaclesFromElements, route } from '../index'
+import { orthogonalRoute } from '../orthogonal'
 import type { Obstacle, RouterConfig } from '../types'
-import type { Rect, Point } from '@diagen/shared'
+import { calculateRouteCost, euclideanDistance, isRouteValid, simplifyOrthogonalPath } from '../utils'
 
 const defaultConfig: RouterConfig = {
   gridSize: 10,
@@ -31,30 +23,6 @@ function createObstacle(x: number, y: number, w: number, h: number, padding = 10
 }
 
 describe('utils', () => {
-  describe('expandRect', () => {
-    it('应正确扩展矩形边界', () => {
-      const rect: Rect = { x: 10, y: 20, w: 100, h: 50 }
-      const expanded = expandRect(rect, 5)
-      expect(expanded).toEqual({ x: 5, y: 15, w: 110, h: 60 })
-    })
-  })
-
-  describe('snapToGrid', () => {
-    it('应将值对齐到网格', () => {
-      expect(snapToGrid(12, 10)).toBe(10)
-      expect(snapToGrid(15, 10)).toBe(20)
-      expect(snapToGrid(20, 10)).toBe(20)
-    })
-  })
-
-  describe('manhattanDistance', () => {
-    it('应正确计算曼哈顿距离', () => {
-      const p1: Point = { x: 0, y: 0 }
-      const p2: Point = { x: 30, y: 40 }
-      expect(manhattanDistance(p1, p2)).toBe(70)
-    })
-  })
-
   describe('euclideanDistance', () => {
     it('应正确计算欧几里得距离', () => {
       const p1: Point = { x: 0, y: 0 }
@@ -82,7 +50,10 @@ describe('utils', () => {
     })
 
     it('当路径长度小于等于2时应原样返回', () => {
-      const path: Point[] = [{ x: 0, y: 0 }, { x: 10, y: 10 }]
+      const path: Point[] = [
+        { x: 0, y: 0 },
+        { x: 10, y: 10 },
+      ]
       expect(simplifyOrthogonalPath(path)).toEqual(path)
     })
   })
@@ -101,13 +72,19 @@ describe('utils', () => {
 
   describe('isRouteValid', () => {
     it('有效路由应返回 true', () => {
-      const route: Point[] = [{ x: 0, y: 0 }, { x: 100, y: 0 }]
+      const route: Point[] = [
+        { x: 0, y: 0 },
+        { x: 100, y: 0 },
+      ]
       const obstacles = [createObstacle(50, 50, 20, 20)]
       expect(isRouteValid(route, obstacles)).toBe(true)
     })
 
     it('穿过障碍物的路由应返回 false', () => {
-      const route: Point[] = [{ x: 0, y: 60 }, { x: 100, y: 60 }]
+      const route: Point[] = [
+        { x: 0, y: 60 },
+        { x: 100, y: 60 },
+      ]
       const obstacles = [createObstacle(40, 50, 30, 20)]
       expect(isRouteValid(route, obstacles)).toBe(false)
     })
@@ -145,8 +122,8 @@ describe('astar', () => {
 
   describe('createObstacleFromRect', () => {
     it('应从矩形创建障碍物', () => {
-      const rect: Rect = { x: 10, y: 20, w: 100, h: 50 }
-      const obstacle = createObstacleFromRect('test', rect, 15)
+      const rect: Bounds = { x: 10, y: 20, w: 100, h: 50 }
+      const obstacle = createObstacleFromBounds('test', rect, 15)
       expect(obstacle.id).toBe('test')
       expect(obstacle.bounds).toEqual(rect)
       expect(obstacle.padding).toBe(15)
@@ -256,9 +233,7 @@ describe('router index', () => {
     it('应计算两点之间的路由点', () => {
       const from: Point = { x: 0, y: 0 }
       const to: Point = { x: 200, y: 0 }
-      const elements = [
-        { id: 'block', type: 'shape', props: { x: 80, y: -20, w: 40, h: 40 } },
-      ] as any
+      const elements = [{ id: 'block', type: 'shape', props: { x: 80, y: -20, w: 40, h: 40 } }] as any
 
       const points = calculateRoutePoints(from, to, elements)
       expect(points.length).toBeGreaterThanOrEqual(2)

@@ -2,6 +2,8 @@
 // 类型定义
 // ============================================================================
 
+import type { ValueOf } from "@diagen/shared"
+
 const ALL_THEME_VARS = [
   '--dg-selection-color',
   '--dg-selection-border',
@@ -31,7 +33,7 @@ const ALL_THEME_VARS = [
   '--dg-cursor-grabbing',
 ] as const
 
-export type ThemeVarName = (typeof ALL_THEME_VARS)[number]
+export type ThemeVarName = ValueOf<typeof ALL_THEME_VARS>
 
 export type ThemeVars = Record<ThemeVarName, string>
 

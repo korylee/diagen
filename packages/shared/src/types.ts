@@ -33,3 +33,9 @@ export type KeyOf<T> = number extends keyof T
   : keyof T
 
 export type ValueOf<T> = T[KeyOf<T>]
+
+export type Mutable<T> = {
+  -readonly [K in keyof T]: T[K]
+}
+
+export type PartialBy<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>

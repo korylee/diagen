@@ -1,7 +1,5 @@
-import type { Point, Rect } from '@diagen/shared'
-import { expandRect, lineIntersectsRect, manhattanDistance, snapToGrid } from '@diagen/shared'
-
-export { expandRect, lineIntersectsRect, manhattanDistance, snapToGrid }
+import type { Bounds, Point } from '@diagen/shared'
+import { expandBounds, lineIntersectsBounds } from '@diagen/shared'
 
 export function euclideanDistance(p1: Point, p2: Point): number {
   const dx = p2.x - p1.x
@@ -34,6 +32,7 @@ export function calculatePathLength(points: Point[]): number {
 export function simplifyOrthogonalPath(path: Point[]): Point[] {
   if (path.length <= 2) return path
 
+  // 正交路径只在方向变化处保留节点，删除同一直线上的冗余点。
   const result: Point[] = [path[0]]
 
   for (let i = 1; i < path.length - 1; i++) {
@@ -54,6 +53,7 @@ export function simplifyOrthogonalPath(path: Point[]): Point[] {
 }
 
 export function calculateRouteCost(route: Point[], bendCost: number = 10): number {
+  // 成本模型 = 几何长度 + 拐点惩罚，用于在多候选路径中做排序。
   return calculatePathLength(route) + getBendCount(route) * bendCost
 }
 
@@ -62,8 +62,9 @@ export function calculateBounds(
   to: Point,
   obstacles: Obstacle[],
   padding: number,
-  expand: number = 100
-): Rect {
+  expand: number = 100,
+): Bounds {
+  // 包围盒覆盖起终点与全部障碍，并额外扩展，给路由算法预留绕行空间。
   let minX = Math.min(from.x, to.x)
   let minY = Math.min(from.y, to.y)
   let maxX = Math.max(from.x, to.x)
@@ -87,9 +88,13 @@ export function calculateBounds(
 
 export function isPointInAnyObstacle(point: Point, obstacles: Obstacle[]): boolean {
   for (const obstacle of obstacles) {
-    const expanded = expandRect(obstacle.bounds, obstacle.padding)
-    if (point.x >= expanded.x && point.x <= expanded.x + expanded.w &&
-        point.y >= expanded.y && point.y <= expanded.y + expanded.h) {
+    const expanded = expandBounds(obstacle.bounds, obstacle.padding)
+    if (
+      point.x >= expanded.x &&
+      point.x <= expanded.x + expanded.w &&
+      point.y >= expanded.y &&
+      point.y <= expanded.y + expanded.h
+    ) {
       return true
     }
   }
@@ -97,10 +102,11 @@ export function isPointInAnyObstacle(point: Point, obstacles: Obstacle[]): boole
 }
 
 export function isRouteValid(route: Point[], obstacles: Obstacle[]): boolean {
+  // 逐段线段碰撞检测：任一段与任一扩展障碍相交即判定无效。
   for (let i = 0; i < route.length - 1; i++) {
     for (const obstacle of obstacles) {
-      const expanded = expandRect(obstacle.bounds, obstacle.padding)
-      if (lineIntersectsRect(route[i], route[i + 1], expanded)) {
+      const expanded = expandBounds(obstacle.bounds, obstacle.padding)
+      if (lineIntersectsBounds(route[i], route[i + 1], expanded)) {
         return false
       }
     }
@@ -109,6 +115,6 @@ export function isRouteValid(route: Point[], obstacles: Obstacle[]): boolean {
 }
 
 interface Obstacle {
-  bounds: Rect
+  bounds: Bounds
   padding: number
 }

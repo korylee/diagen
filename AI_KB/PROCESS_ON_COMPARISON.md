@@ -1,115 +1,129 @@
-# ProcessOn 关键对照点
+# ProcessOn 对照与可迁移经验
 
-本文件基于 `.processon/` 目录中的参考源码提炼，与本项目（diagen）做对照，便于后续 AI 接入与功能迁移时快速定位。
+本文件基于 `.processon/` 参考代码提炼，重点关注对 Diagen 当前坐标/交互架构最有价值的机制。
 
-来源文件（.processon）：
-- `designer.core.js`：核心数据结构（Model/Utils/MessageSource 等）
-- `designer.methods.js`：对外方法与操作入口（open/align/distribute/layer/zoom 等）
-- `designer.events.js`：事件监听与联动
-- `designer.ui.js`：UI 层逻辑
-- `schema.js`：形状/页面/默认值与 Schema 管理
+参考来源：
+- `.processon/designer.core.js`
+- `.processon/designer.events.js`
+- `.processon/designer.methods.js`
+- `.processon/designer.ui.js`
 
-## 一、Schema 与默认值
+---
 
-ProcessOn：
-- `Schema.pageDefaults/shapeDefaults/linkerDefaults` 定义页面、形状、连线默认值。
-- `Schema.addShape` / `Schema.addTheme` 注册形状与主题。
-- `Schema.initShapeFunctions` 在形状对象上注入 `getPath()` / `getAnchors()` 等动态函数（通过字符串拼装函数体）。
-- 形状结构含 `attribute`（container/rotatable/linkable/collapsable 等）、`textBlock`、`anchors`、`path`。
+## 1. 坐标缩放机制：`toScale / restoreScale`
 
-diagen 对应：
-- 页面默认：`packages/core/src/model/page.ts`
-- 形状/连线默认：`packages/core/src/model/shape.ts`、`packages/core/src/model/linker.ts`
-- 常量与默认集合：`packages/core/src/constants.ts`（`DEFAULTS`）
-- Schema 目录：`packages/core/src/schema/`
+ProcessOn 关键实现：
+- `Utils.toScale` 与 `Utils.restoreScale`
+- `Number.prototype.toScale` / `restoreScale`
+- 本质是统一的“模型坐标 <-> 屏幕坐标”双向映射
 
-差异要点：
-- ProcessOn 用“动态函数”生成 path/anchors；diagen 目前以“静态数据 + utils”表达。
-- ProcessOn `shapeDefaults` 有 `groupName`、`resizeDir`、`props.zindex` 等字段；diagen 中部分字段未直接出现或由 `orderList` 管理。
+价值：
+- 所有 UI 控件（选框、手柄、锚点、连线控制点）都遵循同一尺度逻辑
+- 降低“某些层忘记换算”导致的漂移
 
-## 二、Model 与数据持久化
+Diagen 当前落点：
+- `packages/core/src/utils/transform.ts` 中 `canvasToScreen / screenToCanvas`
+- 已修复 `screenToCanvas(Bounds)` 的宽高反变换
+- 新增回归测试：`packages/core/src/utils/__tests__/transform.test.ts`
 
-ProcessOn（见 `designer.core.js`）：
-- `Model.define`：当前图表定义（元素、页面、主题等）
-- `Model.persistence`：持久化副本
-- `orderList` + `maxZIndex`：渲染顺序与层级
-- `groupMap` / `linkerMap`：分组与连线关系索引
+---
 
-diagen 对应：
-- `Diagram`：`elements`（map）+ `orderList`（渲染顺序）
-- `group` 字段直接挂在元素上（`BaseElement.group`）
-- 当前未见 `maxZIndex` / `linkerMap` 的独立结构（由渲染/工具层计算）
+## 2. 事件归一化：`getRelativePos + scroll`
 
-迁移提示：
-- 若从 ProcessOn 导入数据，需要将 `props.zindex` 映射为 `orderList`（或排序后写入）。
+ProcessOn 关键点：
+- `getRelativePos(pageX, pageY, container)` 同时考虑 offset 与 scroll
+- 该函数是大量交互行为的基础输入
 
-## 三、核心操作入口对照
+价值：
+- 保证滚动容器中的命中、拖拽、框选不会错位
 
-ProcessOn（`designer.methods.js`）：
-- `open`：加载 definition（page/elements/theme/defaultStyle 等）
-- `alignShapes` / `distributeShapes`
-- `layerShapes`（front/forward/back/backward）
-- `group` / `ungroup`
-- `lockShapes` / `unlockShapes`
-- `setPageStyle`
-- `zoomIn` / `zoomOut` / `setZoomScale`
+Diagen 当前落点：
+- `packages/renderer/src/utils/pointer.ts`
+  - `eventToViewportPoint`
+  - `eventToCanvasPoint`
+- `Interaction` 暴露 `eventToCanvas` 能力，调用方不直接操作 viewport DOM
 
-diagen 对应：
-- 加载/保存：`createDesigner().loadFromJSON()` / `serialize()`（`packages/core/src/designer/index.ts`）
-- 对齐/分布：`element.align()` / `element.distribute()`（`packages/core/src/designer/managers/element.ts`）
-- 分组：`element.group()` / `element.ungroup()`（同上）
-- 图层：`element.toFront()` / `toBack()` / `bringForward()` / `sendBackward()`（同上）
-- 缩放：`view.setZoom()`（`packages/core/src/designer/managers/view.ts`）
-- 修改元素：`edit.update()` / `edit.move()` / `edit.remove()`（`packages/core/src/designer/managers/edit.ts`）
+---
 
-差异要点：
-- ProcessOn 操作函数内部会直接触发 `Designer.painter.renderShape/renderLinker`；diagen 依赖 Solid 的响应式渲染，无需显式渲染调用。
-- ProcessOn 的 `open` 同时处理外部图片与 UI 导航；diagen 需在 UI 层另行处理。
+## 3. 框选策略：屏幕绘制，提交前回到模型坐标
 
-## 四、事件与历史记录
+ProcessOn 关键点：
+- 框选盒子先以屏幕像素绘制
+- 鼠标抬起时将选区恢复到模型坐标进行范围命中
 
-ProcessOn：
-- `Designer.events.push(...)` 触发事件；`designer.events.js` 注册监听（如 `selectChanged`, `undoStackChanged`）。
-- `MessageSource` 维护 `undoStack/redoStack`，并在提交时推送事件。
+价值：
+- 视觉体验稳定（屏幕层操作），逻辑判断精确（模型层命中）
 
-diagen 对应：
-- `createEmitter()` 事件系统（`packages/core/src/designer/index.ts`）
-- `history` manager 负责 undo/redo（`packages/core/src/designer/managers/history.ts`）
-- `EditorEventType` 常量定义（`packages/core/src/constants.ts`）
+Diagen 当前落点：
+- `createSelection` 内部维护 canvas bounds（命中逻辑使用模型坐标）
+- `RendererContainer` 将其转为 screen bounds 后放入 overlay 渲染
+- `SelectionLayer` 仅接收 `screenBounds`
 
-## 五、选择与交互
+---
 
-ProcessOn：
-- `Utils.selectShape()` / `Utils.unselect()` 负责选中状态
-- `Utils.gridSelectObj` 支持表格网格选区
-- `Utils.showAnchors()` / `Utils.showLinkerControls()` 管理交互控件
+## 4. 控制层统一绘制（selection/anchor/linker controls）
 
-diagen 对应：
-- `selection` manager（`packages/core/src/designer/managers/selection.ts`）
-- 交互层渲染：`InteractionOverlay` 与 `RendererContainer`
+ProcessOn 关键点：
+- `drawControls`
+- `showAnchors`
+- `showLinkerControls`
+- 均在同一可控覆盖层按屏幕坐标渲染
 
-差异要点：
-- ProcessOn 有“表格网格选区”的专门结构；diagen 目前未体现对应模型与工具。
+价值：
+- 交互控件尺寸稳定，不随 zoom 异常放大/缩小
+- 控件与主图层职责分离
 
-## 六、连线跨线与性能阈值
+Diagen 当前落点：
+- P2 后容器三层：
+  - `world-layer`（有 transform）
+  - `scene-layer`（无 transform）
+  - `overlay-layer`（无 transform）
+- `SelectionBox / SelectionLayer` 已在 overlay 渲染
 
-ProcessOn：
-- `resetBrokenLinker` 负责跨线与交叉检测（`designer.events.js`）
-- 当元素数量过多时限制跨线渲染（例如 >400）
+---
 
-diagen 对应：
-- `DEFAULTS.LINE_JUMPS` / `DISABLE_LINE_JUMPS_THRESHOLD` 常量已存在（`packages/core/src/constants.ts`）
-- 跨线的具体计算与渲染路径尚未在当前代码中看到完整实现
+## 5. 边缘自动滚动与画布扩容
 
-## 七、数据结构差异摘要（迁移提示）
+ProcessOn 关键点：
+- near-edge 自动滚动（定时推进）
+- 形状超出页面后 `changeCanvas` 自动扩容
 
-可直接对齐：
-- `Diagram.page` ↔ `definition.page`
-- `Diagram.elements` ↔ `definition.elements`
-- `Diagram.theme` ↔ `definition.theme`
-- `Diagram.comments` ↔ `definition.comments`
+价值：
+- 拖拽连续性更强
+- 文档尺寸可随内容增长
 
-需要转换：
-- `props.zindex`（ProcessOn） → `orderList`（diagen）
-- `defaultStyle/defaultLinkerStyle`（ProcessOn） → diagen 默认值体系（`DEFAULTS`/Schema）
-- 形状动态函数（`getPath/getAnchors`） → diagen 的静态 `path/anchors` + utils 计算
+Diagen 当前落点：
+- `RendererContainer` 内已有 edge auto-scroll
+- `view manager` 提供 `autoGrow` 能力（`scheduleAutoGrow` / `flushAutoGrow`）
+
+---
+
+## 6. 与 Diagen 的结构差异（必须意识到）
+
+- ProcessOn 在一个大对象（Model/Utils/Designer）内集中管理大量状态与行为。
+- Diagen 将“领域逻辑”和“渲染交互”分离：
+  - core manager 负责语义与状态
+  - renderer/primitives 负责交互会话
+
+迁移策略建议：
+- 迁机制，不迁实现形态。
+- 优先迁“原则一致性”：单一坐标入口、覆盖层统一、输入归一化。
+
+---
+
+## 7. 可借鉴清单（供后续功能实现参考）
+
+- 对齐线/吸附线：沿用 overlay 层屏幕绘制，模型层计算。
+- 连线编辑控制点：保持“控制点屏幕渲染 + 模型更新”双轨。
+- 高负载降级：参考 ProcessOn 的阈值策略，对交叉检测/装饰渲染做按量降级。
+
+---
+
+## 8. 小结
+
+ProcessOn 给出的最有价值经验不是“API 名称”，而是三件事：
+1. 坐标变换必须可逆且全局统一；
+2. 输入归一化必须覆盖 scroll/offset；
+3. 交互控件必须与主渲染层解耦。
+
+Diagen 当前架构已吸收这三点，并进入可持续演进阶段。

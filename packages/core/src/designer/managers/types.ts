@@ -1,9 +1,8 @@
 import type { SetStoreFunction, Store } from 'solid-js/store'
-import type { EditorState } from '../index'
-import type { Emitter } from '@diagen/shared'
+import type { DesignerEmitter, EditorState } from '../types'
 
 export interface DesignerContext {
   state: Store<EditorState>
   setState: SetStoreFunction<EditorState>
-  emit: Emitter['emit']
+  emitter: DesignerEmitter
 }

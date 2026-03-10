@@ -1,6 +1,6 @@
+import { canvasToScreen, isLinker, isShape } from '@diagen/core'
+import type { Bounds, Point } from '@diagen/shared'
 import { createMemo, For, Show } from 'solid-js'
-import { canvasRectToScreen, canvasToScreen, isShape } from '@diagen/core'
-import type { Point, Rect } from '@diagen/shared'
 import { useDesigner } from './DesignerProvider'
 import { useInteraction } from './InteractionProvider'
 
@@ -23,20 +23,15 @@ const HANDLE_POSITIONS = [
 // 框选层 - 用于显示框选区域
 // ============================================================================
 
-export function SelectionLayer(props: { rect: Rect }) {
-  const {
-    view: { viewport },
-  } = useDesigner()
-  const screenRect = createMemo(() => canvasRectToScreen(props.rect, viewport()))
-
+export function SelectionLayer(props: { screenBounds: Bounds }) {
   return (
     <div
       style={{
         position: 'absolute',
-        left: `${screenRect().x}px`,
-        top: `${screenRect().y}px`,
-        width: `${screenRect().w}px`,
-        height: `${screenRect().h}px`,
+        left: `${props.screenBounds.x}px`,
+        top: `${props.screenBounds.y}px`,
+        width: `${props.screenBounds.w}px`,
+        height: `${props.screenBounds.h}px`,
         border: `var(--dg-boxselect-border)`,
         'background-color': `var(--dg-boxselect-background)`,
         'pointer-events': 'none',
@@ -51,22 +46,31 @@ export function SelectionLayer(props: { rect: Rect }) {
 // ============================================================================
 
 export interface SelectionBoxProps {
+  /**
+   * @default true
+   */
   showRotateHandle?: boolean
 }
 
 export function SelectionBox(props: SelectionBoxProps) {
-  const designer = useDesigner()
-  const { selection, view } = designer
-  const { resize } = useInteraction()
+  const { selection, view, element } = useDesigner()
+  const { pointer } = useInteraction()
 
-  const screenBounds = createMemo(() => {
-    const bounds = selection.getSelectionBounds()
-    if (!bounds) return null
-    return canvasRectToScreen(bounds, view.viewport())
+  const bounds = createMemo(() => {
+    const selectedIds = selection.selectedIds()
+    if (selectedIds.length === 0) return null
+
+    const selectedElements = selectedIds.map(id => element.getById(id))
+    if (selectedElements.some(el => !el || !isShape(el))) {
+      return null
+    }
+
+    const b = view.getElementsBounds(selectedElements)
+    return b && canvasToScreen(b, view.viewport())
   })
 
   return (
-    <Show when={screenBounds()}>
+    <Show when={bounds()}>
       {bounds => (
         <div
           style={{
@@ -102,7 +106,7 @@ export function SelectionBox(props: SelectionBoxProps) {
                   e.preventDefault()
                   const selectedIds = selection.selectedIds()
                   if (selectedIds.length === 1) {
-                    resize.start(selectedIds[0], handle.dir, e)
+                    pointer.machine.startResize(selectedIds[0], handle.dir, e)
                   }
                 }}
               />
@@ -151,13 +155,187 @@ export function SelectionBox(props: SelectionBoxProps) {
 }
 
 // ============================================================================
+// 连线选中控制点层
+// ============================================================================
+
+export function LinkerSelectionOverlay() {
+  const { selection, element, view } = useDesigner()
+  const { pointer } = useInteraction()
+
+  const selectedLinker = createMemo(() => {
+    const selectedIds = selection.selectedIds()
+    if (selectedIds.length !== 1) return null
+    const selected = element.getById(selectedIds[0])
+    return selected && isLinker(selected) ? selected : null
+  })
+
+  const layout = createMemo(() => {
+    const linker = selectedLinker()
+    if (!linker) return null
+    return view.getLinkerLayout(linker)
+  })
+  const route = createMemo(() => layout()?.route ?? null)
+
+  const routePath = createMemo(() => {
+    const linker = selectedLinker()
+    const linkerRoute = route()
+    if (!linker || !linkerRoute || linkerRoute.points.length < 2) return ''
+    const screenPoints = linkerRoute.points.map(point => canvasToScreen(point, view.viewport()))
+    return createRoutePath(screenPoints, linker.linkerType)
+  })
+
+  const endpointHandles = createMemo(() => {
+    const linkerRoute = route()
+    if (!linkerRoute || linkerRoute.points.length < 2) return null
+
+    const fromPoint = linkerRoute.points[0]
+    const toPoint = linkerRoute.points[linkerRoute.points.length - 1]
+    return {
+      from: {
+        screen: canvasToScreen(fromPoint, view.viewport()),
+        canvas: fromPoint,
+      },
+      to: {
+        screen: canvasToScreen(toPoint, view.viewport()),
+        canvas: toPoint,
+      },
+    }
+  })
+
+  const controlHandles = createMemo(() => {
+    const linker = selectedLinker()
+    if (!linker) return []
+    return linker.points.map((point, index) => ({
+      index,
+      screen: canvasToScreen(point, view.viewport()),
+      canvas: point,
+    }))
+  })
+
+  const startEndpointDrag = (e: MouseEvent, type: 'from' | 'to') => {
+    const linker = selectedLinker()
+    const endpoints = endpointHandles()
+    const linkerRoute = route()
+    if (!linker || !endpoints) return
+    e.stopPropagation()
+    e.preventDefault()
+    const point = type === 'from' ? endpoints.from.canvas : endpoints.to.canvas
+    pointer.machine.startLinkerDrag(e, linker.id, point, { type }, linkerRoute ?? undefined)
+  }
+
+  const startControlDrag = (e: MouseEvent, index: number, point: Point) => {
+    const linker = selectedLinker()
+    const linkerRoute = route()
+    if (!linker) return
+    e.stopPropagation()
+    e.preventDefault()
+    pointer.machine.startLinkerDrag(e, linker.id, point, { type: 'control', controlIndex: index }, linkerRoute ?? undefined)
+  }
+
+  return (
+    <Show when={selectedLinker() && endpointHandles()}>
+      <div
+        style={{
+          position: 'absolute',
+          left: '0',
+          top: '0',
+          width: '100%',
+          height: '100%',
+          'pointer-events': 'none',
+          'z-index': 1001,
+        }}
+      >
+        <svg
+          style={{
+            position: 'absolute',
+            left: '0',
+            top: '0',
+            width: '100%',
+            height: '100%',
+            overflow: 'visible',
+            'pointer-events': 'none',
+          }}
+        >
+          <path
+            d={routePath()}
+            fill="none"
+            stroke="var(--dg-selection-color)"
+            stroke-width={1.5}
+            stroke-dasharray="4,3"
+          />
+        </svg>
+
+        <Show when={endpointHandles()}>
+          {handles => (
+            <>
+              <div
+                style={{
+                  position: 'absolute',
+                  left: `${handles().from.screen.x}px`,
+                  top: `${handles().from.screen.y}px`,
+                  width: `var(--dg-anchor-size)`,
+                  height: `var(--dg-anchor-size)`,
+                  transform: 'translate(-50%, -50%)',
+                  'border-radius': '50%',
+                  background: 'var(--dg-anchor-background)',
+                  border: 'var(--dg-anchor-border)',
+                  cursor: 'crosshair',
+                  'pointer-events': 'auto',
+                }}
+                onMouseDown={e => startEndpointDrag(e, 'from')}
+              />
+
+              <div
+                style={{
+                  position: 'absolute',
+                  left: `${handles().to.screen.x}px`,
+                  top: `${handles().to.screen.y}px`,
+                  width: `var(--dg-anchor-size)`,
+                  height: `var(--dg-anchor-size)`,
+                  transform: 'translate(-50%, -50%)',
+                  'border-radius': '50%',
+                  background: 'var(--dg-anchor-background)',
+                  border: 'var(--dg-anchor-border)',
+                  cursor: 'crosshair',
+                  'pointer-events': 'auto',
+                }}
+                onMouseDown={e => startEndpointDrag(e, 'to')}
+              />
+            </>
+          )}
+        </Show>
+
+        <For each={controlHandles()}>
+          {handle => (
+            <div
+              style={{
+                position: 'absolute',
+                left: `${handle.screen.x}px`,
+                top: `${handle.screen.y}px`,
+                width: `var(--dg-handle-size)`,
+                height: `var(--dg-handle-size)`,
+                transform: 'translate(-50%, -50%)',
+                'background-color': 'var(--dg-handle-background)',
+                border: 'var(--dg-handle-border)',
+                'border-radius': 'var(--dg-anchor-radius)',
+                cursor: 'move',
+                'pointer-events': 'auto',
+              }}
+              onMouseDown={e => startControlDrag(e, handle.index, handle.canvas)}
+            />
+          )}
+        </For>
+      </div>
+    </Show>
+  )
+}
+
+// ============================================================================
 // 锚点预览 - 连线时显示元素的锚点
 // ============================================================================
 
 export function AnchorPreview(props: { elementId: string; highlightAnchor?: string }) {
-  const designer = useDesigner()
-
-  const element = () => designer.element.getById(props.elementId)
+  const { state, element } = useDesigner()
   const anchors = () => [
     { x: 0.5, y: 0, id: 'top' },
     { x: 1, y: 0.5, id: 'right' },
@@ -166,7 +344,7 @@ export function AnchorPreview(props: { elementId: string; highlightAnchor?: stri
   ]
 
   const getAnchorPosition = (anchor: { x: number; y: number }): Point => {
-    const el = element()
+    const el = element.getById(props.elementId)
     if (!el || !isShape(el)) return { x: 0, y: 0 }
     return {
       x: el.props.x + el.props.w * anchor.x,
@@ -178,7 +356,7 @@ export function AnchorPreview(props: { elementId: string; highlightAnchor?: stri
     <For each={anchors()}>
       {(anchor: { x: number; y: number; id: string }) => {
         const pos = getAnchorPosition(anchor)
-        const screenPos = canvasToScreen(pos, designer.state.viewport)
+        const screenPos = canvasToScreen(pos, state.viewport)
         const isHighlight = anchor.id === props.highlightAnchor
 
         return (
@@ -233,4 +411,18 @@ export function LinkerPreview(props: { from: Point; to: Point; hasTarget?: boole
       />
     </svg>
   )
+}
+
+function createRoutePath(points: Point[], linkerType: string): string {
+  if (points.length < 2) return ''
+
+  if (linkerType === 'curved' && points.length === 4) {
+    return `M ${points[0].x} ${points[0].y} C ${points[1].x} ${points[1].y}, ${points[2].x} ${points[2].y}, ${points[3].x} ${points[3].y}`
+  }
+
+  const commands = [`M ${points[0].x} ${points[0].y}`]
+  for (let i = 1; i < points.length; i++) {
+    commands.push(`L ${points[i].x} ${points[i].y}`)
+  }
+  return commands.join(' ')
 }

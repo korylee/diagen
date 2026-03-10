@@ -1,4 +1,4 @@
-import type { Point, Rect } from '@diagen/shared'
+import type { Point, Bounds } from '@diagen/shared'
 import type { Obstacle, RouteResult, RouterConfig } from './types'
 import {
   calculateBounds,
@@ -21,6 +21,7 @@ export function orthogonalRoute(
   config: RouterConfig,
   options: OrthogonalRouteOptions = {}
 ): RouteResult {
+  // 分层策略：从最便宜的候选开始尝试，逐步放宽到复杂绕行。
   const directRoute = tryDirectRoute(from, to, obstacles)
   if (directRoute.success) return directRoute
 
@@ -54,6 +55,7 @@ function trySimpleOrthogonal(
 
   const candidates: Point[][] = []
 
+  // 第一层候选：一折或两折的标准正交路径。
   if (options.startDirection !== 'v') {
     candidates.push([from, { x: from.x + dx, y: from.y }, { x: from.x + dx, y: to.y }, to])
     candidates.push([from, { x: to.x, y: from.y }, to])
@@ -73,6 +75,7 @@ function tryIntermediateRoute(
   obstacles: Obstacle[],
   options: OrthogonalRouteOptions
 ): RouteResult {
+  // 第二层候选：引入中继线(midX/midY)避开简单阻挡。
   const midX = (from.x + to.x) / 2
   const midY = (from.y + to.y) / 2
 
@@ -101,6 +104,7 @@ function tryComplexOrthogonal(
   config: RouterConfig,
   options: OrthogonalRouteOptions
 ): RouteResult {
+  // 第三层候选：通过逃逸点把路径先拉出拥挤区域，再回接到终点。
   const bounds = calculateBounds(from, to, obstacles, config.padding, 50)
 
   const candidates: Point[][] = []
@@ -166,7 +170,7 @@ function tryComplexOrthogonal(
   return findBestRoute(candidates, obstacles, options.bendCost)
 }
 
-function generateEscapePoints(point: Point, bounds: Rect, obstacles: Obstacle[]): Point[] {
+function generateEscapePoints(point: Point, bounds: Bounds, obstacles: Obstacle[]): Point[] {
   const offsets = [30, 60, 100, 150]
   const points: Point[] = []
 
@@ -199,6 +203,7 @@ function findBestRoute(
   obstacles: Obstacle[],
   bendCost: number = 10
 ): RouteResult {
+  // 所有候选统一走“合法性 + 简化 + 成本”流水线，保证比较标准一致。
   let bestRoute: RouteResult = { points: [], success: false }
   let minCost = Infinity
 

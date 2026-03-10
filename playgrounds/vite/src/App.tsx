@@ -83,7 +83,7 @@ function Toolbar() {
   }
 
   const fitToScreen = () => {
-    designer.view.zoomToFit()
+    designer.view.fitToContent()
   }
 
   const undo = () => {
@@ -110,8 +110,7 @@ function Toolbar() {
     groups.forEach(groupId => designer.element.ungroup(groupId))
   }
 
-  const toggleGrid = () => {
-  }
+  const toggleGrid = () => {}
 
   return (
     <div class="toolbar">

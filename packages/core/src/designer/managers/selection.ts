@@ -1,10 +1,14 @@
-import type { DesignerContext } from './types'
+import { ensureArray, keys, Point } from '@diagen/shared'
 import { createMemo } from 'solid-js'
 import { createStore, produce } from 'solid-js/store'
-import { getElementBounds } from '../../utils'
-import type { Point, Rect } from '@diagen/shared'
-import { ensureArray, normalizeRect } from '@diagen/shared'
-import { ElementManager } from './element'
+import type { ElementManager } from './element'
+import type { DesignerContext } from './types'
+
+export interface SelectionEvents {
+  'selection:replaced': { previous: string[]; current: string[] }
+  'selection:selected': { previous: string[]; current: string[] }
+  'selection:deselected': { previous: string[]; current: string[] }
+}
 
 export function createSelectionManager(
   ctx: DesignerContext,
@@ -12,7 +16,7 @@ export function createSelectionManager(
     element: ElementManager
   },
 ) {
-  const { emit } = ctx
+  const { emit } = ctx.emitter
   const { element } = deps
   const [selected, setSelected] = createStore<Record<string, boolean>>({})
 
@@ -31,12 +35,12 @@ export function createSelectionManager(
         for (const id of ids) {
           selected[id] = true
         }
+        emit('selection:replaced', {
+          previous,
+          current: keys(selected),
+        })
       }),
     )
-    emit('selection:replaced', {
-      previous,
-      ids,
-    })
   }
   // add to selection
   function select(id: string[] | string, anchorPoint?: Point) {
@@ -51,11 +55,12 @@ export function createSelectionManager(
             changed = true
           }
         }
-        changed &&
+        if (changed) {
           emit('selection:selected', {
             previous,
-            ids,
+            current: keys(selected),
           })
+        }
       }),
     )
   }
@@ -72,11 +77,12 @@ export function createSelectionManager(
             changed = true
           }
         }
-        changed &&
-          emit('selection:deselect', {
+        if (changed) {
+          emit('selection:deselected', {
             previous,
-            ids,
+            current: keys(selected),
           })
+        }
       }),
     )
   }
@@ -91,41 +97,15 @@ export function createSelectionManager(
     replace([])
   }
 
-  const getSelectionBounds = createMemo((): Rect | null => {
-    const ids = selectedIds()
-    if (ids.length === 0) return null
-
-    let minX = Infinity,
-      minY = Infinity
-    let maxX = -Infinity,
-      maxY = -Infinity
-
-    for (const id of ids) {
-      const el = element.getById(id)
-      const b = el && getElementBounds(el)
-      if (b) {
-        const nb = normalizeRect(b) // 添加规范化
-        minX = Math.min(minX, nb.x)
-        minY = Math.min(minY, nb.y)
-        maxX = Math.max(maxX, nb.x + nb.w)
-        maxY = Math.max(maxY, nb.y + nb.h)
-      }
-    }
-
-    if (minX === Infinity) return null
-
-    return normalizeRect({ x: minX, y: minY, w: maxX - minX, h: maxY - minY })
-  })
-
   return {
     selected,
+
     setSelected,
     selectedIds,
     hasMultiple,
     isEmpty,
     isSelected,
 
-    getSelectionBounds,
     replace,
     select,
     deselect,

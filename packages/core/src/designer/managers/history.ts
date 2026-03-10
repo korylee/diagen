@@ -1,7 +1,7 @@
-import type { DesignerContext } from './types'
-import { createStore, produce } from 'solid-js/store'
+import { generateId, PartialBy } from '@diagen/shared'
 import { createMemo } from 'solid-js'
-import { generateId } from '@diagen/shared'
+import { createStore, produce } from 'solid-js/store'
+import type { DesignerContext } from './types'
 
 // ==================== 命令接口 ====================
 
@@ -16,10 +16,32 @@ export interface Command {
   merge?(next: Command): Command | null
 }
 
+export function createCommand<T>(
+  opts: PartialBy<Omit<Command, 'id' | 'timestamp'>, 'redo'> & { payload?: T },
+): T extends null | undefined ? Command : Command & { payload: T } {
+  const command: any = {
+    redo: () => {
+      command.execute()
+    },
+    ...opts,
+    id: generateId(opts.name),
+    timestamp: Date.now(),
+  }
+  return command
+}
+
 export interface CommandMeta {
   group?: string
   silent?: boolean
   mergeStrategy?: 'replace' | 'append' | 'custom'
+}
+
+export interface TransactionScope {
+  begin: () => boolean
+  commit: () => boolean
+  abort: () => boolean
+  run: <T>(fn: () => Promise<T> | T) => Promise<T>
+  isActive: () => boolean
 }
 
 // ==================== 组合命令 ====================
@@ -53,11 +75,16 @@ export interface HistoryState {
   redoStack: Command[]
   maxHistory: number
   mergeWindow: number
-  transaction?: { name: string; commands: Command[] }
+  transaction?: { id: string; name: string; commands: Command[] }
+}
+
+export interface HistoryEvents {
+  'history:undo': Command
+  'history:redo': Command
 }
 
 export function createHistoryManager(ctx: DesignerContext) {
-  const { emit } = ctx
+  const { emit } = ctx.emitter
 
   const [state, setState] = createStore<HistoryState>({
     undoStack: [],
@@ -125,6 +152,7 @@ export function createHistoryManager(ctx: DesignerContext) {
     const enrichedCommand = Object.assign(command, meta)
 
     if (state.transaction) {
+      enrichedCommand.execute()
       setState(
         'transaction',
         'commands',
@@ -132,7 +160,6 @@ export function createHistoryManager(ctx: DesignerContext) {
           commands.push(enrichedCommand)
         }),
       )
-      enrichedCommand.execute()
       return
     }
 
@@ -147,21 +174,24 @@ export function createHistoryManager(ctx: DesignerContext) {
 
   // ==================== 事务系统 ====================
 
-  function startTransaction(name = '事务') {
+  function startTransaction(name = '事务'): string | null {
     if (state.transaction) {
       console.warn('事务嵌套不支持')
-      return
+      return null
     }
+    const id = generateId()
     setState(
       produce(s => {
-        s.transaction = { name, commands: [] }
+        s.transaction = { id, name, commands: [] }
       }),
     )
+    return id
   }
 
-  function commitTransaction() {
+  function commitTransaction(transactionId?: string): boolean {
     const { transaction } = state
-    if (!transaction) return
+    if (!transaction) return false
+    if (transactionId && transaction.id !== transactionId) return false
 
     setState(
       produce(s => {
@@ -172,11 +202,13 @@ export function createHistoryManager(ctx: DesignerContext) {
     if (transaction.commands.length > 0) {
       pushCommand(new CompositeCommand(transaction.name, transaction.commands))
     }
+    return true
   }
 
-  function abortTransaction() {
+  function abortTransaction(transactionId?: string): boolean {
     const { transaction } = state
-    if (!transaction) return
+    if (!transaction) return false
+    if (transactionId && transaction.id !== transactionId) return false
 
     transaction.commands.reduceRight((_, cmd) => cmd.undo(), null as any)
     setState(
@@ -184,23 +216,69 @@ export function createHistoryManager(ctx: DesignerContext) {
         s.transaction = undefined
       }),
     )
+    return true
+  }
+
+  function createTransactionScope(name = '事务'): TransactionScope {
+    let transactionId: string | null = null
+
+    const begin = (): boolean => {
+      if (transactionId) return false
+      const id = startTransaction(name)
+      if (!id) return false
+      transactionId = id
+      return true
+    }
+
+    const commit = (): boolean => {
+      if (!transactionId) return false
+      const ok = commitTransaction(transactionId)
+      if (ok) transactionId = null
+      return ok
+    }
+
+    const abort = (): boolean => {
+      if (!transactionId) return false
+      const ok = abortTransaction(transactionId)
+      if (ok) transactionId = null
+      return ok
+    }
+
+    const run = async <T>(fn: () => Promise<T> | T): Promise<T> => {
+      if (!begin()) {
+        throw new Error('事务嵌套不支持')
+      }
+
+      try {
+        const result = await fn()
+        commit()
+        return result
+      } catch (error) {
+        abort()
+        throw error
+      }
+    }
+
+    const isActive = (): boolean => transactionId !== null
+
+    return {
+      begin,
+      commit,
+      abort,
+      run,
+      isActive,
+    }
   }
 
   async function transaction<T>(name: string, fn: () => Promise<T> | T): Promise<T> {
-    startTransaction(name)
-    try {
-      const result = await fn()
-      commitTransaction()
-      return result
-    } catch (error) {
-      abortTransaction()
-      throw error
-    }
+    const scope = createTransactionScope(name)
+    return scope.run(fn)
   }
 
   // ==================== Undo/Redo ====================
 
   function undo() {
+    if (state.transaction) return
     if (!canUndo()) return
 
     const command = state.undoStack[state.undoStack.length - 1]
@@ -215,6 +293,7 @@ export function createHistoryManager(ctx: DesignerContext) {
   }
 
   function redo() {
+    if (state.transaction) return
     if (!canRedo()) return
 
     const command = state.redoStack[state.redoStack.length - 1]
@@ -229,6 +308,7 @@ export function createHistoryManager(ctx: DesignerContext) {
   }
 
   function clear() {
+    if (state.transaction) return
     setState(
       produce(s => {
         s.undoStack = []
@@ -241,6 +321,7 @@ export function createHistoryManager(ctx: DesignerContext) {
   // ==================== 配置与高级功能 ====================
 
   function jumpTo(index: number) {
+    if (state.transaction) return
     const target = Math.max(0, Math.min(index, state.undoStack.length - 1))
     const current = state.undoStack.length - 1
     const diff = target - current
@@ -275,6 +356,7 @@ export function createHistoryManager(ctx: DesignerContext) {
       begin: startTransaction,
       commit: commitTransaction,
       abort: abortTransaction,
+      createScope: createTransactionScope,
       run: transaction,
     },
 

@@ -5,10 +5,11 @@ export function DesignerGrids() {
   const { state } = useDesigner()
   const grid = createMemo(() => {
     const { page } = state.diagram
+    const { containerSize } = state
 
     return {
-      width: page.width,
-      height: page.height,
+      width: containerSize.width,
+      height: containerSize.height,
       backgroundColor: page.backgroundColor,
     }
   })

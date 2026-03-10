@@ -22,7 +22,12 @@
     "lib": ["es2016", "dom"],
     "types": ["node"],
     "rootDir": ".",
-    "paths": {},
+    "paths": {
+      "@diagen/shared": ["./packages/shared/src/index.ts"],
+      "@diagen/core": ["./packages/core/src/index.ts"],
+      "@diagen/primitives": ["./packages/renderer/src/index.ts"],
+      "@diagen/renderer": ["./packages/renderer/src/index.ts"],
+    },
     "isolatedDeclarations": false,
     "composite": true,
     "emitDeclarationOnly": true,
@@ -31,7 +36,7 @@
     "strictNullChecks": true,
     "declaration": true,
     "declarationDir": "./types",
-    "skipDefaultLibCheck": true,
+    "skipDefaultLibCheck": true
   },
   "include": ["*.ts", "packages", "playgrounds"],
   "exclude": ["node_modules", "dist", "**/*.md", "packages/.test"]
