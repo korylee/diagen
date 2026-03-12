@@ -3,6 +3,7 @@ import { isShape } from '@diagen/core'
 import { unionBounds } from '@diagen/shared'
 import type { Bounds, Point } from '@diagen/shared'
 import { useDesigner } from '../components'
+import { getRotatedBoxBounds } from '../utils'
 import { createDragSession, type CreateDragSessionOptions } from './createDragSession'
 import { resolveCanvasDelta, type EventToCanvas } from './resolveCanvasDelta'
 
@@ -74,7 +75,13 @@ export function createShapeDrag(options: UseShapeDragOptions = {}) {
           },
         })
 
-        const shapeBounds: Bounds = { x: nextX, y: nextY, w: el.props.w, h: el.props.h }
+        const shapeBounds: Bounds = getRotatedBoxBounds({
+          x: nextX,
+          y: nextY,
+          w: el.props.w,
+          h: el.props.h,
+          angle: el.props.angle,
+        })
         movedBounds = movedBounds ? unionBounds(movedBounds, shapeBounds) : shapeBounds
       }
     })

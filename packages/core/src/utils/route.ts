@@ -1,7 +1,7 @@
 import { Point } from '@diagen/shared'
 import { LinkerType } from '../constants'
 import { LinkerElement, ShapeElement } from '../model'
-import { getAnchorAngle, resolveAnchors } from './anchors'
+import { getAnchorAngle, resolveAnchors, rotatePointInBox } from './anchors'
 
 export interface LinkerRoute {
   points: Point[]
@@ -25,8 +25,9 @@ export function calculateLinkerRoute(
     if (shape && from.anchorIndex !== undefined) {
       const anchors = resolveAnchors(shape.anchors, shape.props.w, shape.props.h)
       if (anchors[from.anchorIndex]) {
-        fromPoint = { x: shape.props.x + anchors[from.anchorIndex].x, y: shape.props.y + anchors[from.anchorIndex].y }
-        fromAngle = getAnchorAngle(anchors[from.anchorIndex], shape.props.w, shape.props.h)
+        const anchor = rotatePointInBox(anchors[from.anchorIndex], shape.props.w, shape.props.h, shape.props.angle)
+        fromPoint = { x: shape.props.x + anchor.x, y: shape.props.y + anchor.y }
+        fromAngle = getAnchorAngle(anchor, shape.props.w, shape.props.h)
       }
     }
   }
@@ -36,8 +37,9 @@ export function calculateLinkerRoute(
     if (shape && to.anchorIndex !== undefined) {
       const anchors = resolveAnchors(shape.anchors, shape.props.w, shape.props.h)
       if (anchors[to.anchorIndex]) {
-        toPoint = { x: shape.props.x + anchors[to.anchorIndex].x, y: shape.props.y + anchors[to.anchorIndex].y }
-        toAngle = getAnchorAngle(anchors[to.anchorIndex], shape.props.w, shape.props.h)
+        const anchor = rotatePointInBox(anchors[to.anchorIndex], shape.props.w, shape.props.h, shape.props.angle)
+        toPoint = { x: shape.props.x + anchor.x, y: shape.props.y + anchor.y }
+        toAngle = getAnchorAngle(anchor, shape.props.w, shape.props.h)
       }
     }
   }

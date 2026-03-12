@@ -1,10 +1,10 @@
 import { createContext, JSX, useContext } from 'solid-js'
-import { createScroll, createKeyboard } from '@diagen/primitives'
+import { CreateKeyboard, createScroll } from '@diagen/primitives'
 import type { CreatePointerInteraction } from '../primitives'
 
 type Interaction = {
   pointer: CreatePointerInteraction
-  keyboard: ReturnType<typeof createKeyboard>
+  keyboard: CreateKeyboard
   scroll: ReturnType<typeof createScroll>
 }
 

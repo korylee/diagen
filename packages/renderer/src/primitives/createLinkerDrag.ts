@@ -13,6 +13,7 @@ interface DragState {
   linkerId: string
   mode: LinkerDragMode
   controlIndex?: number
+  oppositeShapeId: string | null
   startFrom: Point
   startTo: Point
   startControl?: Point
@@ -22,7 +23,7 @@ interface DragState {
   startPointerCanvas: Point | null
 }
 
-interface AnchorHit {
+export interface AnchorHit {
   shapeId: string
   anchorIndex: number
   point: Point
@@ -35,6 +36,8 @@ export interface CreateLinkerDragOptions extends CreateDragSessionOptions {
   controlTolerance?: number
   segmentTolerance?: number
   snapDistance?: number
+  snapOnMove?: boolean
+  allowSelfConnect?: boolean
 }
 
 export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
@@ -46,6 +49,8 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     controlTolerance = 8,
     segmentTolerance = 8,
     snapDistance = 12,
+    snapOnMove = true,
+    allowSelfConnect = true,
   } = options
 
   const designer = useDesigner()
@@ -54,6 +59,7 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
   const transaction = designer.history.transaction.createScope('拖拽连线')
 
   const [dragState, setDragState] = createSignal<DragState | null>(null)
+  const [candidateAnchor, setCandidateAnchor] = createSignal<AnchorHit | null>(null)
 
   function getHitWithRoute(linker: LinkerElement, point: Point): { hit: LinkerHit | null; route: LinkerRoute } {
     const route = view.getLinkerRoute(linker)
@@ -124,6 +130,12 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
       linkerId,
       mode,
       controlIndex,
+      oppositeShapeId:
+        mode === 'from'
+          ? (el.to.id ?? null)
+          : mode === 'to'
+            ? (el.from.id ?? null)
+            : null,
       startFrom: route.points[0],
       startTo: route.points[route.points.length - 1],
       startControl,
@@ -138,6 +150,7 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
       edit.update(linkerId, { points: startPoints })
     }
 
+    setCandidateAnchor(null)
     setDragState(state)
     session.begin({ x: e.clientX, y: e.clientY })
     return true
@@ -164,6 +177,7 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     }
 
     if (state.mode === 'line') {
+      setCandidateAnchor(null)
       edit.update(state.linkerId, {
         from: {
           ...state.startRawFrom,
@@ -186,6 +200,7 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     }
 
     if (state.mode === 'control' && state.controlIndex !== undefined && state.startControl) {
+      setCandidateAnchor(null)
       const nextPoints = linkerElement.points.slice()
       nextPoints[state.controlIndex] = {
         x: state.startControl.x + delta.x,
@@ -201,25 +216,28 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
       x: startPoint.x + delta.x,
       y: startPoint.y + delta.y,
     }
+    const maxDistance = snapDistance / zoom
+    const snappedAnchor = findNearestAnchor(target, maxDistance, state)
+    setCandidateAnchor(snappedAnchor)
 
     if (state.mode === 'from') {
       edit.update(state.linkerId, {
         from: {
           ...linkerElement.from,
-          id: null,
-          anchorIndex: undefined,
-          x: target.x,
-          y: target.y,
+          id: snapOnMove && snappedAnchor ? snappedAnchor.shapeId : null,
+          anchorIndex: snapOnMove && snappedAnchor ? snappedAnchor.anchorIndex : undefined,
+          x: snapOnMove && snappedAnchor ? snappedAnchor.point.x : target.x,
+          y: snapOnMove && snappedAnchor ? snappedAnchor.point.y : target.y,
         },
       })
     } else {
       edit.update(state.linkerId, {
         to: {
           ...linkerElement.to,
-          id: null,
-          anchorIndex: undefined,
-          x: target.x,
-          y: target.y,
+          id: snapOnMove && snappedAnchor ? snappedAnchor.shapeId : null,
+          anchorIndex: snapOnMove && snappedAnchor ? snappedAnchor.anchorIndex : undefined,
+          x: snapOnMove && snappedAnchor ? snappedAnchor.point.x : target.x,
+          y: snapOnMove && snappedAnchor ? snappedAnchor.point.y : target.y,
         },
       })
     }
@@ -244,6 +262,7 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
       transaction.abort()
     }
 
+    setCandidateAnchor(null)
     setDragState(null)
   }
 
@@ -251,6 +270,7 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     if (!session.isPending()) return
     transaction.abort()
     session.cancel()
+    setCandidateAnchor(null)
     setDragState(null)
   }
 
@@ -261,7 +281,9 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     const currentPoint =
       state.mode === 'from' ? { x: element.from.x, y: element.from.y } : { x: element.to.x, y: element.to.y }
     const maxDistance = snapDistance / view.viewport().zoom
-    const target = findNearestAnchor(currentPoint, maxDistance)
+    const target =
+      candidateAnchor() ??
+      findNearestAnchor(currentPoint, maxDistance, state)
     if (!target) return
 
     if (state.mode === 'from') {
@@ -293,11 +315,15 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     designer.view.scheduleAutoGrow(view.getLinkerBounds(linker))
   }
 
-  function findNearestAnchor(point: Point, maxDistance: number): AnchorHit | null {
+  function findNearestAnchor(point: Point, maxDistance: number, state?: DragState): AnchorHit | null {
     let best: AnchorHit | null = null
     let bestDistance = maxDistance
 
     for (const shape of designer.element.shapes()) {
+      if (!shape.visible || shape.locked) continue
+      if (shape.attribute?.visible === false || shape.attribute?.linkable === false) continue
+      if (!allowSelfConnect && state?.oppositeShapeId && shape.id === state.oppositeShapeId) continue
+
       const anchors = getShapeAnchors(shape)
       for (let i = 0; i < anchors.length; i++) {
         const d = getDistance(point, anchors[i])
@@ -322,6 +348,7 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
   return {
     isPending: session.isPending,
     isDragging: session.isDragging,
+    candidateAnchor,
     hitTestWithRoute,
     hitTest,
     start,

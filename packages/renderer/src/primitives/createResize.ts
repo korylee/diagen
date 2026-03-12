@@ -2,6 +2,7 @@ import { batch, createSignal, onCleanup } from 'solid-js'
 import { isShape } from '@diagen/core'
 import type { Bounds, Point } from '@diagen/shared'
 import { useDesigner } from '../components'
+import { getRotatedBoxBounds } from '../utils'
 import { resolveCanvasDelta, type EventToCanvas } from './resolveCanvasDelta'
 
 // ============================================================================
@@ -116,7 +117,15 @@ export function createResize(
     const el = element.getById(id)
     if (el && isShape(el)) {
       edit.update(id, { props: { ...el.props, x, y, w, h } })
-      view.scheduleAutoGrow({ x, y, w, h })
+      view.scheduleAutoGrow(
+        getRotatedBoxBounds({
+          x,
+          y,
+          w,
+          h,
+          angle: el.props.angle,
+        }),
+      )
     }
   }
 

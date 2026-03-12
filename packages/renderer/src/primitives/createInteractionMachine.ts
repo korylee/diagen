@@ -7,21 +7,30 @@ import type { CreateSelection } from './createSelection'
 import type { CreateLinkerDrag } from './createLinkerDrag'
 import type { CreatePan } from './createPan'
 import type { CreateResize, ResizeDirection } from './createResize'
+import type { CreateRotate } from './createRotate'
 import type { CreateShapeDrag } from './createShapeDrag'
 
-export type InteractionMode = 'idle' | 'panning' | 'draggingShape' | 'draggingLinker' | 'resizing' | 'boxSelecting'
+export type InteractionMode =
+  | 'idle'
+  | 'panning'
+  | 'draggingShape'
+  | 'draggingLinker'
+  | 'resizing'
+  | 'rotatingShape'
+  | 'boxSelecting'
 
 interface CreateInteractionMachineOptions {
   pan: CreatePan
   shapeDrag: CreateShapeDrag
   linkerDrag: CreateLinkerDrag
   resize: CreateResize
+  rotate: CreateRotate
   boxSelect: CreateSelection
   eventToCanvas: EventToCanvas
 }
 
 export function createInteractionMachine(options: CreateInteractionMachineOptions) {
-  const { pan, shapeDrag, linkerDrag, resize, boxSelect, eventToCanvas } = options
+  const { pan, shapeDrag, linkerDrag, resize, rotate, boxSelect, eventToCanvas } = options
   const [mode, setMode] = createSignal<InteractionMode>('idle')
 
   const isIdle = (): boolean => mode() === 'idle'
@@ -32,6 +41,7 @@ export function createInteractionMachine(options: CreateInteractionMachineOption
       current === 'draggingShape' ||
       current === 'draggingLinker' ||
       current === 'resizing' ||
+      current === 'rotatingShape' ||
       current === 'boxSelecting'
     )
   }
@@ -68,6 +78,14 @@ export function createInteractionMachine(options: CreateInteractionMachineOption
     return true
   }
 
+  const startRotate = (id: string, e: MouseEvent): boolean => {
+    if (!isIdle()) return false
+    const started = rotate.start(id, e)
+    if (!started || !rotate.isPending()) return false
+    setMode('rotatingShape')
+    return true
+  }
+
   const startLinkerDrag = (
     e: MouseEvent,
     linkerId: string,
@@ -96,6 +114,9 @@ export function createInteractionMachine(options: CreateInteractionMachineOption
       case 'resizing':
         resize.move(e)
         break
+      case 'rotatingShape':
+        rotate.move(e)
+        break
       case 'boxSelecting':
         boxSelect.move(eventToCanvas(e))
         break
@@ -117,6 +138,9 @@ export function createInteractionMachine(options: CreateInteractionMachineOption
         break
       case 'resizing':
         resize.end()
+        break
+      case 'rotatingShape':
+        rotate.end()
         break
       case 'boxSelecting':
         boxSelect.end()
@@ -141,6 +165,9 @@ export function createInteractionMachine(options: CreateInteractionMachineOption
       case 'resizing':
         resize.cancel()
         break
+      case 'rotatingShape':
+        rotate.cancel()
+        break
       case 'boxSelecting':
         boxSelect.cancel()
         break
@@ -159,6 +186,7 @@ export function createInteractionMachine(options: CreateInteractionMachineOption
     startBoxSelect,
     startShapeDrag,
     startResize,
+    startRotate,
     startLinkerDrag,
     move,
     end,

@@ -3,7 +3,7 @@ import { isBoundsVisible } from '@diagen/core'
 import { createDevicePixelRatio } from '@diagen/primitives'
 import { createEffect, createMemo } from 'solid-js'
 import { useDesigner } from '../../components'
-import { renderShape } from '../../utils'
+import { getRotatedBoxBounds, renderShape } from '../../utils'
 
 export interface ShapeCanvasProps {
   shape: ShapeElement
@@ -16,14 +16,22 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
 
   const { selection, view } = useDesigner()
   const pixelRatio = createDevicePixelRatio()
-  const bounds = createMemo(() => view.getShapeBounds(props.shape))
+  const renderBounds = createMemo(() =>
+    getRotatedBoxBounds({
+      x: props.shape.props.x,
+      y: props.shape.props.y,
+      w: props.shape.props.w,
+      h: props.shape.props.h,
+      angle: props.shape.props.angle,
+    }),
+  )
 
   const padding = 4
 
   /** 屏幕坐标系中的位置（DOM 定位用） */
   const getScreenBounds = () => {
     const vp = view.viewport()
-    const b = bounds()
+    const b = renderBounds()
     return {
       x: b.x * vp.zoom + vp.x - padding,
       y: b.y * vp.zoom + vp.y - padding,
@@ -36,7 +44,7 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
   const isVisible = () => {
     const vp = view.viewport()
     const vpSize = view.viewportSize()
-    return isBoundsVisible(bounds(), vp, { width: vpSize.width, height: vpSize.height })
+    return isBoundsVisible(renderBounds(), vp, { width: vpSize.width, height: vpSize.height })
   }
 
   const doRender = () => {
@@ -48,12 +56,15 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
     const bounds = getScreenBounds()
     const width = Math.max(1, Math.ceil(bounds.w))
     const height = Math.max(1, Math.ceil(bounds.h))
+    const shapeBounds = renderBounds()
+    const offsetX = props.shape.props.x - shapeBounds.x
+    const offsetY = props.shape.props.y - shapeBounds.y
 
     ctx.clearRect(0, 0, width * pixelRatio(), height * pixelRatio())
     ctx.save()
     ctx.scale(pixelRatio(), pixelRatio())
     ctx.scale(vp.zoom, vp.zoom)
-    ctx.translate(padding / vp.zoom, padding / vp.zoom)
+    ctx.translate(offsetX + padding / vp.zoom, offsetY + padding / vp.zoom)
     renderShape(ctx, props.shape)
     ctx.restore()
   }

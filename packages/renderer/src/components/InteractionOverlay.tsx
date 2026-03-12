@@ -1,5 +1,5 @@
-import { canvasToScreen, isLinker, isShape } from '@diagen/core'
-import type { Bounds, Point } from '@diagen/shared'
+import { canvasToScreen, getShapeAnchors, isLinker, isShape } from '@diagen/core'
+import type { Point } from '@diagen/shared'
 import { createMemo, For, Show } from 'solid-js'
 import { useDesigner } from './DesignerProvider'
 import { useInteraction } from './InteractionProvider'
@@ -23,21 +23,32 @@ const HANDLE_POSITIONS = [
 // 框选层 - 用于显示框选区域
 // ============================================================================
 
-export function SelectionLayer(props: { screenBounds: Bounds }) {
+export function SelectionLayer() {
+  const { pointer } = useInteraction()
+
+  const screenBounds = createMemo(() => {
+    const b = pointer.boxSelect.bounds()
+    return b ? pointer.coordinate.canvasToScreen(b) : null
+  })
+
   return (
-    <div
-      style={{
-        position: 'absolute',
-        left: `${props.screenBounds.x}px`,
-        top: `${props.screenBounds.y}px`,
-        width: `${props.screenBounds.w}px`,
-        height: `${props.screenBounds.h}px`,
-        border: `var(--dg-boxselect-border)`,
-        'background-color': `var(--dg-boxselect-background)`,
-        'pointer-events': 'none',
-        'z-index': 9999,
-      }}
-    />
+    <Show when={pointer.boxSelect.isSelecting() && screenBounds()}>
+      {bounds => (
+        <div
+          style={{
+            position: 'absolute',
+            left: `${bounds().x}px`,
+            top: `${bounds().y}px`,
+            width: `${bounds().w}px`,
+            height: `${bounds().h}px`,
+            border: `var(--dg-boxselect-border)`,
+            'background-color': `var(--dg-boxselect-background)`,
+            'pointer-events': 'none',
+            'z-index': 9999,
+          }}
+        />
+      )}
+    </Show>
   )
 }
 
@@ -45,118 +56,12 @@ export function SelectionLayer(props: { screenBounds: Bounds }) {
 // 选中框 + 调整手柄 + 旋转手柄 - 统一组件
 // ============================================================================
 
-export interface SelectionBoxProps {
+export interface ShapeSelectionLayerProps {
   /**
    * @default true
    */
   showRotateHandle?: boolean
 }
-
-export function SelectionBox(props: SelectionBoxProps) {
-  const { selection, view, element } = useDesigner()
-  const { pointer } = useInteraction()
-
-  const bounds = createMemo(() => {
-    const selectedIds = selection.selectedIds()
-    if (selectedIds.length === 0) return null
-
-    const selectedElements = selectedIds.map(id => element.getById(id))
-    if (selectedElements.some(el => !el || !isShape(el))) {
-      return null
-    }
-
-    const b = view.getElementsBounds(selectedElements)
-    return b && canvasToScreen(b, view.viewport())
-  })
-
-  return (
-    <Show when={bounds()}>
-      {bounds => (
-        <div
-          style={{
-            position: 'absolute',
-            left: `${bounds().x - 1}px`,
-            top: `${bounds().y - 1}px`,
-            width: `${bounds().w + 2}px`,
-            height: `${bounds().h + 2}px`,
-            border: `var(--dg-selection-border)`,
-            'pointer-events': 'none',
-            'z-index': 1000,
-          }}
-        >
-          {/* 调整大小手柄 */}
-          <For each={HANDLE_POSITIONS}>
-            {handle => (
-              <div
-                style={{
-                  position: 'absolute',
-                  left: `${handle.x * 100}%`,
-                  top: `${handle.y * 100}%`,
-                  width: `var(--dg-handle-size)`,
-                  height: `var(--dg-handle-size)`,
-                  'background-color': `var(--dg-handle-background)`,
-                  border: `var(--dg-handle-border)`,
-                  'border-radius': `var(--dg-anchor-radius)`,
-                  transform: 'translate(-50%, -50%)',
-                  cursor: handle.cursor,
-                  'pointer-events': 'auto',
-                }}
-                onMouseDown={e => {
-                  e.stopPropagation()
-                  e.preventDefault()
-                  const selectedIds = selection.selectedIds()
-                  if (selectedIds.length === 1) {
-                    pointer.machine.startResize(selectedIds[0], handle.dir, e)
-                  }
-                }}
-              />
-            )}
-          </For>
-
-          {/* 旋转手柄 */}
-          <Show when={props.showRotateHandle ?? true}>
-            <>
-              <div
-                style={{
-                  position: 'absolute',
-                  left: '50%',
-                  top: '-25px',
-                  width: `var(--dg-rotate-size)`,
-                  height: `var(--dg-rotate-size)`,
-                  'background-color': `var(--dg-rotate-background)`,
-                  border: `var(--dg-rotate-border)`,
-                  'border-radius': '50%',
-                  transform: 'translateX(-50%)',
-                  cursor: 'grab',
-                  'pointer-events': 'auto',
-                }}
-                onMouseDown={e => {
-                  e.stopPropagation()
-                  // TODO: 旋转功能待实现
-                }}
-              />
-              <div
-                style={{
-                  position: 'absolute',
-                  left: '50%',
-                  top: '-20px',
-                  width: '1px',
-                  height: '15px',
-                  'background-color': `var(--dg-rotate-color)`,
-                  transform: 'translateX(-50%)',
-                }}
-              />
-            </>
-          </Show>
-        </div>
-      )}
-    </Show>
-  )
-}
-
-// ============================================================================
-// 连线选中控制点层
-// ============================================================================
 
 export function LinkerSelectionOverlay() {
   const { selection, element, view } = useDesigner()
@@ -211,6 +116,7 @@ export function LinkerSelectionOverlay() {
       canvas: point,
     }))
   })
+  const candidateAnchor = createMemo(() => pointer.linkerDrag.candidateAnchor())
 
   const startEndpointDrag = (e: MouseEvent, type: 'from' | 'to') => {
     const linker = selectedLinker()
@@ -219,7 +125,7 @@ export function LinkerSelectionOverlay() {
     if (!linker || !endpoints) return
     e.stopPropagation()
     e.preventDefault()
-    const point = type === 'from' ? endpoints.from.canvas : endpoints.to.canvas
+    const point = endpoints[type].canvas
     pointer.machine.startLinkerDrag(e, linker.id, point, { type }, linkerRoute ?? undefined)
   }
 
@@ -229,7 +135,13 @@ export function LinkerSelectionOverlay() {
     if (!linker) return
     e.stopPropagation()
     e.preventDefault()
-    pointer.machine.startLinkerDrag(e, linker.id, point, { type: 'control', controlIndex: index }, linkerRoute ?? undefined)
+    pointer.machine.startLinkerDrag(
+      e,
+      linker.id,
+      point,
+      { type: 'control', controlIndex: index },
+      linkerRoute ?? undefined,
+    )
   }
 
   return (
@@ -325,8 +237,134 @@ export function LinkerSelectionOverlay() {
             />
           )}
         </For>
+
+        <Show when={candidateAnchor()}>
+          {candidate => <AnchorPreview elementId={candidate().shapeId} highlightAnchor={candidate().anchorIndex} />}
+        </Show>
       </div>
     </Show>
+  )
+}
+
+export function ShapeSelectionOverlay(props: ShapeSelectionLayerProps) {
+  const { selection, view, element } = useDesigner()
+  const { pointer } = useInteraction()
+
+  const bounds = createMemo(() => {
+    const selectedIds = selection.selectedIds()
+    if (selectedIds.length === 0) return null
+
+    const selectedElements = selectedIds.map(id => element.getById(id))
+    if (selectedElements.some(el => !el || !isShape(el))) {
+      return null
+    }
+
+    const b = view.getElementsBounds(selectedElements)
+    return b && canvasToScreen(b, view.viewport())
+  })
+
+  const canRotate = createMemo(() => {
+    const selectedIds = selection.selectedIds()
+    if (selectedIds.length !== 1) return false
+    const target = element.getById(selectedIds[0])
+    return !!(target && isShape(target) && target.attribute.rotatable && !target.locked)
+  })
+
+  return (
+    <Show when={bounds()}>
+      {bounds => (
+        <div
+          style={{
+            position: 'absolute',
+            left: `${bounds().x - 1}px`,
+            top: `${bounds().y - 1}px`,
+            width: `${bounds().w + 2}px`,
+            height: `${bounds().h + 2}px`,
+            border: `var(--dg-selection-border)`,
+            'pointer-events': 'none',
+            'z-index': 1000,
+          }}
+        >
+          {/* 调整大小手柄 */}
+          <For each={HANDLE_POSITIONS}>
+            {handle => (
+              <div
+                style={{
+                  position: 'absolute',
+                  left: `${handle.x * 100}%`,
+                  top: `${handle.y * 100}%`,
+                  width: `var(--dg-handle-size)`,
+                  height: `var(--dg-handle-size)`,
+                  'background-color': `var(--dg-handle-background)`,
+                  border: `var(--dg-handle-border)`,
+                  'border-radius': `var(--dg-anchor-radius)`,
+                  transform: 'translate(-50%, -50%)',
+                  cursor: handle.cursor,
+                  'pointer-events': 'auto',
+                }}
+                onMouseDown={e => {
+                  e.stopPropagation()
+                  e.preventDefault()
+                  const selectedIds = selection.selectedIds()
+                  if (selectedIds.length === 1) {
+                    pointer.machine.startResize(selectedIds[0], handle.dir, e)
+                  }
+                }}
+              />
+            )}
+          </For>
+
+          {/* 旋转手柄 */}
+          <Show when={(props.showRotateHandle ?? true) && canRotate()}>
+            <>
+              <div
+                style={{
+                  position: 'absolute',
+                  left: '50%',
+                  top: '-25px',
+                  width: `var(--dg-rotate-size)`,
+                  height: `var(--dg-rotate-size)`,
+                  'background-color': `var(--dg-rotate-background)`,
+                  border: `var(--dg-rotate-border)`,
+                  'border-radius': '50%',
+                  transform: 'translateX(-50%)',
+                  cursor: 'grab',
+                  'pointer-events': 'auto',
+                }}
+                onMouseDown={e => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  const selectedIds = selection.selectedIds()
+                  if (selectedIds.length === 1) {
+                    pointer.machine.startRotate(selectedIds[0], e)
+                  }
+                }}
+              />
+              <div
+                style={{
+                  position: 'absolute',
+                  left: '50%',
+                  top: '-20px',
+                  width: '1px',
+                  height: '15px',
+                  'background-color': `var(--dg-rotate-color)`,
+                  transform: 'translateX(-50%)',
+                }}
+              />
+            </>
+          </Show>
+        </div>
+      )}
+    </Show>
+  )
+}
+
+export function SelectionOverlay(props: ShapeSelectionLayerProps) {
+  return (
+    <>
+      <ShapeSelectionOverlay showRotateHandle={props.showRotateHandle} />
+      <LinkerSelectionOverlay />
+    </>
   )
 }
 
@@ -334,82 +372,55 @@ export function LinkerSelectionOverlay() {
 // 锚点预览 - 连线时显示元素的锚点
 // ============================================================================
 
-export function AnchorPreview(props: { elementId: string; highlightAnchor?: string }) {
-  const { state, element } = useDesigner()
-  const anchors = () => [
-    { x: 0.5, y: 0, id: 'top' },
-    { x: 1, y: 0.5, id: 'right' },
-    { x: 0.5, y: 1, id: 'bottom' },
-    { x: 0, y: 0.5, id: 'left' },
-  ]
-
-  const getAnchorPosition = (anchor: { x: number; y: number }): Point => {
+export function AnchorPreview(props: { elementId: string; highlightAnchor?: number | string }) {
+  const { element, view } = useDesigner()
+  const shape = createMemo(() => {
     const el = element.getById(props.elementId)
-    if (!el || !isShape(el)) return { x: 0, y: 0 }
-    return {
-      x: el.props.x + el.props.w * anchor.x,
-      y: el.props.y + el.props.h * anchor.y,
-    }
-  }
+    return el && isShape(el) ? el : null
+  })
+
+  const anchors = createMemo(() => {
+    const el = shape()
+    if (!el) return []
+
+    const points = getShapeAnchors(el)
+    return points.map((point, index) => ({
+      point,
+      index,
+      id: el.anchors[index]?.id ?? String(index),
+    }))
+  })
 
   return (
     <For each={anchors()}>
-      {(anchor: { x: number; y: number; id: string }) => {
-        const pos = getAnchorPosition(anchor)
-        const screenPos = canvasToScreen(pos, state.viewport)
-        const isHighlight = anchor.id === props.highlightAnchor
+      {anchor => {
+        const screenPos = canvasToScreen(anchor.point, view.viewport())
+        const isHighlight =
+          props.highlightAnchor !== undefined &&
+          (props.highlightAnchor === anchor.index ||
+            props.highlightAnchor === anchor.id ||
+            String(props.highlightAnchor) === String(anchor.index))
 
         return (
           <div
             style={{
               position: 'absolute',
-              left: `${screenPos.x - 5}px`,
-              top: `${screenPos.y - 5}px`,
+              left: `${screenPos.x}px`,
+              top: `${screenPos.y}px`,
               width: `var(--dg-anchor-size)`,
               height: `var(--dg-anchor-size)`,
+              transform: 'translate(-50%, -50%)',
               'border-radius': '50%',
               background: isHighlight ? `var(--dg-anchor-color)` : `var(--dg-anchor-background)`,
-              border: `2px solid var(--dg-anchor-color)`,
+              border: isHighlight ? `2px solid var(--dg-anchor-color)` : `var(--dg-anchor-border)`,
               cursor: 'crosshair',
+              'pointer-events': 'none',
               'z-index': 9998,
             }}
           />
         )
       }}
     </For>
-  )
-}
-
-// ============================================================================
-// 连线预览 - 拖动连线时显示预览线
-// ============================================================================
-export function LinkerPreview(props: { from: Point; to: Point; hasTarget?: boolean }) {
-  const designer = useDesigner()
-  const fromScreen = () => canvasToScreen(props.from, designer.state.viewport)
-  const toScreen = () => canvasToScreen(props.to, designer.state.viewport)
-
-  return (
-    <svg
-      style={{
-        position: 'absolute',
-        left: '0',
-        top: '0',
-        width: '100%',
-        height: '100%',
-        'pointer-events': 'none',
-        'z-index': 9997,
-      }}
-    >
-      <line
-        x1={fromScreen().x}
-        y1={fromScreen().y}
-        x2={toScreen().x}
-        y2={toScreen().y}
-        stroke={props.hasTarget ? `var(--dg-linker-color)` : `var(--dg-linker-color-inactive)`}
-        stroke-width={2}
-        stroke-dasharray={props.hasTarget ? 'none' : '5,5'}
-      />
-    </svg>
   )
 }
 

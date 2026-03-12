@@ -1,4 +1,6 @@
-export const ensureArray = <T>(
-  value: T,
-): T extends any[] ? T : T extends null | undefined ? never[] : [NonNullable<T>] =>
-  (Array.isArray(value) ? value : value == null ? [] : [value]) as any
+export function ensureArray<T>(value: T | readonly T[]): readonly T[]
+export function ensureArray<T>(value: T | T[]): T[]
+export function ensureArray<T>(value: null | undefined[]): []
+export function ensureArray<T>(value: T | T[]): T[] {
+  return Array.isArray(value) ? value : value == null ? [] : [value]
+}

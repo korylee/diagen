@@ -8,6 +8,24 @@ import type { ShapeElement, Anchor } from '../model'
 import { evaluateExpression, resolvePoints } from './expression'
 
 /**
+ * 将相对图形坐标点绕图形中心旋转
+ */
+export function rotatePointInBox(point: Point, w: number, h: number, angle: number = 0): Point {
+  if (!angle) return point
+  const rad = (angle * Math.PI) / 180
+  const cos = Math.cos(rad)
+  const sin = Math.sin(rad)
+  const cx = w / 2
+  const cy = h / 2
+  const dx = point.x - cx
+  const dy = point.y - cy
+  return {
+    x: cx + dx * cos - dy * sin,
+    y: cy + dx * sin + dy * cos,
+  }
+}
+
+/**
  * 解析锚点数组为绝对坐标（相对于图形的坐标）
  * @param anchors 锚点定义数组
  * @param w 图形宽度
@@ -30,10 +48,13 @@ export function resolveAnchors(
 export function getShapeAnchors(shape: ShapeElement): Point[] {
   const { anchors, props } = shape
   const relativeAnchors = resolveAnchors(anchors, props.w, props.h)
-  return relativeAnchors.map(p => ({
-    x: props.x + p.x,
-    y: props.y + p.y,
-  }))
+  return relativeAnchors.map(anchor => {
+    const rotated = rotatePointInBox(anchor, props.w, props.h, props.angle)
+    return {
+      x: props.x + rotated.x,
+      y: props.y + rotated.y,
+    }
+  })
 }
 
 /**
@@ -48,10 +69,11 @@ export function getShapeAnchorPosition(shape: ShapeElement, anchorIndex: number)
   const anchor = shape.anchors[anchorIndex]
   const ax = evaluateExpression(anchor.x, shape.props.w, shape.props.h)
   const ay = evaluateExpression(anchor.y, shape.props.w, shape.props.h)
+  const rotated = rotatePointInBox({ x: ax, y: ay }, shape.props.w, shape.props.h, shape.props.angle)
 
   return {
-    x: shape.props.x + ax,
-    y: shape.props.y + ay,
+    x: shape.props.x + rotated.x,
+    y: shape.props.y + rotated.y,
   }
 }
 

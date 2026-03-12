@@ -1,9 +1,9 @@
-import { createMemo, createSignal, JSX, onMount, Show } from 'solid-js'
+import { createMemo, createSignal, JSX, onMount } from 'solid-js'
 import { createEventListener, createKeyboard, createScroll } from '@diagen/primitives'
 import { createPointerInteraction } from '../primitives'
 import { DesignerGrids } from './DesignerGrids'
 import { useDesigner } from './DesignerProvider'
-import { LinkerSelectionOverlay, SelectionBox, SelectionLayer } from './InteractionOverlay'
+import { SelectionLayer, SelectionOverlay } from './InteractionOverlay'
 import { InteractionProvider } from './InteractionProvider'
 
 const EDGE_AUTO_SCROLL_GAP = 28
@@ -64,7 +64,10 @@ export function RendererContainer(props: {
       'background-color': `var(--dg-page-background)`,
       'box-sizing': 'content-box',
       cursor:
-        pointer.pan.isPanning() || pointer.shapeDrag.isDragging() || pointer.linkerDrag.isDragging()
+        pointer.pan.isPanning() ||
+        pointer.shapeDrag.isDragging() ||
+        pointer.linkerDrag.isDragging() ||
+        pointer.rotate.isRotating()
           ? 'grabbing'
           : 'default',
     } as const
@@ -98,21 +101,11 @@ export function RendererContainer(props: {
     }
   })
   const overlayLayerStyle = createMemo(() => {
-    const { containerSize, diagram } = state
     return {
-      position: 'absolute' as const,
-      left: `${diagram.page.margin}px`,
-      top: `${diagram.page.margin}px`,
-      width: `${containerSize.width}px`,
-      height: `${containerSize.height}px`,
-      overflow: 'visible',
+      ...sceneLayerStyle(),
       'z-index': 2,
       'pointer-events': 'none',
     } as const
-  })
-  const boxSelectionScreenBounds = createMemo(() => {
-    const b = pointer.boxSelect.bounds()
-    return b ? pointer.coordinate.canvasToScreen(b) : null
   })
 
   const onMouseDown = (e: MouseEvent) => {
@@ -241,29 +234,23 @@ export function RendererContainer(props: {
         style="overflow: scroll;position: relative;z-index: 0;background: #eaecee;height: 900px;"
       >
         {/*滚动容器*/}
-        <div
-          ref={setContainerRef}
-          style={containerStyle()}
-          onMouseDown={onMouseDown}
-          class="designer-container"
-        >
+        <div ref={setContainerRef} style={containerStyle()} onMouseDown={onMouseDown} class="designer-container">
           {/*世界层（canvas 坐标，交给 transform 处理）*/}
           <div style={layerStyle()} class="designer-layer">
             <DesignerGrids />
           </div>
 
           {/*渲染层（屏幕坐标，不做 transform）*/}
-          <div ref={setSceneLayerRef} style={sceneLayerStyle()}>{props.children}</div>
+          <div ref={setSceneLayerRef} style={sceneLayerStyle()}>
+            {props.children}
+          </div>
 
           {/*交互覆盖层（屏幕坐标，不做 transform）*/}
           <div style={overlayLayerStyle()}>
-            <SelectionBox />
-            <LinkerSelectionOverlay />
+            <SelectionOverlay />
 
             {/* 框选层 - 用于显示框选区域 */}
-            <Show when={pointer.boxSelect.isSelecting() && boxSelectionScreenBounds()}>
-              {bounds => <SelectionLayer screenBounds={bounds()} />}
-            </Show>
+            <SelectionLayer />
           </div>
         </div>
       </div>
