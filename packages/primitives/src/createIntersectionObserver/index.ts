@@ -21,21 +21,23 @@ export interface CreateIntersectionObserverOptions<Controls extends boolean = fa
   controls?: Controls
 }
 
-export type CreateIntersectionObserverReturn<Controls extends boolean = false> = Controls extends false
+export interface CreateIntersectionObserverControls {
+  stop: VoidFunction
+  isSupported: Accessor<boolean>
+  isActive: Accessor<boolean>
+}
+
+export type CreateIntersectionObserverReturn<Controls extends boolean> = Controls extends false
   ? undefined
-  : {
-      stop: VoidFunction
-      isSupported: Accessor<boolean>
-      isActive: Accessor<boolean>
-    }
+  : CreateIntersectionObserverControls
 
 export function createIntersectionObserver<T extends CreateIntersectionObserverOptions>(
-  target: MaybeAccessor<MaybeElement> | MaybeAccessor<MaybeElement[]> | MaybeElement[],
+  target: MaybeAccessor<MaybeElement> | MaybeAccessor<MaybeElement[]>,
   callback: IntersectionObserverCallback,
   options?: T,
 ): undefined
 export function createIntersectionObserver<T extends CreateIntersectionObserverOptions<true>>(
-  target: MaybeAccessor<MaybeElement> | MaybeAccessor<MaybeElement[]> | MaybeElement[],
+  target: MaybeAccessor<MaybeElement> | MaybeAccessor<MaybeElement[]>,
   callback: IntersectionObserverCallback,
   options: T,
 ): {
@@ -44,10 +46,10 @@ export function createIntersectionObserver<T extends CreateIntersectionObserverO
   isActive: Accessor<boolean>
 }
 export function createIntersectionObserver(
-  target: MaybeAccessor<MaybeElement> | MaybeAccessor<MaybeElement[]> | MaybeElement[],
+  target: MaybeAccessor<MaybeElement> | MaybeAccessor<MaybeElement[]>,
   callback: IntersectionObserverCallback,
   options: CreateIntersectionObserverOptions<boolean> = {},
-) {
+): CreateIntersectionObserverReturn<boolean> {
   const { window = defaultWindow, root, threshold = 0, immediate = true, rootMargin, controls = false } = options
 
   const isSupported = createMemo(() => !!window && 'IntersectionObserver' in window)

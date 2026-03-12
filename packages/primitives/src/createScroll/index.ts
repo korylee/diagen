@@ -202,6 +202,8 @@ export function createScroll(element: MaybeAccessor<ScrollTarget>, options: Crea
     direction,
     measure,
 
-    scrollTo
+    scrollTo,
   }
 }
+
+export type CreateScroll = ReturnType<typeof createScroll>
