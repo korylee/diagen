@@ -1,38 +1,25 @@
-import { createSignal, onCleanup, onMount } from 'solid-js'
+import { createEffect, createMemo, createSignal } from 'solid-js'
 import { ConfigurableWindow, defaultWindow } from '../_configurable'
+import { createMediaQuery } from '../createMediaQuery'
 
 interface CreateDevicePixelRatioOptions extends ConfigurableWindow {}
 
 export function createDevicePixelRatio(options: CreateDevicePixelRatioOptions = {}): () => number {
   const { window = defaultWindow } = options
 
-  if (!window) return () => 1
+  const [pixelRatio, setPixelRatio] = createSignal(1)
 
-  const [pixelRatio, setPixelRatio] = createSignal(window.devicePixelRatio || 1)
+  const query = createMediaQuery(
+    createMemo(() => `(resolution: ${pixelRatio()}dppx)`),
+    options,
+  )
 
-  onMount(() => {
-    let media: MediaQueryList | null = null
-
-    const updatePixelRatio = () => {
-      if (!window) return
-      const dpr = window.devicePixelRatio || 1
-      setPixelRatio(dpr)
-
-      if (media) {
-        media.removeEventListener('change', updatePixelRatio)
-      }
-      media = window.matchMedia(`(resolution: ${dpr}dppx)`)
-      media.addEventListener('change', updatePixelRatio)
-    }
-
-    updatePixelRatio()
-
-    onCleanup(() => {
-      if (media) {
-        media.removeEventListener('change', updatePixelRatio)
-      }
+  if (window) {
+    createEffect(() => {
+      query()
+      setPixelRatio(window.devicePixelRatio)
     })
-  })
+  }
 
   return pixelRatio
 }
