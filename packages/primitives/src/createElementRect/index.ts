@@ -3,6 +3,7 @@ import { createEffect, createSignal, onMount } from 'solid-js'
 import { createResizeObserver } from '../createResizeObserver'
 import { createEventListener } from '../createEventListener'
 import { ConfigurableWindow, defaultWindow } from '../_configurable.ts'
+import { pick } from '@diagen/shared'
 
 export interface CreateElementRectOptions extends ConfigurableWindow {
   /**
@@ -56,7 +57,16 @@ export function createElementRect(target: MaybeAccessor<MaybeElement>, options: 
     }
     const _rect = el.getBoundingClientRect()
 
-    setRect({ ..._rect })
+    setRect({
+      x: _rect.x,
+      y: _rect.y,
+      width: _rect.width,
+      height: _rect.height,
+      top: _rect.top,
+      bottom: _rect.bottom,
+      left: _rect.left,
+      right: _rect.right,
+    })
   }
 
   function update() {
