@@ -1,5 +1,5 @@
-import { createMemo, createSignal, JSX, onMount } from 'solid-js'
-import { createEventListener, createKeyboard, createScroll } from '@diagen/primitives'
+import { createEffect, createMemo, createSignal, JSX, onMount } from 'solid-js'
+import { createElementRect, createEventListener, createKeyboard, createScroll } from '@diagen/primitives'
 import { createPointerInteraction } from '../primitives'
 import { DesignerGrids } from './DesignerGrids'
 import { useDesigner } from './DesignerProvider'
@@ -21,6 +21,7 @@ export function RendererContainer(props: {
   const [containerRef, setContainerRef] = createSignal<HTMLDivElement | null>(null)
   const [viewportRef, setViewportRef] = createSignal<HTMLDivElement | null>(null)
   const [sceneLayerRef, setSceneLayerRef] = createSignal<HTMLDivElement | null>(null)
+  const { rect: viewportRect } = createElementRect(viewportRef)
   const pointer = createPointerInteraction({
     getViewport: () => view.viewport(),
     getViewportElement: viewportRef,
@@ -54,11 +55,11 @@ export function RendererContainer(props: {
   }
 
   const containerStyle = createMemo(() => {
-    const { diagram, containerSize } = state
+    const { containerSize, config } = state
     return {
       width: `${containerSize.width}px`,
       height: `${containerSize.height}px`,
-      padding: `${diagram.page.margin}px`,
+      padding: `${config.containerInset}px`,
       overflow: 'hidden',
       position: 'relative',
       'background-color': `var(--dg-page-background)`,
@@ -89,11 +90,11 @@ export function RendererContainer(props: {
     }
   })
   const sceneLayerStyle = createMemo(() => {
-    const { containerSize, diagram } = state
+    const { containerSize, config } = state
     return {
       position: 'absolute' as const,
-      left: `${diagram.page.margin}px`,
-      top: `${diagram.page.margin}px`,
+      left: `${config.containerInset}px`,
+      top: `${config.containerInset}px`,
       width: `${containerSize.width}px`,
       height: `${containerSize.height}px`,
       overflow: 'visible',
@@ -202,27 +203,13 @@ export function RendererContainer(props: {
     },
   )
 
-  const measureViewport = () => {
-    const el = viewportRef()
-    if (!el) return
-    view.setViewportSize(el.clientWidth, el.clientHeight)
-  }
-
-  createEventListener(viewportRef, 'scroll', () => {
-    measureViewport()
+  createEffect(() => {
+    const { width, height } = viewportRect()
+    view.setViewportSize(width, height)
   })
-  createEventListener(
-    () => window,
-    'resize',
-    () => {
-      measureViewport()
-    },
-  )
 
   onMount(() => {
-    measureViewport()
-    const { padding, margin } = state.diagram.page
-    const val = margin - padding
+    const val = Math.max(0, state.config.containerInset - 10)
     scroll.scrollTo(val, val)
   })
 

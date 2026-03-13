@@ -29,6 +29,8 @@ export interface EditorConfig {
   rotaterSize: number
   anchorColor: string
   selectorColor: string
+  /** 画布容器外圈缓冲区（运行时，不持久化） */
+  containerInset: number
   autoGrow: AutoGrowConfig
 }
 
@@ -36,6 +38,7 @@ export interface EditorConfig {
 export interface EditorState {
   /** 图表数据 */
   diagram: Diagram
+  
   /** 视口变换参数：x, y 为偏移，zoom 为缩放级别 */
   viewport: Viewport
 

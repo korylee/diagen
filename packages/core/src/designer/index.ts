@@ -34,6 +34,8 @@ const DEFAULT_AUTO_GROW_CONFIG = {
 }
 
 function createResolvedConfig(options: DesignerOptions): EditorConfig {
+  const containerInset = typeof options.containerInset === 'number' ? options.containerInset : 800
+
   return {
     panelItemWidth: 50,
     panelItemHeight: 50,
@@ -41,6 +43,7 @@ function createResolvedConfig(options: DesignerOptions): EditorConfig {
     rotaterSize: 9,
     anchorColor: '#067bef',
     selectorColor: '#067bef',
+    containerInset,
     ...pick(options, [
       'panelItemWidth',
       'panelItemHeight',
@@ -48,6 +51,7 @@ function createResolvedConfig(options: DesignerOptions): EditorConfig {
       'rotaterSize',
       'anchorColor',
       'selectorColor',
+      'containerInset',
     ]),
     autoGrow: {
       ...DEFAULT_AUTO_GROW_CONFIG,
