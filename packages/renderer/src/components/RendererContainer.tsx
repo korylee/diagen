@@ -1,10 +1,11 @@
 import { createEffect, createMemo, createSignal, JSX, onMount } from 'solid-js'
-import { createElementRect, createEventListener, createKeyboard, createScroll } from '@diagen/primitives'
+import { createEventListener, createKeyboard, createScroll } from '@diagen/primitives'
 import { createPointerInteraction } from '../primitives'
 import { DesignerGrids } from './DesignerGrids'
 import { useDesigner } from './DesignerProvider'
 import { SelectionLayer, SelectionOverlay } from './InteractionOverlay'
 import { InteractionProvider } from './InteractionProvider'
+import { createCoordinateService } from '../primitives/createCoordinateService'
 
 const EDGE_AUTO_SCROLL_GAP = 28
 const EDGE_AUTO_SCROLL_MAX_STEP = 26
@@ -21,11 +22,13 @@ export function RendererContainer(props: {
   const [containerRef, setContainerRef] = createSignal<HTMLDivElement | null>(null)
   const [viewportRef, setViewportRef] = createSignal<HTMLDivElement | null>(null)
   const [sceneLayerRef, setSceneLayerRef] = createSignal<HTMLDivElement | null>(null)
-  const { rect: viewportRect } = createElementRect(viewportRef)
+  const coordinate = createCoordinateService({
+    getViewport: view.viewport,
+    viewportRef,
+    sceneLayerRef,
+  })
   const pointer = createPointerInteraction({
-    getViewport: () => view.viewport(),
-    getViewportElement: viewportRef,
-    getSceneLayerElement: sceneLayerRef,
+    coordinate,
     panButton: 1,
     shapeDragThreshold: 3,
     linkerDragThreshold: 3,
@@ -52,6 +55,7 @@ export function RendererContainer(props: {
     pointer,
     keyboard,
     scroll,
+    coordinate
   }
 
   const containerStyle = createMemo(() => {
@@ -134,7 +138,7 @@ export function RendererContainer(props: {
     const el = viewportRef()
     if (!el) return
 
-    const rect = pointer.coordinate.getViewportRect()
+    const rect = coordinate.viewportRect()
     if (!rect) return
     const leftDistance = e.clientX - rect.left
     const rightDistance = rect.right - e.clientX
@@ -183,7 +187,7 @@ export function RendererContainer(props: {
       e.preventDefault()
       const delta = e.deltaY > 0 ? -0.1 : 0.1
       const newZoom = Math.max(0.1, Math.min(5, view.viewport().zoom + delta))
-      view.setZoom(newZoom, pointer.coordinate.eventToCanvas(e))
+      view.setZoom(newZoom, coordinate.eventToCanvas(e))
     }
   }
 
@@ -204,7 +208,7 @@ export function RendererContainer(props: {
   )
 
   createEffect(() => {
-    const { width, height } = viewportRect()
+    const { width, height } = coordinate.viewportRect()
     view.setViewportSize(width, height)
   })
 

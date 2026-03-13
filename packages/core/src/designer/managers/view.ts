@@ -1,5 +1,6 @@
 import { type Bounds, createRafMergeQueue, normalizeBounds, pick, type Point, unionBounds } from '@diagen/shared'
 import { batch, createMemo, createSignal } from 'solid-js'
+import { createStore } from 'solid-js/store'
 import { type DiagramElement, isLinker, isShape, type LinkerElement, type ShapeElement } from '../../model'
 import { calculateLinkerRoute, canvasToScreen, clampZoom, type LinkerRoute, screenToCanvas } from '../../utils'
 import type { ElementManager } from './element'
@@ -12,7 +13,7 @@ export interface LinkerLayout {
 }
 
 interface LinkerLayoutCacheEntry {
-  key: string
+  stamp: number
   layout: LinkerLayout
 }
 
@@ -219,8 +220,7 @@ export function createViewManager(
     run: payload => ensureContainerFits(payload),
   })
   const linkerLayoutCache = new Map<string, LinkerLayoutCacheEntry>()
-  const linkerVersionMap = new Map<string, number>()
-  const shapeVersionMap = new Map<string, number>()
+  const [linkerLayoutStampMap, setLinkerLayoutStampMap] = createStore<Record<string, number>>({})
 
   /**
    * 在下一帧合并执行扩容，避免拖拽过程高频 setState
@@ -237,33 +237,45 @@ export function createViewManager(
     return autoGrowQueue.flush(extraBounds)
   }
 
-  function getVersion(versionMap: Map<string, number>, id: string): number {
-    return versionMap.get(id) ?? 0
+  function getLinkerLayoutStamp(id: string): number {
+    return linkerLayoutStampMap[id] ?? 0
   }
 
-  function bumpVersion(versionMap: Map<string, number>, id: string): void {
-    versionMap.set(id, getVersion(versionMap, id) + 1)
+  function bumpLinkerLayoutStamp(id: string): void {
+    setLinkerLayoutStampMap(id, value => (value ?? 0) + 1)
   }
 
   function markLayoutDirty(elements: Array<DiagramElement | null | undefined>): void {
+    const dirtyLinkerIds = new Set<string>()
+
     for (const el of elements) {
       if (!el) continue
 
       if (isLinker(el)) {
-        bumpVersion(linkerVersionMap, el.id)
+        dirtyLinkerIds.add(el.id)
         continue
       }
 
       if (isShape(el)) {
-        bumpVersion(shapeVersionMap, el.id)
+        const relatedLinkers = element.getRelatedLinkers(el.id)
+        for (const linker of relatedLinkers) {
+          dirtyLinkerIds.add(linker.id)
+        }
       }
     }
+
+    if (dirtyLinkerIds.size === 0) return
+    batch(() => {
+      for (const id of dirtyLinkerIds) {
+        linkerLayoutCache.delete(id)
+        bumpLinkerLayoutStamp(id)
+      }
+    })
   }
 
   function clearLayoutCache(): void {
     linkerLayoutCache.clear()
-    linkerVersionMap.clear()
-    shapeVersionMap.clear()
+    setLinkerLayoutStampMap({})
   }
 
   function removeLayoutCacheEntries(elements: Array<DiagramElement | null | undefined>): void {
@@ -272,12 +284,7 @@ export function createViewManager(
 
       if (isLinker(el)) {
         linkerLayoutCache.delete(el.id)
-        linkerVersionMap.delete(el.id)
-        continue
-      }
-
-      if (isShape(el)) {
-        shapeVersionMap.delete(el.id)
+        setLinkerLayoutStampMap(el.id, 0)
       }
     }
   }
@@ -285,31 +292,6 @@ export function createViewManager(
   const getShapeById = (id: string) => {
     const el = element.getById(id)
     return el && isShape(el) ? el : null
-  }
-
-  function createLinkerLayoutCacheKey(linker: LinkerElement): string {
-    const linkerVersion = getVersion(linkerVersionMap, linker.id)
-
-    const fromId = linker.from.id ?? ''
-    const fromShape = fromId ? getShapeById(fromId) : null
-    const fromShapeVersion = fromId ? getVersion(shapeVersionMap, fromId) : 0
-
-    const toId = linker.to.id ?? ''
-    const toShape = toId ? getShapeById(toId) : null
-    const toShapeVersion = toId ? getVersion(shapeVersionMap, toId) : 0
-
-    return [
-      linkerVersion,
-      linker.linkerType,
-      fromId,
-      linker.from.anchorIndex ?? -1,
-      fromShape ? 1 : 0,
-      fromShapeVersion,
-      toId,
-      linker.to.anchorIndex ?? -1,
-      toShape ? 1 : 0,
-      toShapeVersion,
-    ].join('|')
   }
 
   function getLinkerRoute(linker: LinkerElement): LinkerRoute {
@@ -326,9 +308,10 @@ export function createViewManager(
   }
 
   function getLinkerLayout(linker: LinkerElement): LinkerLayout {
-    const cacheKey = createLinkerLayoutCacheKey(linker)
+    // 通过 linker 级 stamp 建立响应依赖，确保受影响连线可触发重算。
+    const stamp = getLinkerLayoutStamp(linker.id)
     const cached = linkerLayoutCache.get(linker.id)
-    if (cached && cached.key === cacheKey) {
+    if (cached && cached.stamp === stamp) {
       return cached.layout
     }
 
@@ -336,7 +319,7 @@ export function createViewManager(
     const bounds = calculateLinkerBoundsFromRoute(route)
     const layout = { route, bounds }
     linkerLayoutCache.set(linker.id, {
-      key: cacheKey,
+      stamp,
       layout,
     })
     return layout
@@ -388,11 +371,11 @@ export function createViewManager(
   const removeLayoutCacheFromEvent = ({ elements }: { elements: Array<DiagramElement | null | undefined> }) =>
     removeLayoutCacheEntries(elements)
 
-  emitter.on('element:updated', mergeBoundsFromEvent)
-  emitter.on('element:added', mergeBoundsFromEvent)
   emitter.on('element:updated', markLayoutDirtyFromEvent)
   emitter.on('element:added', markLayoutDirtyFromEvent)
   emitter.on('element:removed', markLayoutDirtyFromEvent)
+  emitter.on('element:updated', mergeBoundsFromEvent)
+  emitter.on('element:added', mergeBoundsFromEvent)
   emitter.on('element:removed', removeLayoutCacheFromEvent)
   emitter.on('element:cleared', clearLayoutCacheFromEvent)
 

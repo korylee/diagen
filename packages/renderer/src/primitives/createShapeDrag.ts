@@ -4,8 +4,10 @@ import { unionBounds } from '@diagen/shared'
 import type { Bounds, Point } from '@diagen/shared'
 import { useDesigner } from '../components'
 import { getRotatedBoxBounds } from '../utils'
-import { createDragSession, type CreateDragSessionOptions } from './createDragSession'
-import { resolveCanvasDelta, type EventToCanvas } from './resolveCanvasDelta'
+import { type EventToCanvas } from './createCoordinateService'
+import type { CreateDragSessionOptions } from './createDragSession'
+import { createPointerDeltaState } from './pointerDeltaState'
+import { createTransactionalSession } from './createTransactionalSession'
 
 // ============================================================================
 // 图形拖动 Hook - 与 Designer 集成
@@ -18,11 +20,17 @@ export interface UseShapeDragOptions extends CreateDragSessionOptions {
 export function createShapeDrag(options: UseShapeDragOptions = {}) {
   const { threshold = 3, eventToCanvas } = options
   const designer = useDesigner()
-  const session = createDragSession({ threshold })
   const transaction = designer.history.transaction.createScope('拖拽图形')
+  const pointerDelta = createPointerDeltaState({ eventToCanvas })
+  const session = createTransactionalSession({
+    threshold,
+    transaction,
+    onCommit: () => {
+      designer.view.flushAutoGrow()
+    },
+  })
 
   const [startPositions, setStartPositions] = createSignal<Record<string, Point>>({})
-  const [startPointerCanvas, setStartPointerCanvas] = createSignal<Point | null>(null)
 
   const start = (e: MouseEvent, ids?: string[]) => {
     const targetIds = ids ?? designer.selection.selectedIds()
@@ -38,10 +46,8 @@ export function createShapeDrag(options: UseShapeDragOptions = {}) {
 
     if (Object.keys(positions).length === 0) return
 
-    if (!transaction.begin()) return
-
     setStartPositions(positions)
-    setStartPointerCanvas(eventToCanvas ? eventToCanvas(e) : null)
+    pointerDelta.setStartFromEvent(e)
     session.begin({ x: e.clientX, y: e.clientY })
   }
 
@@ -51,12 +57,10 @@ export function createShapeDrag(options: UseShapeDragOptions = {}) {
 
     const zoom = designer.state.viewport.zoom
     const positions = startPositions()
-    const delta = resolveCanvasDelta({
+    const delta = pointerDelta.resolveDelta({
       moveState,
       zoom,
-      startPointerCanvas: startPointerCanvas(),
       event: e,
-      eventToCanvas,
     })
     let movedBounds: Bounds | null = null
 
@@ -90,25 +94,19 @@ export function createShapeDrag(options: UseShapeDragOptions = {}) {
   }
 
   const end = () => {
-    if (!session.isPending()) return
-
-    const dragged = session.finish()
-    if (dragged) {
-      designer.view.flushAutoGrow()
-      transaction.commit()
-    } else {
-      transaction.abort()
+    if (session.isPending()) {
+      session.finish()
     }
     setStartPositions({})
-    setStartPointerCanvas(null)
+    pointerDelta.clear()
   }
 
   const cancel = () => {
-    if (!session.isPending()) return
-    transaction.abort()
-    session.cancel()
+    if (session.isPending()) {
+      session.cancel()
+    }
     setStartPositions({})
-    setStartPointerCanvas(null)
+    pointerDelta.clear()
   }
 
   onCleanup(() => {

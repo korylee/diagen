@@ -34,4 +34,19 @@
 
   --dg-linker-color: #2196f3;
   --dg-linker-color-inactive: #999999;
+
+  --dg-hl-link-outline: 1px solid rgba(33, 150, 243, 0.45);
+  --dg-hl-link-bg: rgba(33, 150, 243, 0.08);
+  --dg-hl-link-outline-active: 2px solid rgba(33, 150, 243, 0.95);
+  --dg-hl-link-bg-active: rgba(33, 150, 243, 0.16);
+
+  --dg-hl-deny-outline: 1px solid rgba(244, 67, 54, 0.48);
+  --dg-hl-deny-bg: rgba(244, 67, 54, 0.1);
+  --dg-hl-deny-outline-active: 2px solid rgba(244, 67, 54, 0.92);
+  --dg-hl-deny-bg-active: rgba(244, 67, 54, 0.18);
+
+  --dg-hl-custom-outline: 1px solid rgba(255, 152, 0, 0.5);
+  --dg-hl-custom-bg: rgba(255, 152, 0, 0.1);
+  --dg-hl-custom-outline-active: 2px solid rgba(255, 152, 0, 0.95);
+  --dg-hl-custom-bg-active: rgba(255, 152, 0, 0.18);
 }

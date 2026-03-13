@@ -1,7 +1,7 @@
-import { Point } from '@diagen/shared'
-import { LinkerType } from '../constants'
-import { LinkerElement, ShapeElement } from '../model'
-import { getAnchorAngle, resolveAnchors, rotatePointInBox } from './anchors'
+import type { Point } from '@diagen/shared'
+import type { LinkerType } from '../constants'
+import type { LinkerElement, LinkerEndpoint, ShapeElement } from '../model'
+import { getShapeAnchorInfoById, resolveShapePerimeterInfo } from './anchors'
 
 export interface LinkerRoute {
   points: Point[]
@@ -15,37 +15,18 @@ export function calculateLinkerRoute(
 ): LinkerRoute {
   const { from, to, linkerType, points: controlPoints } = linker
 
-  let fromPoint: Point = { x: from.x, y: from.y }
-  let toPoint: Point = { x: to.x, y: to.y }
-  let fromAngle = from.angle ?? 0
-  let toAngle = to.angle ?? 0
+  const fromResolved = resolveEndpoint(linker.from, getShapeById)
+  const toResolved = resolveEndpoint(linker.to, getShapeById)
 
-  if (from.id) {
-    const shape = getShapeById(from.id)
-    if (shape && from.anchorIndex !== undefined) {
-      const anchors = resolveAnchors(shape.anchors, shape.props.w, shape.props.h)
-      if (anchors[from.anchorIndex]) {
-        const anchor = rotatePointInBox(anchors[from.anchorIndex], shape.props.w, shape.props.h, shape.props.angle)
-        fromPoint = { x: shape.props.x + anchor.x, y: shape.props.y + anchor.y }
-        fromAngle = getAnchorAngle(anchor, shape.props.w, shape.props.h)
-      }
-    }
-  }
-
-  if (to.id) {
-    const shape = getShapeById(to.id)
-    if (shape && to.anchorIndex !== undefined) {
-      const anchors = resolveAnchors(shape.anchors, shape.props.w, shape.props.h)
-      if (anchors[to.anchorIndex]) {
-        const anchor = rotatePointInBox(anchors[to.anchorIndex], shape.props.w, shape.props.h, shape.props.angle)
-        toPoint = { x: shape.props.x + anchor.x, y: shape.props.y + anchor.y }
-        toAngle = getAnchorAngle(anchor, shape.props.w, shape.props.h)
-      }
-    }
-  }
-
-  const routePoints = calculateRoutePoints(fromPoint, toPoint, fromAngle, toAngle, linkerType, controlPoints)
-  return { points: routePoints, fromAngle, toAngle }
+  const routePoints = calculateRoutePoints(
+    fromResolved.point,
+    toResolved.point,
+    fromResolved.angle,
+    toResolved.angle,
+    linkerType,
+    controlPoints,
+  )
+  return { points: routePoints, fromAngle: fromResolved.angle, toAngle: toResolved.angle }
 }
 
 function calculateRoutePoints(
@@ -97,4 +78,37 @@ function calculateRoutePoints(
   }
 
   return points
+}
+
+function resolveEndpoint(
+  endpoint: LinkerEndpoint,
+  getShapeById: (id: string) => ShapeElement | undefined | null,
+): { point: Point; angle: number } {
+  const fallback = {
+    point: { x: endpoint.x, y: endpoint.y },
+    angle: endpoint.angle ?? 0,
+  }
+
+  if (!endpoint.id) return fallback
+  const shape = getShapeById(endpoint.id)
+  if (!shape) return fallback
+
+  const binding = endpoint.binding
+  if (binding.type === 'free') return fallback
+
+  if (binding.type === 'fixed') {
+    const info = getShapeAnchorInfoById(shape, binding.anchorId)
+    if (!info) return fallback
+    return {
+      point: info.point,
+      angle: info.angle,
+    }
+  }
+
+  const info = resolveShapePerimeterInfo(shape, binding)
+  if (!info) return fallback
+  return {
+    point: info.point,
+    angle: info.angle,
+  }
 }

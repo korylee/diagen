@@ -8,7 +8,7 @@ export interface CanvasRendererProps {}
 export function CanvasRenderer(props: CanvasRendererProps) {
   const designer = useDesigner()
   const { element, selection } = designer
-  const { pointer } = useInteraction()
+  const { pointer, coordinate } = useInteraction()
 
   const applySelection = (id: string, event: MouseEvent) => {
     if (event.ctrlKey || event.metaKey) {
@@ -23,7 +23,7 @@ export function CanvasRenderer(props: CanvasRendererProps) {
     e.preventDefault()
 
     // 调整大小检测
-    const point = pointer.coordinate.eventToCanvas(e)
+    const point = coordinate.eventToCanvas(e)
     const hit = pointer.resize.hitTest(point)
     if (hit) {
       pointer.machine.startResize(hit.id, hit.dir, e)
@@ -40,7 +40,7 @@ export function CanvasRenderer(props: CanvasRendererProps) {
     const target = element.getById(id)
     if (!target || !isLinker(target)) return false
 
-    const point = pointer.coordinate.eventToCanvas(e)
+    const point = coordinate.eventToCanvas(e)
     const hitResult = pointer.linkerDrag.hitTestWithRoute(id, point)
     const hit = hitResult?.hit
     const linkerHit =

@@ -17,7 +17,7 @@ function Toolbar() {
   const designer = useDesigner()
   const { getElementById, selection, element, view } = designer
   ;(window as any).designer = designer
-  const zoomDisplay = createMemo(() => view.zoom() * 100)
+  const zoomDisplay = createMemo(() => (view.zoom() * 100).toFixed())
 
   const addShape = () => {
     const shape = Schema.createShape(
@@ -56,11 +56,13 @@ function Toolbar() {
         id: fromId,
         x: (fromShape as ShapeElement).props.x + (fromShape as ShapeElement).props.w / 2,
         y: (fromShape as ShapeElement).props.y + (fromShape as ShapeElement).props.h / 2,
+        binding: { type: 'free' },
       },
       {
         id: toId,
         x: (toShape as ShapeElement).props.x + (toShape as ShapeElement).props.w / 2,
         y: (toShape as ShapeElement).props.y + (toShape as ShapeElement).props.h / 2,
+        binding: { type: 'free' },
       },
     )!
 

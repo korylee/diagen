@@ -6,12 +6,17 @@ import { generateId } from '@diagen/shared'
 import type { LinkerType } from '../constants'
 import type { BaseElement, LineStyle, FontStyle, DataAttribute } from './types'
 
+export type LinkerEndpointBinding =
+  | { type: 'free' }
+  | { type: 'fixed'; anchorId: string }
+  | { type: 'perimeter'; pathIndex: number; segmentIndex: number; t: number }
+
 /** 连线端点 */
 export interface LinkerEndpoint {
   id?: string | null   // 连接的形状 ID
   x: number
   y: number
-  anchorIndex?: number
+  binding: LinkerEndpointBinding
   angle?: number
 }
 
@@ -55,11 +60,13 @@ export function createLinker(patch: Partial<LinkerElement>):LinkerElement {
       id: null,
       x: 0,
       y: 0,
+      binding: { type: 'free' },
     },
     to: {
       id: null,
       x: 0,
       y: 0,
+      binding: { type: 'free' },
     },
     points: [],
     lineStyle: {

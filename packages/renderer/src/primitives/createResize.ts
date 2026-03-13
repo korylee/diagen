@@ -3,7 +3,8 @@ import { isShape } from '@diagen/core'
 import type { Bounds, Point } from '@diagen/shared'
 import { useDesigner } from '../components'
 import { getRotatedBoxBounds } from '../utils'
-import { resolveCanvasDelta, type EventToCanvas } from './resolveCanvasDelta'
+import { type EventToCanvas } from './createCoordinateService'
+import { createPointerDeltaState } from './pointerDeltaState'
 
 // ============================================================================
 // 调整大小 Hook - 与 Designer 集成
@@ -23,12 +24,12 @@ export function createResize(
   const { minWidth = 20, minHeight = 20, eventToCanvas } = options
   const { element, history, selection, view, edit } = useDesigner()
   const transaction = history.transaction.createScope('调整尺寸')
+  const pointerDelta = createPointerDeltaState({ eventToCanvas })
 
   const [targetId, setTargetId] = createSignal<string | null>(null)
   const [direction, setDirection] = createSignal<ResizeDirection | null>(null)
   const [startBounds, setStartBounds] = createSignal<Bounds | null>(null)
   const [startMouse, setStartMouse] = createSignal<Point | null>(null)
-  const [startPointerCanvas, setStartPointerCanvas] = createSignal<Point | null>(null)
   const [ratio, setRatio] = createSignal(1)
 
   const isResizing = () => targetId() !== null
@@ -50,7 +51,7 @@ export function createResize(
       setDirection(dir)
       setStartBounds(bounds)
       setStartMouse({ x: e.clientX, y: e.clientY })
-      setStartPointerCanvas(eventToCanvas ? eventToCanvas(e) : null)
+      pointerDelta.setStartFromEvent(e)
       setRatio(bounds.w / bounds.h)
     })
   }
@@ -63,16 +64,14 @@ export function createResize(
     if (!start || !bounds || !dir || !id) return
 
     const zoom = view.viewport().zoom
-    const delta = resolveCanvasDelta({
+    const delta = pointerDelta.resolveDelta({
       moveState: {
         dx: e.clientX - start.x,
         dy: e.clientY - start.y,
         shouldUpdate: true,
       },
       zoom,
-      startPointerCanvas: startPointerCanvas(),
       event: e,
-      eventToCanvas,
     })
     const dx = delta.x
     const dy = delta.y
@@ -146,7 +145,7 @@ export function createResize(
       setDirection(null)
       setStartBounds(null)
       setStartMouse(null)
-      setStartPointerCanvas(null)
+      pointerDelta.clear()
     })
   }
 

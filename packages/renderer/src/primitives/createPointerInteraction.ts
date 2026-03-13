@@ -1,5 +1,3 @@
-import type { Viewport } from '@diagen/core'
-import { createCoordinateService } from '../utils/coordinate'
 import { createInteractionMachine } from './createInteractionMachine'
 import { createLinkerDrag } from './createLinkerDrag'
 import { createPan } from './createPan'
@@ -7,16 +5,17 @@ import { createResize } from './createResize'
 import { createRotate } from './createRotate'
 import { createSelection } from './createSelection'
 import { createShapeDrag } from './createShapeDrag'
+import { CoordinateService } from './createCoordinateService'
 
 export interface CreatePointerInteractionOptions {
-  getViewport: () => Viewport
-  getViewportElement: () => HTMLDivElement | null
-  getSceneLayerElement: () => HTMLDivElement | null
+  coordinate: CoordinateService
   panButton?: number
   shapeDragThreshold?: number
   linkerDragThreshold?: number
   linkerSnapDistance?: number
   linkerSnapOnMove?: boolean
+  linkerSnapStickDistance?: number
+  linkerDirectionBias?: number
   linkerAllowSelfConnect?: boolean
   resizeMinWidth?: number
   resizeMinHeight?: number
@@ -32,14 +31,14 @@ export interface CreatePointerInteractionOptions {
  */
 export function createPointerInteraction(options: CreatePointerInteractionOptions) {
   const {
-    getViewport,
-    getViewportElement,
-    getSceneLayerElement,
+    coordinate,
     panButton = 1,
     shapeDragThreshold = 3,
     linkerDragThreshold = 3,
     linkerSnapDistance = 12,
     linkerSnapOnMove = true,
+    linkerSnapStickDistance = 8,
+    linkerDirectionBias = 0.35,
     linkerAllowSelfConnect = true,
     resizeMinWidth = 20,
     resizeMinHeight = 20,
@@ -47,12 +46,6 @@ export function createPointerInteraction(options: CreatePointerInteractionOption
     rotateThreshold = 2,
     rotateSnapStep = 15,
   } = options
-
-  const coordinate = createCoordinateService({
-    getViewport,
-    getViewportElement,
-    getSceneLayerElement,
-  })
 
   const shapeDrag = createShapeDrag({
     threshold: shapeDragThreshold,
@@ -63,6 +56,8 @@ export function createPointerInteraction(options: CreatePointerInteractionOption
     eventToCanvas: coordinate.eventToCanvas,
     snapDistance: linkerSnapDistance,
     snapOnMove: linkerSnapOnMove,
+    snapStickDistance: linkerSnapStickDistance,
+    directionBias: linkerDirectionBias,
     allowSelfConnect: linkerAllowSelfConnect,
   })
   const pan = createPan({ button: panButton })
@@ -89,7 +84,6 @@ export function createPointerInteraction(options: CreatePointerInteractionOption
   })
 
   return {
-    coordinate,
     machine,
     pan,
     shapeDrag,

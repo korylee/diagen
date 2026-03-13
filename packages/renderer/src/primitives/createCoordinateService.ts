@@ -1,20 +1,14 @@
 import { canvasToScreen, screenToCanvas, type Viewport } from '@diagen/core'
+import { createElementRect } from '@diagen/primitives'
 import type { Bounds, Point } from '@diagen/shared'
+import { Accessor } from 'solid-js'
 
 export type EventToCanvas = (event: { clientX: number; clientY: number }) => Point
 
-export interface CoordinateService {
-  eventToCanvas: EventToCanvas
-  eventToScreen: (event: { clientX: number; clientY: number }) => Point
-  canvasToScreen: <T extends Point | Bounds>(value: T) => T extends Bounds ? Bounds : Point
-  screenToCanvas: <T extends Point | Bounds>(value: T) => T extends Bounds ? Bounds : Point
-  getViewportRect: () => DOMRect | null
-}
-
 export interface CreateCoordinateServiceOptions {
   getViewport: () => Viewport
-  getViewportElement: () => HTMLDivElement | null
-  getSceneLayerElement: () => HTMLDivElement | null
+  viewportRef: Accessor<HTMLDivElement | null>
+  sceneLayerRef: Accessor<HTMLDivElement | null>
 }
 
 /**
@@ -22,11 +16,12 @@ export interface CreateCoordinateServiceOptions {
  * - DOM 读取集中在容器层
  * - 交互与 primitives 仅依赖转换接口
  */
-export function createCoordinateService(options: CreateCoordinateServiceOptions): CoordinateService {
-  const { getViewport, getViewportElement, getSceneLayerElement } = options
+export function createCoordinateService(options: CreateCoordinateServiceOptions) {
+  const { getViewport, sceneLayerRef, viewportRef } = options
+  const { rect: viewportRect } = createElementRect(viewportRef)
 
   const eventToScreen = (event: { clientX: number; clientY: number }): Point => {
-    const sceneLayerElement = getSceneLayerElement()
+    const sceneLayerElement = sceneLayerRef()
     if (sceneLayerElement) {
       const rect = sceneLayerElement.getBoundingClientRect()
       return {
@@ -35,12 +30,12 @@ export function createCoordinateService(options: CreateCoordinateServiceOptions)
       }
     }
 
-    const viewportElement = getViewportElement()
-    if (!viewportElement) return { x: 0, y: 0 }
-    const rect = viewportElement.getBoundingClientRect()
+    const viewportEl = viewportRef()
+    if (!viewportEl) return { x: 0, y: 0 }
+    const rect = viewportRect()
     return {
-      x: event.clientX - rect.left + viewportElement.scrollLeft,
-      y: event.clientY - rect.top + viewportElement.scrollTop,
+      x: event.clientX - rect.left + viewportEl.scrollLeft,
+      y: event.clientY - rect.top + viewportEl.scrollTop,
     }
   }
 
@@ -56,17 +51,13 @@ export function createCoordinateService(options: CreateCoordinateServiceOptions)
     return screenToCanvasValue(eventToScreen(event))
   }
 
-  const getViewportRect = (): DOMRect | null => {
-    const viewportElement = getViewportElement()
-    return viewportElement ? viewportElement.getBoundingClientRect() : null
-  }
-
   return {
     eventToCanvas,
     eventToScreen,
     canvasToScreen: canvasToScreenValue,
     screenToCanvas: screenToCanvasValue,
-    getViewportRect,
+    viewportRect,
   }
 }
 
+export type CoordinateService = ReturnType<typeof createCoordinateService>

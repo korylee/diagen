@@ -1,6 +1,7 @@
-import { canvasToScreen, getShapeAnchors, isLinker, isShape } from '@diagen/core'
-import type { Point } from '@diagen/shared'
 import { createMemo, For, Show } from 'solid-js'
+import { getShapeAnchors, isLinker, isShape } from '@diagen/core'
+import type { Point } from '@diagen/shared'
+import { ShapeHighlightOverlay, type ShapeHighlightItem } from './ShapeHighlightOverlay'
 import { useDesigner } from './DesignerProvider'
 import { useInteraction } from './InteractionProvider'
 
@@ -24,11 +25,11 @@ const HANDLE_POSITIONS = [
 // ============================================================================
 
 export function SelectionLayer() {
-  const { pointer } = useInteraction()
+  const { pointer, coordinate } = useInteraction()
 
   const screenBounds = createMemo(() => {
     const b = pointer.boxSelect.bounds()
-    return b ? pointer.coordinate.canvasToScreen(b) : null
+    return b ? coordinate.canvasToScreen(b) : null
   })
 
   return (
@@ -56,16 +57,46 @@ export function SelectionLayer() {
 // 选中框 + 调整手柄 + 旋转手柄 - 统一组件
 // ============================================================================
 
-export interface ShapeSelectionLayerProps {
+interface ShapeSelectionLayerProps {
   /**
    * @default true
    */
   showRotateHandle?: boolean
 }
 
-export function LinkerSelectionOverlay() {
+function LinkerConnectableShapeHighlightOverlay() {
+  const { element, view } = useDesigner()
+  const { pointer, coordinate } = useInteraction()
+
+  const dragSnapshot = createMemo(() => pointer.linkerDrag.dragSnapshot())
+  const isEndpointDragging = createMemo(() => {
+    const snapshot = dragSnapshot()
+    return !!snapshot && pointer.linkerDrag.isPending() && (snapshot.mode === 'from' || snapshot.mode === 'to')
+  })
+  const candidateShapeId = createMemo(() => pointer.linkerDrag.candidateAnchor()?.shapeId ?? null)
+
+  const highlightItems = createMemo<ShapeHighlightItem[]>(() => {
+    if (!isEndpointDragging()) return []
+
+    return element
+      .shapes()
+      .filter(shape => pointer.linkerDrag.isShapeLinkable(shape.id))
+      .map(shape => ({
+        id: shape.id,
+        bounds: coordinate.canvasToScreen(view.getShapeBounds(shape)),
+        tone: 'connectable',
+        active: candidateShapeId() === shape.id,
+      }))
+  })
+
+  return (
+    <ShapeHighlightOverlay items={highlightItems} visible={isEndpointDragging} zIndex={999} />
+  )
+}
+
+function LinkerSelectionOverlay() {
   const { selection, element, view } = useDesigner()
-  const { pointer } = useInteraction()
+  const { pointer, coordinate } = useInteraction()
 
   const selectedLinker = createMemo(() => {
     const selectedIds = selection.selectedIds()
@@ -85,7 +116,7 @@ export function LinkerSelectionOverlay() {
     const linker = selectedLinker()
     const linkerRoute = route()
     if (!linker || !linkerRoute || linkerRoute.points.length < 2) return ''
-    const screenPoints = linkerRoute.points.map(point => canvasToScreen(point, view.viewport()))
+    const screenPoints = linkerRoute.points.map(point => coordinate.canvasToScreen(point))
     return createRoutePath(screenPoints, linker.linkerType)
   })
 
@@ -97,11 +128,11 @@ export function LinkerSelectionOverlay() {
     const toPoint = linkerRoute.points[linkerRoute.points.length - 1]
     return {
       from: {
-        screen: canvasToScreen(fromPoint, view.viewport()),
+        screen: coordinate.canvasToScreen(fromPoint),
         canvas: fromPoint,
       },
       to: {
-        screen: canvasToScreen(toPoint, view.viewport()),
+        screen: coordinate.canvasToScreen(toPoint),
         canvas: toPoint,
       },
     }
@@ -112,11 +143,15 @@ export function LinkerSelectionOverlay() {
     if (!linker) return []
     return linker.points.map((point, index) => ({
       index,
-      screen: canvasToScreen(point, view.viewport()),
+      screen: coordinate.canvasToScreen(point),
       canvas: point,
     }))
   })
   const candidateAnchor = createMemo(() => pointer.linkerDrag.candidateAnchor())
+  const fixedCandidateAnchor = createMemo(() => {
+    const candidate = candidateAnchor()
+    return candidate && candidate.binding.type === 'fixed' ? candidate : null
+  })
 
   const startEndpointDrag = (e: MouseEvent, type: 'from' | 'to') => {
     const linker = selectedLinker()
@@ -238,17 +273,17 @@ export function LinkerSelectionOverlay() {
           )}
         </For>
 
-        <Show when={candidateAnchor()}>
-          {candidate => <AnchorPreview elementId={candidate().shapeId} highlightAnchor={candidate().anchorIndex} />}
+        <Show when={fixedCandidateAnchor()}>
+          {candidate => <AnchorPreview elementId={candidate().shapeId} highlightAnchor={candidate().anchorId} />}
         </Show>
       </div>
     </Show>
   )
 }
 
-export function ShapeSelectionOverlay(props: ShapeSelectionLayerProps) {
+function ShapeSelectionOverlay(props: ShapeSelectionLayerProps) {
   const { selection, view, element } = useDesigner()
-  const { pointer } = useInteraction()
+  const { pointer, coordinate } = useInteraction()
 
   const bounds = createMemo(() => {
     const selectedIds = selection.selectedIds()
@@ -260,7 +295,7 @@ export function ShapeSelectionOverlay(props: ShapeSelectionLayerProps) {
     }
 
     const b = view.getElementsBounds(selectedElements)
-    return b && canvasToScreen(b, view.viewport())
+    return b && coordinate.canvasToScreen(b)
   })
 
   const canRotate = createMemo(() => {
@@ -359,9 +394,13 @@ export function ShapeSelectionOverlay(props: ShapeSelectionLayerProps) {
   )
 }
 
-export function SelectionOverlay(props: ShapeSelectionLayerProps) {
+
+export interface SelectionLayerProps extends ShapeSelectionLayerProps {}
+
+export function SelectionOverlay(props: SelectionLayerProps) {
   return (
     <>
+      <LinkerConnectableShapeHighlightOverlay />
       <ShapeSelectionOverlay showRotateHandle={props.showRotateHandle} />
       <LinkerSelectionOverlay />
     </>
@@ -373,7 +412,8 @@ export function SelectionOverlay(props: ShapeSelectionLayerProps) {
 // ============================================================================
 
 export function AnchorPreview(props: { elementId: string; highlightAnchor?: number | string }) {
-  const { element, view } = useDesigner()
+  const { element } = useDesigner()
+  const { pointer, coordinate } = useInteraction()
   const shape = createMemo(() => {
     const el = element.getById(props.elementId)
     return el && isShape(el) ? el : null
@@ -394,7 +434,7 @@ export function AnchorPreview(props: { elementId: string; highlightAnchor?: numb
   return (
     <For each={anchors()}>
       {anchor => {
-        const screenPos = canvasToScreen(anchor.point, view.viewport())
+        const screenPos = coordinate.canvasToScreen(anchor.point)
         const isHighlight =
           props.highlightAnchor !== undefined &&
           (props.highlightAnchor === anchor.index ||

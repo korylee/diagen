@@ -3,8 +3,9 @@ import { isRotatable, isShape } from '@diagen/core'
 import type { Point } from '@diagen/shared'
 import { useDesigner } from '../components'
 import { getRotatedBoxBounds } from '../utils'
-import { createDragSession, type CreateDragSessionOptions } from './createDragSession'
-import type { EventToCanvas } from './resolveCanvasDelta'
+import type { EventToCanvas } from './createCoordinateService'
+import type { CreateDragSessionOptions } from './createDragSession'
+import { createTransactionalSession } from './createTransactionalSession'
 
 export interface CreateRotateOptions extends CreateDragSessionOptions {
   eventToCanvas?: EventToCanvas
@@ -30,7 +31,13 @@ export function createRotate(options: CreateRotateOptions = {}) {
   const designer = useDesigner()
   const { element, edit, view } = designer
   const transaction = designer.history.transaction.createScope('旋转图形')
-  const session = createDragSession({ threshold })
+  const session = createTransactionalSession({
+    threshold,
+    transaction,
+    onCommit: () => {
+      view.flushAutoGrow()
+    },
+  })
 
   const [targetId, setTargetId] = createSignal<string | null>(null)
   const [startAngle, setStartAngle] = createSignal<number>(0)
@@ -45,7 +52,6 @@ export function createRotate(options: CreateRotateOptions = {}) {
     const shape = element.getById(id)
     if (!shape || !isShape(shape) || !isRotatable(shape)) return false
     if (!eventToCanvas) return false
-    if (!transaction.begin()) return false
 
     const centerPoint = {
       x: shape.props.x + shape.props.w / 2,
@@ -108,21 +114,16 @@ export function createRotate(options: CreateRotateOptions = {}) {
   }
 
   function end(): void {
-    if (!session.isPending()) return
-    const rotated = session.finish()
-    if (rotated) {
-      view.flushAutoGrow()
-      transaction.commit()
-    } else {
-      transaction.abort()
+    if (session.isPending()) {
+      session.finish()
     }
     reset()
   }
 
   function cancel(): void {
-    if (!session.isPending()) return
-    transaction.abort()
-    session.cancel()
+    if (session.isPending()) {
+      session.cancel()
+    }
     reset()
   }
 
