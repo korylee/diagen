@@ -18,6 +18,11 @@
 - 交互测试覆盖薄弱（仅 `core/utils` 为主）。
 - 本机环境无 `node/pnpm/npx`，暂无法在当前终端直接执行自动化测试。
 
+### PR-1 落地状态（2026-03-16）
+1. 已完成：历史事件类型补全（`history:execute/history:clear`）。
+2. 已完成：路由统一入口已收敛为 `calculateLinkerRoute`（支持 `basic/obstacle` 分发）。
+3. 待处理：恢复 Node 工具链后执行单测回归。
+
 ---
 
 ## 2. 与计划主线的代码对照
@@ -62,7 +67,7 @@
 2. `lineJumps` 字段在模型层：`packages/core/src/model/page.ts`
 
 缺口（未有）：
-1. `view.getLinkerLayout` 仍调用 `calculateLinkerRoute`（基础路径）：
+1. `view.getLinkerLayout` 当前调用统一入口 `calculateLinkerRoute`（当前策略为 `basic`）：
 - `packages/core/src/designer/managers/view.ts`
 2. `renderLinker` 尚未使用 `lineJumps` 信息：
 - `packages/renderer/src/utils/render-utils.ts`
@@ -76,12 +81,11 @@
 ## 3. 跨模块阻塞项（D1 必须冻结）
 
 1. 历史事件契约不完整：
-- `history.ts` 实际 emit 了 `history:execute/history:clear`，`HistoryEvents` 仅声明 `undo/redo`。
-- 建议：先统一类型声明，避免后续事件订阅出现隐式 any 漏洞。
+- 已完成：`HistoryEvents` 已补齐 `history:execute/history:clear`。
+- 后续建议：新增事件时同步更新 `HistoryEvents`，避免类型与运行时漂移。
 
-2. 路由策略入口命名需要统一：
-- 现有同时存在 `utils/route.ts` 与 `utils/router/index.ts`，语义相近但层次不同。
-- 建议：D1 确定“主链路只走一个入口”，另一个作为兼容层或降级层。
+2. 路由策略入口命名已冻结（已完成）：
+- 主链路与障碍规避统一入口：`utils/router/index.ts` 的 `calculateLinkerRoute`（统一分发）。
 
 3. 测试执行环境缺失：
 - 当前终端不可用 `node/pnpm/npx`。

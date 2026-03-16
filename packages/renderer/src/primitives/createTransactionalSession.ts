@@ -61,11 +61,15 @@ export function createTransactionalSession(options: CreateTransactionalSessionOp
     if (!transactionStarted()) return
 
     if (shouldCommit) {
-      onCommit?.()
-      transaction.commit()
+      if (transaction.commit()) {
+        onCommit?.()
+      } else {
+        onAbort?.()
+      }
     } else {
-      onAbort?.()
-      transaction.abort()
+      if (transaction.abort()) {
+        onAbort?.()
+      }
     }
     setTransactionStarted(false)
   }

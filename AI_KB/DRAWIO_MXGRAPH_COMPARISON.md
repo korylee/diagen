@@ -80,7 +80,7 @@
 
 ### Diagen 映射
 - 已有路由库：`packages/core/src/utils/router/*`
-- 当前主链路仍使用 `calculateLinkerRoute`（基础策略）
+- 当前主链路使用统一入口 `calculateLinkerRoute`（当前策略为基础路径）
 
 ### 结论
 - “算法存在但未接入主链路”是当前关键差距。

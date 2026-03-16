@@ -1,6 +1,6 @@
 export * from './router'
 export * from './transform'
-export * from './route'
 export * from './expression'
 export * from './anchors'
 export * from './keypoints'
+export * from './guide'

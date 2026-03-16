@@ -1,7 +1,7 @@
 import type { Bounds, Point } from '@diagen/shared'
 import { describe, expect, it } from 'vitest'
 import { aStarRoute, createObstacleFromBounds } from '../astar'
-import { calculateRoutePoints, createObstaclesFromElements, route } from '../index'
+import { calculateObstacleRoute, calculateRoutePoints, createObstaclesFromElements } from '../index'
 import { orthogonalRoute } from '../orthogonal'
 import type { Obstacle, RouterConfig } from '../types'
 import { calculateRouteCost, euclideanDistance, isRouteValid, simplifyOrthogonalPath } from '../utils'
@@ -173,25 +173,25 @@ describe('orthogonal', () => {
 })
 
 describe('router index', () => {
-  describe('route', () => {
+  describe('calculateObstacleRoute', () => {
     it('默认应使用混合算法', () => {
       const from: Point = { x: 0, y: 0 }
       const to: Point = { x: 100, y: 100 }
-      const result = route(from, to, [])
+      const result = calculateObstacleRoute(from, to, [])
       expect(result.success).toBe(true)
     })
 
     it('应支持 A* 算法', () => {
       const from: Point = { x: 0, y: 0 }
       const to: Point = { x: 100, y: 100 }
-      const result = route(from, to, [], {}, { algorithm: 'astar' })
+      const result = calculateObstacleRoute(from, to, [], {}, { algorithm: 'astar' })
       expect(result.success).toBe(true)
     })
 
     it('应支持正交算法', () => {
       const from: Point = { x: 0, y: 0 }
       const to: Point = { x: 100, y: 100 }
-      const result = route(from, to, [], {}, { algorithm: 'orthogonal' })
+      const result = calculateObstacleRoute(from, to, [], {}, { algorithm: 'orthogonal' })
       expect(result.success).toBe(true)
     })
   })
@@ -253,14 +253,14 @@ describe('integration', () => {
       createObstacle(150, 250, 100, 60),
     ]
 
-    const result = route(from, to, obstacles, defaultConfig)
+    const result = calculateObstacleRoute(from, to, obstacles, defaultConfig)
     expect(result.success).toBe(true)
     expect(isRouteValid(result.points, obstacles)).toBe(true)
   })
 
   it('应处理起点等于终点的情况', () => {
     const point: Point = { x: 50, y: 50 }
-    const result = route(point, point, [])
+    const result = calculateObstacleRoute(point, point, [])
     expect(result.success).toBe(true)
     expect(result.points).toHaveLength(2)
   })

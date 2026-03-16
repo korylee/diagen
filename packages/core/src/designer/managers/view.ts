@@ -2,7 +2,8 @@ import { type Bounds, createRafMergeQueue, normalizeBounds, pick, type Point, un
 import { batch, createMemo, createSignal } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { type DiagramElement, isLinker, isShape, type LinkerElement, type ShapeElement } from '../../model'
-import { calculateLinkerRoute, canvasToScreen, clampZoom, type LinkerRoute, screenToCanvas } from '../../utils'
+import { canvasToScreen, clampZoom, screenToCanvas } from '../../utils'
+import { calculateLinkerRoute, type LinkerRoute } from '../../utils/router'
 import type { ElementManager } from './element'
 import type { DesignerContext } from './types'
 import type { SelectionManager } from './selection.ts'
@@ -315,7 +316,7 @@ export function createViewManager(
       return cached.layout
     }
 
-    const route = calculateLinkerRoute(linker, getShapeById)
+    const route = calculateLinkerRoute(linker, getShapeById, { strategy: 'basic' })
     const bounds = calculateLinkerBoundsFromRoute(route)
     const layout = { route, bounds }
     linkerLayoutCache.set(linker.id, {

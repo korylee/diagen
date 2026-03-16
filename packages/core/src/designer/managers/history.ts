@@ -79,8 +79,10 @@ export interface HistoryState {
 }
 
 export interface HistoryEvents {
+  'history:execute': Command
   'history:undo': Command
   'history:redo': Command
+  'history:clear': void
 }
 
 export function createHistoryManager(ctx: DesignerContext) {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createLinker, createShape } from '../../../model'
 import { getShapeAnchorAngle, getShapeAnchorInfo } from '..'
-import { calculateLinkerRoute } from '../../route'
+import { calculateBasicLinkerRoute, calculateLinkerRoute } from '../../router'
 
 describe('anchors', () => {
   describe('getShapeAnchorAngle - 路径边界法线', () => {
@@ -54,7 +54,7 @@ describe('anchors', () => {
   })
 
   describe('calculateLinkerRoute', () => {
-    it('应使用锚点信息中的角度作为 route 的端点角度', () => {
+    it('应默认按 basic 策略计算端点角度', () => {
       const fromShape = createShape({
         id: 'from_shape',
         name: 'from_shape',
@@ -85,6 +85,78 @@ describe('anchors', () => {
 
       expect(route.fromAngle).toBeCloseTo(0)
       expect(route.toAngle).toBeCloseTo(Math.PI)
+      expect(route.points.length).toBeGreaterThanOrEqual(2)
+    })
+
+    it('应支持 obstacle 策略分发', () => {
+      const fromShape = createShape({
+        id: 'from_shape_2',
+        name: 'from_shape_2',
+        props: { x: 0, y: 0, w: 100, h: 60, angle: 0 },
+        anchors: [{ id: 'right', x: 'w', y: 'h/2', direction: 'right' }],
+      })
+
+      const toShape = createShape({
+        id: 'to_shape_2',
+        name: 'to_shape_2',
+        props: { x: 220, y: 0, w: 100, h: 60, angle: 0 },
+        anchors: [{ id: 'left', x: '0', y: 'h/2', direction: 'left' }],
+      })
+
+      const linker = createLinker({
+        id: 'linker_2',
+        name: 'linker_2',
+        linkerType: 'orthogonal',
+        from: { id: fromShape.id, binding: { type: 'fixed', anchorId: 'right' }, x: 0, y: 0 },
+        to: { id: toShape.id, binding: { type: 'fixed', anchorId: 'left' }, x: 0, y: 0 },
+      })
+
+      const route = calculateLinkerRoute(
+        linker,
+        id => {
+          if (id === fromShape.id) return fromShape
+          if (id === toShape.id) return toShape
+          return null
+        },
+        {
+          strategy: 'obstacle',
+          obstacles: [],
+          obstacleOptions: { algorithm: 'orthogonal' },
+        },
+      )
+
+      expect(route.points.length).toBeGreaterThanOrEqual(2)
+      expect(route.fromAngle).toBeCloseTo(0)
+      expect(route.toAngle).toBeCloseTo(Math.PI)
+    })
+  })
+
+  describe('calculateBasicLinkerRoute', () => {
+    it('应保留基础路由兼容入口', () => {
+      const fromShape = createShape({
+        id: 'from_shape_basic',
+        name: 'from_shape_basic',
+        props: { x: 0, y: 0, w: 80, h: 40, angle: 0 },
+        anchors: [{ id: 'right', x: 'w', y: 'h/2', direction: 'right' }],
+      })
+      const toShape = createShape({
+        id: 'to_shape_basic',
+        name: 'to_shape_basic',
+        props: { x: 160, y: 0, w: 80, h: 40, angle: 0 },
+        anchors: [{ id: 'left', x: '0', y: 'h/2', direction: 'left' }],
+      })
+      const linker = createLinker({
+        id: 'linker_basic',
+        name: 'linker_basic',
+        linkerType: 'straight',
+        from: { id: fromShape.id, binding: { type: 'fixed', anchorId: 'right' }, x: 0, y: 0 },
+        to: { id: toShape.id, binding: { type: 'fixed', anchorId: 'left' }, x: 0, y: 0 },
+      })
+      const route = calculateBasicLinkerRoute(linker, id => {
+        if (id === fromShape.id) return fromShape
+        if (id === toShape.id) return toShape
+        return null
+      })
       expect(route.points.length).toBeGreaterThanOrEqual(2)
     })
   })
