@@ -3,7 +3,7 @@ import { createStore } from 'solid-js/store'
 import { createEmitter, DeepPartial, generateId, pick } from '@diagen/shared'
 import type { Viewport } from '../utils'
 
-import { createDiagram, Diagram, DiagramElement } from '../model'
+import { createDiagram, Diagram } from '../model'
 import {
   type Command,
   createEditManager,
@@ -11,6 +11,7 @@ import {
   createHistoryManager,
   createSelectionManager,
   createViewManager,
+  createGroupManager,
 } from './managers'
 import type { DesignerContext } from './managers/types'
 import type { DesignerEmitter, EditorConfig, EditorState } from './types'
@@ -103,6 +104,7 @@ export function createDesigner(options: DesignerOptions = {}) {
   const selection = createSelectionManager(ctx, { element })
   const view = createViewManager(ctx, { element, selection })
   const edit = createEditManager(ctx, { element, selection, history })
+  const group = createGroupManager(ctx, { edit })
 
   function serialize(): string {
     return JSON.stringify(state.diagram, null, 2)
@@ -141,50 +143,6 @@ export function createDesigner(options: DesignerOptions = {}) {
     selection.clear()
   }
 
-  function getGroupShapes(groupId: string): DiagramElement[] {
-    return Object.values(state.diagram.elements).filter(el => el.group === groupId)
-  }
-
-  function isInSameGroup(ids: string[]): boolean {
-    if (ids.length < 2) return false
-
-    const first = state.diagram.elements[ids[0]]
-    if (!first || !first.group) return false
-
-    const groupId = first.group
-    return ids.every(id => {
-      const el = state.diagram.elements[id]
-      return el && el.group === groupId
-    })
-  }
-
-  function getGroupsFromElements(ids: string[]): Set<string> {
-    const groups = new Set<string>()
-    for (const id of ids) {
-      const el = state.diagram.elements[id]
-      if (el?.group) {
-        groups.add(el.group)
-      }
-    }
-    return groups
-  }
-
-  function expandSelectionToGroups(ids: string[]): string[] {
-    const result = new Set(ids)
-    const groups = getGroupsFromElements(ids)
-
-    for (const groupId of groups) {
-      const groupMembers = getGroupShapes(groupId)
-      for (const member of groupMembers) {
-        result.add(member.id)
-      }
-    }
-
-    return Array.from(result)
-  }
-
-  function dispose(): void {}
-
   return {
     id: id,
     // state
@@ -196,6 +154,7 @@ export function createDesigner(options: DesignerOptions = {}) {
     selection,
     edit,
     view,
+    group,
 
     // 快捷方式
     getElementById: element.getById,
@@ -213,11 +172,6 @@ export function createDesigner(options: DesignerOptions = {}) {
 
     serialize,
     loadFromJSON,
-    getGroupShapes,
-    isInSameGroup,
-    getGroupsFromElements,
-    expandSelectionToGroups,
-    dispose,
   }
 }
 

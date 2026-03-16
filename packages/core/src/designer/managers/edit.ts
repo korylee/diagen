@@ -265,3 +265,5 @@ export function createEditManager(ctx: DesignerContext, deps: EditDeps) {
     move,
   }
 }
+
+export type EditManager = ReturnType<typeof createEditManager>
