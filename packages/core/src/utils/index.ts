@@ -1,6 +1,7 @@
 export * from './router'
 export * from './transform'
 export * from './expression'
+export * from './path'
 export * from './anchors'
 export * from './keypoints'
 export * from './guide'

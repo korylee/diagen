@@ -1,9 +1,10 @@
 import type { ShapeElement } from '@diagen/core'
 import { isBoundsVisible } from '@diagen/core'
 import { createDevicePixelRatio } from '@diagen/primitives'
+import { getRotatedBoxBounds } from '@diagen/shared'
 import { createEffect, createMemo } from 'solid-js'
 import { useDesigner } from '../../components'
-import { getRotatedBoxBounds, renderShape } from '../../utils'
+import { renderShape } from '../../utils'
 
 export interface ShapeCanvasProps {
   shape: ShapeElement

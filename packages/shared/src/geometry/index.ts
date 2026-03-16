@@ -13,6 +13,10 @@ export interface Bounds extends Point {
   h: number
 }
 
+export interface RotatableBounds extends Bounds {
+  angle?: number
+}
+
 export interface Rect extends Point, Size {}
 
 export interface Line {
@@ -59,6 +63,49 @@ export function isPointInRotatedBounds(point: Point, b: Bounds, angle: number): 
   const ry = px * sin + py * cos
 
   return rx >= -b.w / 2 && rx <= b.w / 2 && ry >= -b.h / 2 && ry <= b.h / 2
+}
+
+export function getRotatedBoxBounds(bounds: RotatableBounds): Bounds {
+  const { x, y, w, h, angle = 0 } = bounds
+  if (!angle) {
+    return { x, y, w, h }
+  }
+
+  const rad = (angle * Math.PI) / 180
+  const cos = Math.cos(rad)
+  const sin = Math.sin(rad)
+  const cx = x + w / 2
+  const cy = y + h / 2
+
+  const corners = [
+    { x, y },
+    { x: x + w, y },
+    { x: x + w, y: y + h },
+    { x, y: y + h },
+  ]
+
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+
+  for (const corner of corners) {
+    const dx = corner.x - cx
+    const dy = corner.y - cy
+    const rx = cx + dx * cos - dy * sin
+    const ry = cy + dx * sin + dy * cos
+    minX = Math.min(minX, rx)
+    minY = Math.min(minY, ry)
+    maxX = Math.max(maxX, rx)
+    maxY = Math.max(maxY, ry)
+  }
+
+  return {
+    x: minX,
+    y: minY,
+    w: maxX - minX,
+    h: maxY - minY,
+  }
 }
 
 export function getBoundsCenter(b: Bounds): Point {

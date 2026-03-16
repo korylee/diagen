@@ -1,12 +1,11 @@
-import { canvasToScreen, screenToCanvas, type Viewport } from '@diagen/core'
 import { createElementRect } from '@diagen/primitives'
-import type { Bounds, Point } from '@diagen/shared'
-import { Accessor } from 'solid-js'
+import type { Point } from '@diagen/shared'
+import type { Accessor } from 'solid-js'
+import { useDesigner } from '../components'
 
 export type EventToCanvas = (event: { clientX: number; clientY: number }) => Point
 
 export interface CreateCoordinateServiceOptions {
-  getViewport: () => Viewport
   viewportRef: Accessor<HTMLDivElement | null>
   sceneLayerRef: Accessor<HTMLDivElement | null>
 }
@@ -17,7 +16,8 @@ export interface CreateCoordinateServiceOptions {
  * - 交互与 primitives 仅依赖转换接口
  */
 export function createCoordinateService(options: CreateCoordinateServiceOptions) {
-  const { getViewport, sceneLayerRef, viewportRef } = options
+  const { view } = useDesigner()
+  const { sceneLayerRef, viewportRef } = options
   const { rect: viewportRect } = createElementRect(viewportRef)
 
   const eventToScreen = (event: { clientX: number; clientY: number }): Point => {
@@ -39,24 +39,17 @@ export function createCoordinateService(options: CreateCoordinateServiceOptions)
     }
   }
 
-  const screenToCanvasValue = <T extends Point | Bounds>(value: T): T extends Bounds ? Bounds : Point => {
-    return screenToCanvas(value, getViewport()) as T extends Bounds ? Bounds : Point
-  }
-
-  const canvasToScreenValue = <T extends Point | Bounds>(value: T): T extends Bounds ? Bounds : Point => {
-    return canvasToScreen(value, getViewport()) as T extends Bounds ? Bounds : Point
-  }
-
   const eventToCanvas: EventToCanvas = event => {
-    return screenToCanvasValue(eventToScreen(event))
+    return view.toCanvas(eventToScreen(event))
   }
 
   return {
+    viewportRect,
+
     eventToCanvas,
     eventToScreen,
-    canvasToScreen: canvasToScreenValue,
-    screenToCanvas: screenToCanvasValue,
-    viewportRect,
+    canvasToScreen: view.toScreen,
+    screenToCanvas: view.toCanvas,
   }
 }
 

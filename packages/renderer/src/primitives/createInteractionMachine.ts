@@ -1,7 +1,7 @@
 import { createSignal } from 'solid-js'
 import type { LinkerRoute } from '@diagen/core'
 import type { Point } from '@diagen/shared'
-import type { LinkerHit } from '../utils/linkerHitTest'
+import type { LinkerHit } from '../utils'
 import type { EventToCanvas } from './createCoordinateService'
 import type { CreateSelection } from './createSelection'
 import type { CreateLinkerDrag } from './createLinkerDrag'

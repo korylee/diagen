@@ -23,7 +23,6 @@ export function RendererContainer(props: {
   const [viewportRef, setViewportRef] = createSignal<HTMLDivElement | null>(null)
   const [sceneLayerRef, setSceneLayerRef] = createSignal<HTMLDivElement | null>(null)
   const coordinate = createCoordinateService({
-    getViewport: view.viewport,
     viewportRef,
     sceneLayerRef,
   })
