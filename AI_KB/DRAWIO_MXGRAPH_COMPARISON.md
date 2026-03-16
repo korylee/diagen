@@ -1,106 +1,123 @@
-# draw.io / mxGraph 对照要点
+# draw.io / mxGraph 对照与 Diagen 映射（2026-03-13）
 
-本文件基于 mxGraph（draw.io 底层图形引擎）公开 API 与架构习惯整理，目标是提炼可迁移原则，而非逐行复刻实现。
+本文件用于回答两个问题：
+1. draw.io/mxGraph 的哪些结构原则值得继续借鉴；
+2. 这些原则在 Diagen 当前代码中的映射位置与待补点。
 
----
-
-## 1. 视图层职责：`mxGraphView`
-
-mxGraph 关键思想：
-- 视图变换统一由 `scale + translate` 管理。
-- 事件命中、渲染输出、辅助层都围绕同一视图参数展开。
-
-对 Diagen 的启发：
-- `view manager` 应作为唯一视图参数源。
-- 渲染层不应分散定义多套“局部 zoom/pan 规则”。
+说明：此处参考的是 mxGraph 的稳定架构思想（View/Model/Handler/Undo/Overlay），不是逐行复刻 draw.io 实现。
 
 ---
 
-## 2. 交互处理器拆分：`Handler` 系列
+## 1. View-Model 分离
 
-典型组件：
-- `mxGraphHandler`：节点移动、预览、约束
-- `mxRubberband`：框选
-- `mxPanningHandler`：平移
-- `mxGuide`：对齐辅助
+### mxGraph
+- `mxGraphView` 负责 `scale + translate` 与 cell state 投影。
+- `mxGraphModel` 负责语义数据，不持有 DOM 运行态。
 
-核心思想：
-- 交互“意图判定”与“模型变更提交”分离。
-- 预览层是临时态，不直接污染文档模型。
+### Diagen 映射
+- View：`packages/core/src/designer/managers/view.ts`
+- Model：`packages/core/src/model/*`
 
-Diagen 当前对应：
-- primitives（`createShapeDrag/createResize/createSelection/createPan`）承担 handler 角色
-- core managers 承担模型提交角色
-- overlay 承担临时视觉反馈
+### 结论
+- 该分离已经成立，需持续避免将 `viewportRect` 等 DOM 信息写入模型。
 
 ---
 
-## 3. 框选（Rubberband）机制
+## 2. Handler 体系（交互原语化）
 
-mxGraph 经验：
-- 框选是独立模块，不与元素渲染耦合
-- 通常采用屏幕层绘制 + 模型层命中
+### mxGraph
+- `mxGraphHandler`（移动）
+- `mxRubberband`（框选）
+- `mxPanningHandler`（平移）
+- `mxConnectionHandler`（连线）
+- `mxGuide`（吸附辅助）
 
-Diagen 对应：
-- `createSelection` 维护 canvas bounds
-- `RendererContainer` 将其转换为 screen bounds 渲染到 overlay
+### Diagen 映射
+- `createShapeDrag` / `createSelection` / `createPan` / `createLinkerDrag` / `createResize` / `createRotate`
+- 统一状态机：`createInteractionMachine`
 
----
-
-## 4. 平移与缩放
-
-mxGraph 经验：
-- panning handler 与 graph view 协同，避免多处并行修改坐标系。
-- zoom 通常围绕指定中心点进行变换。
-
-Diagen 对应：
-- `view.setZoom(newZoom, center)` 支持缩放中心
-- `eventToCanvasPoint` 保证中心点换算一致
+### 结论
+- Handler 架构已对齐。
+- 当前缺口集中在 `mxGuide` 对应能力（move/resize 吸附线）。
 
 ---
 
-## 5. 对齐辅助（Guide）与可扩展性
+## 3. Overlay 反馈层
 
-mxGraph 经验：
-- guide 是可插拔层，不应嵌入元素本体绘制流程
+### mxGraph
+- 预览、控制点、辅助线通常作为独立 overlay，不污染模型。
 
-Diagen 设计建议：
-- 将对齐线作为 overlay 子模块实现
-- 计算在 canvas 坐标，显示在 screen 坐标
+### Diagen 映射
+- `packages/renderer/src/components/InteractionOverlay.tsx`
+- `RendererContainer` 的 `overlay-layer`
 
----
-
-## 6. 概览图（Outline）思路
-
-mxGraph 经验：
-- `mxOutline` 将主视图状态映射到小地图
-- 需要稳定的视图变换和可见区域计算
-
-Diagen 前提条件：
-- `view.viewport` + `viewportSize` + `containerSize` 已具备基础
-- 后续可基于 `getVisibleCanvasArea` 构建 minimap
+### 结论
+- 结构正确；后续新增 guide line 建议继续放 overlay。
 
 ---
 
-## 7. 与 Diagen 的关键一致性目标
+## 4. Undo/Redo 与事务边界
 
-1. 坐标语义一致：
-- 同层只允许一种坐标语义（canvas 或 screen）
+### mxGraph
+- `mxUndoManager` 维护可回放编辑动作。
+- 强调“一个用户动作 = 一个撤销单元”。
 
-2. 输入归一化一致：
-- 所有 pointer/wheel 事件先统一归一化，再进入交互逻辑
+### Diagen 映射
+- `createHistoryManager`
+- `history.transaction.createScope`
+- `createTransactionalSession`
 
-3. 临时态与文档态一致：
-- 交互预览不进入 Diagram 持久化结构
+### 结论
+- 机制已到位；需补类型与事件一致性，以及更多交互回归测试。
 
 ---
 
-## 8. 结论
+## 5. 连线路由与可读性
 
-draw.io/mxGraph 最值得迁移的是“分层与职责边界”：
-- View 负责变换
-- Handler 负责交互判定
-- Overlay 负责反馈
-- Model 负责语义状态
+### mxGraph / draw.io 通常做法
+- 提供正交、折线、曲线路线策略。
+- 在密集场景引入跳线（line jumps）与碰撞规避。
 
-Diagen 当前已经具备该结构雏形，后续扩展（guide/outline/高级连线编辑）会更稳。
+### Diagen 映射
+- 已有路由库：`packages/core/src/utils/router/*`
+- 当前主链路仍使用 `calculateLinkerRoute`（基础策略）
+
+### 结论
+- “算法存在但未接入主链路”是当前关键差距。
+
+---
+
+## 6. 与 `.processon` 的三方对照
+
+- `.processon` 强在“功能闭环完整”。
+- mxGraph 强在“抽象与职责边界清晰”。
+- Diagen 当前更接近 mxGraph 架构，但功能面还未追上 `.processon`。
+
+对当前阶段最优策略：
+- 继续走 mxGraph 的结构边界；
+- 在该边界内补齐 `.processon` 的高价值能力（吸附线、剪贴板、line jump）。
+
+---
+
+## 7. 近期优先级建议（和 2 周计划一致）
+
+1. Guide（吸附线）
+- 新增 guide 计算与 overlay 呈现。
+
+2. Clipboard Manager
+- 在 core 定义结构化 copy/cut/paste/duplicate 语义。
+
+3. Router 主链路接入 + line jump
+- 把已有 router 策略接入 view/linker layout。
+
+4. 交互测试补齐
+- 至少覆盖：拖拽、缩放、连线端点、撤销重做。
+
+---
+
+## 8. 小结
+
+draw.io/mxGraph 对 Diagen 的最大价值不是“某个 API 名字”，而是：
+- View/Model/Handler/Overlay/Undo 的职责边界。
+
+Diagen 已具备这套边界，下一阶段重点是沿着该边界补齐 `.processon` 的核心生产力能力。

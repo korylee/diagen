@@ -25,7 +25,7 @@
     "paths": {
       "@diagen/shared": ["./packages/shared/src/index.ts"],
       "@diagen/core": ["./packages/core/src/index.ts"],
-      "@diagen/primitives": ["./packages/renderer/src/index.ts"],
+      "@diagen/primitives": ["./packages/primitives/src/index.ts"],
       "@diagen/renderer": ["./packages/renderer/src/index.ts"],
     },
     "isolatedDeclarations": false,

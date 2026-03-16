@@ -1,4 +1,4 @@
-# 架构总览（2026-03-11）
+# 架构总览（2026-03-13）
 
 ## 1. 包级分层
 - 领域核心：`@diagen/core`
@@ -13,7 +13,7 @@
   - 通用类型（Point/Bounds）
   - 数学与对象工具
 - 浏览器原语：`@diagen/primitives`
-  - scroll、event listener、debounce 等
+  - scroll、event listener、resize observer、element rect
 
 ## 2. 状态边界（关键）
 - 持久化文档态（可 `serialize`）：
@@ -23,60 +23,53 @@
   - `viewportSize`、`containerSize`
   - 交互会话态（drag/resize/selection 临时状态）
 - 结论：
-  - 运行时 DOM 信息（如 viewportRect）不应进入 `diagram`。
+  - DOM 几何信息（如 `viewportRect`）不进入 `diagram`。
 
 ## 3. 坐标系统
 - Canvas 坐标：模型语义坐标（元素 x/y/w/h 等）
-- Screen 坐标：当前视口下的像素坐标
+- Screen 坐标：视口下像素坐标
 - 核心公式（`packages/core/src/utils/transform.ts`）：
   - `screen = canvas * zoom + viewportOffset`
   - `canvas = (screen - viewportOffset) / zoom`
-- 已修复要点：
-  - `screenToCanvas(Bounds)` 的 `w/h` 采用 `/ zoom`（非 `* zoom`）。
 
 ## 4. 事件坐标归一化
-- 单一入口：`packages/renderer/src/utils/pointer.ts`
-  - `eventToViewportPoint`
-  - `eventToCanvasPoint`
-- `Interaction` 上下文暴露能力函数：
-  - `eventToCanvas(event)`（不暴露 viewport DOM）
+- 单一入口：`packages/renderer/src/primitives/createCoordinateService.ts`
+  - `eventToScreen`
+  - `eventToCanvas`
+  - `screenToCanvas`
+  - `canvasToScreen`
 - 价值：
-  - 避免容器、元素、覆盖层各自手写一套坐标换算。
+  - 避免容器、元素、覆盖层重复维护坐标换算逻辑。
 
-## 5. 容器渲染分层（P2 后）
+## 5. 容器渲染分层
 文件：`packages/renderer/src/components/RendererContainer.tsx`
 
 - `world-layer`
   - 有 transform（`translate + scale`）
-  - 主要放“世界空间内容”（当前网格）
+  - 放世界层背景（当前网格）
 - `scene-layer`
   - 无 transform
-  - 元素渲染层（ShapeCanvas/LinkerCanvas，以屏幕坐标定位）
+  - 元素渲染层（ShapeCanvas/LinkerCanvas，屏幕坐标定位）
 - `overlay-layer`
   - 无 transform
-  - 选框、框选矩形、手柄、锚点等交互覆盖
-  - 统一使用 screen bounds
+  - 选框、框选、手柄、锚点等交互覆盖
 
 ## 6. 交互链路（简化）
 1. 事件进入 `RendererContainer`
-2. 通过 `eventToCanvas` 归一化到 canvas 坐标
-3. primitives 判定动作（pan/drag/resize/boxSelect）
+2. 通过 `coordinate.eventToCanvas` 归一化到 canvas 坐标
+3. primitives 判定动作（pan/drag/resize/boxSelect/linkerDrag）
 4. 调用 core managers（`edit/selection/view/history`）
 5. Solid 响应更新 scene 与 overlay
 
-## 7. ProcessOn/draw.io 启发在当前架构中的落点
-- ProcessOn：
-  - `toScale/restoreScale` 的对称思想 -> 当前 `transform.ts` 的可逆性测试
-  - `getRelativePos + scroll` -> 当前 `eventToCanvasPoint`
-  - 框选 screen 绘制 -> 提交前转模型 -> 当前 overlay 层框选呈现
-- draw.io/mxGraph：
-  - View（scale/translate）与 Handler（panning/rubberband/guide）解耦
-  - 当前对应：`view manager` 与 `renderer/primitives` 分离
+## 7. 与 `.processon` / draw.io 的映射
+- `.processon` 的 `toScale/restoreScale/getRelativePos`：
+  - 对应 Diagen 的 `transform.ts + createCoordinateService`
+- `.processon` 的 `drawControls/showAnchors/showLinkerControls`：
+  - 对应 `InteractionOverlay`
+- draw.io/mxGraph 的 View 与 Handler 分层：
+  - 对应 `view manager` 与 `renderer/primitives` 分离
 
-## 8. 现状与约束
-- 当前为“过渡稳定态”：
-  - world/scene/overlay 契约已经建立
-  - 元素渲染仍是每元素独立 canvas 的屏幕定位模式
-- 后续若继续演进，需保持：
-  - 单一事件坐标入口不破坏
-  - 同一层只允许一种坐标语义
+## 8. 当前主要架构风险
+- `router` 能力已实现，但尚未接入主连线路由链路。
+- 缺少 move/resize 吸附线机制，影响复杂排版效率。
+- 测试偏重 `core/utils`，交互层缺少自动化回归。

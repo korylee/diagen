@@ -23,15 +23,16 @@
   - `element.toFront(...)` / `toBack(...)` / `bringForward(...)` / `sendBackward(...)`
 - 历史：
   - `history.undo()` / `history.redo()`
+  - `history.transaction.createScope(name)`
 
 ## 3. 视图与坐标集成注意点
 - 缩放与平移统一走 `view`：
   - `view.setZoom(...)`
   - `view.setPan(...)` / `view.pan(...)`
   - `view.toScreen(...)` / `view.toCanvas(...)`
-- renderer 事件坐标统一入口：
-  - `eventToCanvasPoint`（`packages/renderer/src/utils/pointer.ts`）
-  - 通过 `Interaction` 暴露能力 `eventToCanvas`（避免直接耦合 viewport DOM）
+- renderer 坐标统一入口：
+  - `packages/renderer/src/primitives/createCoordinateService.ts`
+  - `eventToCanvas(event)` 作为交互输入标准
 
 ## 4. 渲染层接入点（UI/交互扩展）
 - 交互容器：`packages/renderer/src/components/RendererContainer.tsx`
@@ -45,9 +46,11 @@
   - `element:updated`
   - `element:moved`
   - `element:cleared`
-- 触发位置：`packages/core/src/designer/managers/element.ts`
+- 历史事件：
+  - `history:undo`
+  - `history:redo`
 
 ## 6. 实用接入建议
-- AI 执行批量编辑时，优先进入 `history.transaction`（已有 primitives 已大量采用）。
-- 不把 UI 几何状态写入 Diagram（如 viewportRect、hoverRect、drag ghost）。
-- 需要做命中判断时，统一先归一化到 canvas 坐标再进入 core 判断逻辑。
+- 批量编辑优先放进 transaction，避免 undo 栈碎片化。
+- 不把 UI 几何临时态写入 Diagram（如 hover、drag ghost、DOM rect）。
+- 命中和吸附计算都以 canvas 坐标为准，overlay 只做 screen 呈现。
