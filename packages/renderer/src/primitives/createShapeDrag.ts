@@ -1,5 +1,5 @@
 import { batch, createSignal, onCleanup } from 'solid-js'
-import { isShape } from '@diagen/core'
+import { calculateMoveGuideSnap, isShape, type GuideLine } from '@diagen/core'
 import { getRotatedBoxBounds, unionBounds } from '@diagen/shared'
 import type { Bounds, Point } from '@diagen/shared'
 import { useDesigner } from '../components'
@@ -14,10 +14,11 @@ import { createTransactionalSession } from './createTransactionalSession'
 
 export interface UseShapeDragOptions extends CreateDragSessionOptions {
   eventToCanvas?: EventToCanvas
+  guideTolerance?: number
 }
 
 export function createShapeDrag(options: UseShapeDragOptions = {}) {
-  const { threshold = 3, eventToCanvas } = options
+  const { threshold = 3, eventToCanvas, guideTolerance } = options
   const designer = useDesigner()
   const transaction = designer.history.transaction.createScope('拖拽图形')
   const pointerDelta = createPointerDeltaState({ eventToCanvas })
@@ -30,22 +31,37 @@ export function createShapeDrag(options: UseShapeDragOptions = {}) {
   })
 
   const [startPositions, setStartPositions] = createSignal<Record<string, Point>>({})
+  const [startSelectionBounds, setStartSelectionBounds] = createSignal<Bounds | null>(null)
+  const [guideCandidates, setGuideCandidates] = createSignal<Bounds[]>([])
+  const [guides, setGuides] = createSignal<GuideLine[]>([])
 
   const start = (e: MouseEvent, ids?: string[]) => {
     const targetIds = ids ?? designer.selection.selectedIds()
     if (targetIds.length === 0) return
 
     const positions: Record<string, Point> = {}
+    let selectionBounds: Bounds | null = null
     for (const id of targetIds) {
       const el = designer.element.getById(id)
       if (el && isShape(el)) {
         positions[id] = { x: el.props.x, y: el.props.y }
+        const bounds = designer.view.getShapeBounds(el)
+        selectionBounds = selectionBounds ? unionBounds(selectionBounds, bounds) : bounds
       }
     }
 
     if (Object.keys(positions).length === 0) return
 
+    const activeIds = new Set(Object.keys(positions))
+    const candidates = designer.element
+      .shapes()
+      .filter(shape => !activeIds.has(shape.id))
+      .map(shape => designer.view.getShapeBounds(shape))
+
     setStartPositions(positions)
+    setStartSelectionBounds(selectionBounds)
+    setGuideCandidates(candidates)
+    setGuides([])
     pointerDelta.setStartFromEvent(e)
     session.begin({ x: e.clientX, y: e.clientY })
   }
@@ -61,6 +77,17 @@ export function createShapeDrag(options: UseShapeDragOptions = {}) {
       zoom,
       event: e,
     })
+    const selectionBounds = startSelectionBounds()
+    const snapped = selectionBounds
+      ? calculateMoveGuideSnap({
+          movingBounds: selectionBounds,
+          delta,
+          candidates: guideCandidates(),
+          tolerance: guideTolerance,
+        })
+      : null
+    const appliedDelta = snapped?.delta ?? delta
+    setGuides(snapped?.guides ?? [])
     let movedBounds: Bounds | null = null
 
     batch(() => {
@@ -68,8 +95,8 @@ export function createShapeDrag(options: UseShapeDragOptions = {}) {
         const el = designer.element.getById(id)
         if (!el || !isShape(el)) continue
 
-        const nextX = startPos.x + delta.x
-        const nextY = startPos.y + delta.y
+        const nextX = startPos.x + appliedDelta.x
+        const nextY = startPos.y + appliedDelta.y
         designer.edit.update(id, {
           props: {
             ...el.props,
@@ -97,6 +124,9 @@ export function createShapeDrag(options: UseShapeDragOptions = {}) {
       session.finish()
     }
     setStartPositions({})
+    setStartSelectionBounds(null)
+    setGuideCandidates([])
+    setGuides([])
     pointerDelta.clear()
   }
 
@@ -105,6 +135,9 @@ export function createShapeDrag(options: UseShapeDragOptions = {}) {
       session.cancel()
     }
     setStartPositions({})
+    setStartSelectionBounds(null)
+    setGuideCandidates([])
+    setGuides([])
     pointerDelta.clear()
   }
 
@@ -116,6 +149,7 @@ export function createShapeDrag(options: UseShapeDragOptions = {}) {
     isDragging: session.isDragging,
     isPending: session.isPending,
     delta: session.delta,
+    guides,
     start,
     move,
     end,

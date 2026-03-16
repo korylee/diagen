@@ -16,6 +16,10 @@ export function RendererContainer(props: {
   class?: string
   /** Optional inline styles */
   style?: Record<string, string>
+  /** shape 拖拽吸附容差（画布坐标） */
+  shapeGuideTolerance?: number
+  /** resize 吸附容差（画布坐标） */
+  resizeGuideTolerance?: number
 }) {
   const { selection, edit, view, state, history } = useDesigner()
 
@@ -30,9 +34,11 @@ export function RendererContainer(props: {
     coordinate,
     panButton: 1,
     shapeDragThreshold: 3,
+    shapeGuideTolerance: props.shapeGuideTolerance,
     linkerDragThreshold: 3,
     resizeMinWidth: 20,
     resizeMinHeight: 20,
+    resizeGuideTolerance: props.resizeGuideTolerance,
     boxSelectMinSize: 5,
   })
   const keyboard = createKeyboard()

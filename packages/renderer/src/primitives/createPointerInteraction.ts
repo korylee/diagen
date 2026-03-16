@@ -11,6 +11,7 @@ export interface CreatePointerInteractionOptions {
   coordinate: CoordinateService
   panButton?: number
   shapeDragThreshold?: number
+  shapeGuideTolerance?: number
   linkerDragThreshold?: number
   linkerSnapDistance?: number
   linkerSnapOnMove?: boolean
@@ -19,6 +20,7 @@ export interface CreatePointerInteractionOptions {
   linkerAllowSelfConnect?: boolean
   resizeMinWidth?: number
   resizeMinHeight?: number
+  resizeGuideTolerance?: number
   boxSelectMinSize?: number
   rotateThreshold?: number
   rotateSnapStep?: number
@@ -34,6 +36,7 @@ export function createPointerInteraction(options: CreatePointerInteractionOption
     coordinate,
     panButton = 1,
     shapeDragThreshold = 3,
+    shapeGuideTolerance,
     linkerDragThreshold = 3,
     linkerSnapDistance = 12,
     linkerSnapOnMove = true,
@@ -42,6 +45,7 @@ export function createPointerInteraction(options: CreatePointerInteractionOption
     linkerAllowSelfConnect = true,
     resizeMinWidth = 20,
     resizeMinHeight = 20,
+    resizeGuideTolerance,
     boxSelectMinSize = 5,
     rotateThreshold = 2,
     rotateSnapStep = 15,
@@ -50,6 +54,7 @@ export function createPointerInteraction(options: CreatePointerInteractionOption
   const shapeDrag = createShapeDrag({
     threshold: shapeDragThreshold,
     eventToCanvas: coordinate.eventToCanvas,
+    guideTolerance: shapeGuideTolerance,
   })
   const linkerDrag = createLinkerDrag({
     threshold: linkerDragThreshold,
@@ -65,6 +70,7 @@ export function createPointerInteraction(options: CreatePointerInteractionOption
     minWidth: resizeMinWidth,
     minHeight: resizeMinHeight,
     eventToCanvas: coordinate.eventToCanvas,
+    guideTolerance: resizeGuideTolerance,
   })
   const rotate = createRotate({
     threshold: rotateThreshold,

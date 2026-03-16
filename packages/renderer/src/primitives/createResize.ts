@@ -1,5 +1,5 @@
 import { batch, createSignal, onCleanup } from 'solid-js'
-import { isShape } from '@diagen/core'
+import { calculateResizeGuideSnap, isShape, type GuideLine } from '@diagen/core'
 import { getRotatedBoxBounds } from '@diagen/shared'
 import type { Bounds, Point } from '@diagen/shared'
 import { useDesigner } from '../components'
@@ -21,9 +21,10 @@ export function createResize(
     minWidth?: number
     minHeight?: number
     eventToCanvas?: EventToCanvas
+    guideTolerance?: number
   } = {},
 ) {
-  const { threshold = 0, minWidth = 20, minHeight = 20, eventToCanvas } = options
+  const { threshold = 0, minWidth = 20, minHeight = 20, eventToCanvas, guideTolerance } = options
   const { element, history, selection, view, edit } = useDesigner()
   const transaction = history.transaction.createScope('调整尺寸')
   const pointerDelta = createPointerDeltaState({ eventToCanvas })
@@ -38,6 +39,8 @@ export function createResize(
   const [targetId, setTargetId] = createSignal<string | null>(null)
   const [direction, setDirection] = createSignal<ResizeDirection | null>(null)
   const [startBounds, setStartBounds] = createSignal<Bounds | null>(null)
+  const [guideCandidates, setGuideCandidates] = createSignal<Bounds[]>([])
+  const [guides, setGuides] = createSignal<GuideLine[]>([])
   const [ratio, setRatio] = createSignal(1)
 
   const isResizing = () => targetId() !== null
@@ -54,6 +57,13 @@ export function createResize(
       setTargetId(id)
       setDirection(dir)
       setStartBounds(bounds)
+      setGuideCandidates(
+        element
+          .shapes()
+          .filter(shape => shape.id !== id)
+          .map(shape => view.getShapeBounds(shape)),
+      )
+      setGuides([])
       pointerDelta.setStartFromEvent(e)
       setRatio(bounds.w / bounds.h)
     })
@@ -115,6 +125,21 @@ export function createResize(
     w = Math.max(minWidth, w)
     h = Math.max(minHeight, h)
 
+    const snapped = calculateResizeGuideSnap({
+      draftBounds: { x, y, w, h },
+      direction: dir,
+      candidates: guideCandidates(),
+      tolerance: guideTolerance,
+      minWidth,
+      minHeight,
+    })
+    const snappedBounds = snapped.bounds
+    x = snappedBounds.x
+    y = snappedBounds.y
+    w = snappedBounds.w
+    h = snappedBounds.h
+    setGuides(snapped.guides)
+
     const el = element.getById(id)
     if (el && isShape(el)) {
       edit.update(id, { props: { ...el.props, x, y, w, h } })
@@ -149,6 +174,8 @@ export function createResize(
       setTargetId(null)
       setDirection(null)
       setStartBounds(null)
+      setGuideCandidates([])
+      setGuides([])
       pointerDelta.clear()
     })
   }
@@ -187,7 +214,7 @@ export function createResize(
     if (isResizing() || session.isPending()) cancel()
   })
 
-  return { isResizing, direction, targetId, start, move, end, cancel, hitTest }
+  return { isResizing, direction, targetId, guides, start, move, end, cancel, hitTest }
 }
 
 export type CreateResize = ReturnType<typeof createResize>
