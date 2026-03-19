@@ -12,24 +12,30 @@
 5. `AI_KB/INTEGRATION_POINTS.md`
 6. `AI_KB/PROCESS_ON_COMPARISON.md`
 7. `AI_KB/DRAWIO_MXGRAPH_COMPARISON.md`
-8. `AI_KB/ROADMAP_2W_2026-03-13.md`
-9. `AI_KB/EXECUTION_READINESS_2026-03-16.md`
-10. `AI_KB/DEV_GUIDE.md`
+8. `AI_KB/FOUNDATION_GAP_2026-03-19.md`
+9. `AI_KB/ROADMAP_2W_2026-03-13.md`
+10. `AI_KB/EXECUTION_READINESS_2026-03-16.md`
+11. `AI_KB/DEV_GUIDE.md`
 
-当前版本要点（2026-03-16）：
+当前版本要点（2026-03-19）：
 - 事件坐标归一化入口已迁移到 `createCoordinateService`：`packages/renderer/src/primitives/createCoordinateService.ts`。
 - 渲染容器采用三层契约：`world-layer` / `scene-layer` / `overlay-layer`。
+- 连线路由主链路已接入 `view` 配置：默认 `broken/orthogonal` 走 obstacle + hybrid，`straight/curved` 保持 basic。
+- `lineJumps` 已接入主渲染链：`diagram.page.lineJumps` 可驱动 `LinkerCanvas` 跳线绘制。
+- 连线端点候选选择已调整为“固定锚点优先、perimeter 回退”，提升创建/重连时的连接稳定性。
 - `.processon` 深度对照已补充吸附线、剪贴板、历史与扩容机制的源码级分析。
 - 已新增未来 1-2 周详尽开发计划，后续阶段仅保留滚动简版路线。
 - 已新增执行前就绪审查文档（阻塞项、PR 切分、开工门槛）。
+- 已新增基础能力差距评估，聚焦“块/线创建工具链路”和与 `.processon` 的真实差距。
 
 更新规则：
 - 新增/调整包结构：更新 `REPO_MAP.md`、`PROJECT_OVERVIEW.md`
 - 修改坐标、交互、渲染链路：更新 `ARCHITECTURE.md`、`INTEGRATION_POINTS.md`
 - 修改模型字段或持久化格式：更新 `DOMAIN_MODEL.md`
 - 对标参考框架结论变化：更新 `PROCESS_ON_COMPARISON.md`、`DRAWIO_MXGRAPH_COMPARISON.md`
+- 基础能力差距结论变化：更新 `FOUNDATION_GAP_2026-03-19.md`
 - 计划与节奏变化：更新 `ROADMAP_2W_2026-03-13.md`
 - 执行前准备与阻塞项变化：更新 `EXECUTION_READINESS_2026-03-16.md`
 - 命令或调试流程变化：更新 `DEV_GUIDE.md`
 
-最后更新日期：2026-03-16
+最后更新日期：2026-03-19

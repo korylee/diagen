@@ -1,5 +1,6 @@
 import { createRoot } from 'solid-js'
 import { describe, expect, it } from 'vitest'
+import { lineIntersectsBounds } from '@diagen/shared'
 import { createLinker, createShape, type ShapeElement } from '../../model'
 import { createDesigner } from '../create'
 
@@ -119,6 +120,101 @@ describe('view manager', () => {
       expect(layout.route.points.length).toBeGreaterThan(1)
       expect(layout.bounds.w).toBeGreaterThan(0)
       expect(layout.bounds.h).toBeGreaterThan(0)
+    })
+  })
+
+  it('broken 连线默认应走 obstacle 主链路', () => {
+    withDesigner(designer => {
+      const a = createShapeById('route_a', 0, 0, 100, 80)
+      const blocker = createShapeById('route_blocker', 140, -20, 120, 120)
+      const b = createShapeById('route_b', 320, 0, 100, 80)
+      const linker = createLinker({
+        id: 'route_linker',
+        name: 'route_linker',
+        linkerType: 'broken',
+        from: { id: a.id, x: a.props.x + a.props.w, y: a.props.y + a.props.h / 2, binding: { type: 'free' } },
+        to: { id: b.id, x: b.props.x, y: b.props.y + b.props.h / 2, binding: { type: 'free' } },
+      })
+      designer.edit.add([a, blocker, b, linker], { record: false, select: false })
+
+      const layout = designer.view.getLinkerLayout(linker)
+      const blockerBounds = designer.view.getShapeBounds(blocker)
+      const intersects = layout.route.points.some((point, index, points) => {
+        if (index === points.length - 1) return false
+        return lineIntersectsBounds(point, points[index + 1], blockerBounds)
+      })
+
+      expect(intersects).toBe(false)
+    })
+  })
+
+  it('切回 basic 策略后应保留基础折线行为', () => {
+    withDesigner(designer => {
+      const a = createShapeById('route_basic_a', 0, 0, 100, 80)
+      const blocker = createShapeById('route_basic_blocker', 140, -20, 120, 120)
+      const b = createShapeById('route_basic_b', 320, 0, 100, 80)
+      const linker = createLinker({
+        id: 'route_basic_linker',
+        name: 'route_basic_linker',
+        linkerType: 'broken',
+        from: { id: a.id, x: a.props.x + a.props.w, y: a.props.y + a.props.h / 2, binding: { type: 'free' } },
+        to: { id: b.id, x: b.props.x, y: b.props.y + b.props.h / 2, binding: { type: 'free' } },
+      })
+      designer.edit.add([a, blocker, b, linker], { record: false, select: false })
+      designer.view.setLinkerRouteConfig({
+        strategies: {
+          broken: 'basic',
+        },
+      })
+
+      const layout = designer.view.getLinkerLayout(linker)
+      const blockerBounds = designer.view.getShapeBounds(blocker)
+      const intersects = layout.route.points.some((point, index, points) => {
+        if (index === points.length - 1) return false
+        return lineIntersectsBounds(point, points[index + 1], blockerBounds)
+      })
+
+      expect(intersects).toBe(true)
+    })
+  })
+
+  it('开启 lineJumps 后绘制连线应生成跳线几何', () => {
+    createRoot(dispose => {
+      const designer = createDesigner({
+        page: {
+          lineJumps: true,
+        },
+      })
+
+      try {
+        const horizontal = createLinker({
+          id: 'jump_horizontal',
+          name: 'jump_horizontal',
+          linkerType: 'straight',
+          from: { id: null, x: 0, y: 50, binding: { type: 'free' } },
+          to: { id: null, x: 100, y: 50, binding: { type: 'free' } },
+        })
+        const vertical = createLinker({
+          id: 'jump_vertical',
+          name: 'jump_vertical',
+          linkerType: 'straight',
+          from: { id: null, x: 50, y: 0, binding: { type: 'free' } },
+          to: { id: null, x: 50, y: 100, binding: { type: 'free' } },
+        })
+        designer.edit.add([horizontal, vertical], { record: false, select: false })
+
+        expect(designer.view.getLinkerLayout(horizontal).route.jumps ?? []).toHaveLength(0)
+        expect(designer.view.getLinkerLayout(vertical).route.jumps).toEqual([
+          {
+            segmentIndex: 0,
+            center: { x: 50, y: 50 },
+            orientation: 'vertical',
+            radius: designer.view.linkerRouteConfig().lineJumpRadius,
+          },
+        ])
+      } finally {
+        dispose()
+      }
     })
   })
 })

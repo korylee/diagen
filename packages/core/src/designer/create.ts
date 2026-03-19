@@ -1,6 +1,7 @@
 import { createStore } from 'solid-js/store'
 
 import { createEmitter, DeepPartial, generateId, pick } from '@diagen/shared'
+import { LinkerType } from '../constants'
 import type { Viewport } from '../utils'
 
 import { createDiagram, Diagram } from '../model'
@@ -30,6 +31,22 @@ const DEFAULT_AUTO_GROW_CONFIG = {
   shrinkPadding: 320,
 }
 
+const DEFAULT_LINKER_ROUTE_CONFIG = {
+  strategies: {
+    [LinkerType.BROKEN]: 'obstacle',
+    [LinkerType.ORTHOGONAL]: 'obstacle',
+    [LinkerType.STRAIGHT]: 'basic',
+    [LinkerType.CURVED]: 'basic',
+  },
+  obstacleConfig: {
+    padding: 15,
+  },
+  obstacleOptions: {
+    algorithm: 'hybrid',
+  },
+  lineJumpRadius: 10,
+} as const
+
 function createResolvedConfig(options: DesignerOptions): EditorConfig {
   const containerInset = typeof options.containerInset === 'number' ? options.containerInset : 800
 
@@ -53,6 +70,21 @@ function createResolvedConfig(options: DesignerOptions): EditorConfig {
     autoGrow: {
       ...DEFAULT_AUTO_GROW_CONFIG,
       ...options.autoGrow,
+    },
+    linkerRoute: {
+      strategies: {
+        ...DEFAULT_LINKER_ROUTE_CONFIG.strategies,
+        ...options.linkerRoute?.strategies,
+      },
+      obstacleConfig: {
+        ...DEFAULT_LINKER_ROUTE_CONFIG.obstacleConfig,
+        ...options.linkerRoute?.obstacleConfig,
+      },
+      obstacleOptions: {
+        ...DEFAULT_LINKER_ROUTE_CONFIG.obstacleOptions,
+        ...options.linkerRoute?.obstacleOptions,
+      },
+      lineJumpRadius: options.linkerRoute?.lineJumpRadius ?? DEFAULT_LINKER_ROUTE_CONFIG.lineJumpRadius,
     },
   }
 }

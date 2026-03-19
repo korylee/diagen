@@ -10,17 +10,6 @@ import { DeepPartial, generateId } from '@diagen/shared'
 
 export type DiagramElement = ShapeElement | LinkerElement
 
-/** 图表评论 */
-export interface DiagramComment {
-  id: string
-  text: string
-  author?: string
-  createdAt: number
-  x: number
-  y: number
-  resolved?: boolean
-}
-
 /** 完整图表模型 */
 export interface Diagram {
   id: string
@@ -44,9 +33,6 @@ export interface Diagram {
   updatedAt: number
   createdBy?: string
 
-  /** 评论列表 */
-  comments?: DiagramComment[]
-
   /** 自定义属性 */
   properties?: Record<string, unknown>
 }
@@ -62,7 +48,6 @@ export function createDiagram(overrides: DeepPartial<Diagram> = {}) {
     orderList: [],
     createdAt: now,
     updatedAt: now,
-    comments: [],
     ...overrides,
     page: createPage(overrides.page),
   } as Diagram

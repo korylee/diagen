@@ -28,7 +28,7 @@
 - `@diagen/ui`
   - UI 组件包（当前占位）
 
-## 4. 当前架构关键事实（2026-03-13）
+## 4. 当前架构关键事实（2026-03-19）
 - 渲染容器采用三层契约：
   - `world-layer`：带 transform，用于世界层内容
   - `scene-layer`：不做 transform，承载元素屏幕坐标渲染
@@ -38,15 +38,27 @@
   - 对外提供 `eventToCanvas / eventToScreen / canvasToScreen / screenToCanvas`
 - `core` 坐标变换保持可逆：
   - `packages/core/src/utils/transform.ts`
+- `view` 已成为连线路由主链路入口：
+  - `packages/core/src/designer/managers/view.ts`
+  - 默认 `broken/orthogonal` -> `obstacle + hybrid`
+  - 默认 `straight/curved` -> `basic`
+- `lineJumps` 已进入主渲染链：
+  - 数据开关：`packages/core/src/model/page.ts`
+  - 几何计算：`packages/core/src/utils/router/lineJumps.ts`
+  - 渲染入口：`packages/renderer/src/utils/render-utils.ts`
 
 ## 5. 当前能力状态（对照 `.processon`）
 - 已具备：
   - 选择、拖拽、缩放、旋转、框选、连线端点拖拽、分组、对齐/分布、撤销重做、自动扩容
+  - 连线路由主链路配置与最小跳线渲染闭环
 - 主要差距：
   - move/resize 吸附线体系
   - 完整剪贴板语义（copy/cut/paste/duplicate + group/linker 保真）
-  - line jump 主链路渲染
-  - 导入导出与评论等产品能力
+  - 创建工具态（shape/linker 正式创建链路）
+  - 导入导出等产品能力
+
+补充原则：
+- 评论/批注属于应用层能力，不进入基础架构 `Diagram` 根模型。
 
 ## 6. 运行入口
 - Playground：`playgrounds/vite`

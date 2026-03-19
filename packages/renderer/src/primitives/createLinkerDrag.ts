@@ -57,6 +57,8 @@ export interface CreateLinkerDragOptions extends CreateDragSessionOptions {
   snapOnMove?: boolean
   snapStickDistance?: number
   directionBias?: number
+  fixedAnchorBias?: number
+  perimeterPenalty?: number
   allowSelfConnect?: boolean
 }
 
@@ -78,6 +80,8 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     snapOnMove = true,
     snapStickDistance = 8,
     directionBias = 0.35,
+    fixedAnchorBias = 0.18,
+    perimeterPenalty = 0.12,
     allowSelfConnect = true,
   } = options
 
@@ -459,6 +463,8 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
           // 角度差越大惩罚越高，避免临近锚点间频繁抖动。
           score += (diff / Math.PI) * weight * maxDistance
         }
+        // 同等条件下优先固定锚点，再回退到 perimeter。
+        score -= fixedAnchorBias * maxDistance
 
         if (score <= bestScore) {
           bestScore = score
@@ -481,6 +487,7 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
         const diff = normalizeAngleDiff(desiredAngle, perimeter.angle)
         score += (diff / Math.PI) * weight * maxDistance
       }
+      score += perimeterPenalty * maxDistance
 
       if (score <= bestScore) {
         bestScore = score

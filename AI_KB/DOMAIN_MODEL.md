@@ -7,6 +7,7 @@
   - `orderList`：渲染顺序
   - `page`：页面设置
   - `theme`、元信息（createdAt/updatedAt 等）
+  - 不包含评论/批注；此类数据应位于应用层模型
 - 生命周期：
   - 创建：`createDiagram`
   - 持久化：`serialize()` / `loadFromJSON()`（通过 designer 暴露）

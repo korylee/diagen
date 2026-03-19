@@ -1,9 +1,10 @@
 import { type Bounds, createRafMergeQueue, normalizeBounds, pick, type Point, unionBounds } from '@diagen/shared'
 import { batch, createMemo, createSignal } from 'solid-js'
 import { createStore } from 'solid-js/store'
+import { DEFAULTS } from '../../constants'
 import { type DiagramElement, isLinker, isShape, type LinkerElement, type ShapeElement } from '../../model'
 import { canvasToScreen, clampZoom, screenToCanvas } from '../../utils'
-import { calculateLinkerRoute, type LinkerRoute } from '../../utils/router'
+import { calculateLineJumps, calculateLinkerRoute, type LinkerRoute } from '../../utils/router'
 import type { ElementManager } from './element'
 import type { DesignerContext } from './types'
 import type { SelectionManager } from './selection.ts'
@@ -15,7 +16,9 @@ export interface LinkerLayout {
 
 interface LinkerLayoutCacheEntry {
   stamp: number
-  layout: LinkerLayout
+  configKey: string
+  route: LinkerRoute
+  bounds: Bounds
 }
 
 /** 视图管理器 */
@@ -31,6 +34,8 @@ export function createViewManager(
   const containerSize = createMemo(() => state.containerSize)
   const zoom = createMemo(() => viewport().zoom)
   const diagramPage = createMemo(() => state.diagram.page)
+  const linkerRouteConfig = createMemo(() => state.config.linkerRoute)
+  const linkerRouteConfigKey = createMemo(() => JSON.stringify(linkerRouteConfig()))
   const [bounds, setBounds] = createSignal<Bounds>(createInitialBounds())
   const selectionBounds = createMemo((): Bounds | null => {
     const ids = selection.selectedIds()
@@ -222,6 +227,7 @@ export function createViewManager(
   })
   const linkerLayoutCache = new Map<string, LinkerLayoutCacheEntry>()
   const [linkerLayoutStampMap, setLinkerLayoutStampMap] = createStore<Record<string, number>>({})
+  const [linkerSceneStamp, setLinkerSceneStamp] = createSignal<number>(0)
 
   /**
    * 在下一帧合并执行扩容，避免拖拽过程高频 setState
@@ -244,6 +250,10 @@ export function createViewManager(
 
   function bumpLinkerLayoutStamp(id: string): void {
     setLinkerLayoutStampMap(id, value => (value ?? 0) + 1)
+  }
+
+  function bumpLinkerSceneStamp(): void {
+    setLinkerSceneStamp(value => value + 1)
   }
 
   function markLayoutDirty(elements: Array<DiagramElement | null | undefined>): void {
@@ -271,23 +281,28 @@ export function createViewManager(
         linkerLayoutCache.delete(id)
         bumpLinkerLayoutStamp(id)
       }
+      bumpLinkerSceneStamp()
     })
   }
 
   function clearLayoutCache(): void {
     linkerLayoutCache.clear()
     setLinkerLayoutStampMap({})
+    bumpLinkerSceneStamp()
   }
 
   function removeLayoutCacheEntries(elements: Array<DiagramElement | null | undefined>): void {
+    let removed = false
     for (const el of elements) {
       if (!el) continue
 
       if (isLinker(el)) {
         linkerLayoutCache.delete(el.id)
         setLinkerLayoutStampMap(el.id, 0)
+        removed = true
       }
     }
+    if (removed) bumpLinkerSceneStamp()
   }
 
   const getShapeById = (id: string) => {
@@ -309,21 +324,72 @@ export function createViewManager(
   }
 
   function getLinkerLayout(linker: LinkerElement): LinkerLayout {
-    // 通过 linker 级 stamp 建立响应依赖，确保受影响连线可触发重算。
+    const baseLayout = getBaseLinkerLayout(linker)
+    const jumps = resolveLinkerRouteJumps(linker, baseLayout.route)
+    return {
+      route: jumps.length > 0 ? { ...baseLayout.route, jumps } : baseLayout.route,
+      bounds: baseLayout.bounds,
+    }
+  }
+
+  function getBaseLinkerLayout(linker: LinkerElement): LinkerLayout {
     const stamp = getLinkerLayoutStamp(linker.id)
+    const configKey = linkerRouteConfigKey()
     const cached = linkerLayoutCache.get(linker.id)
-    if (cached && cached.stamp === stamp) {
-      return cached.layout
+    if (cached && cached.stamp === stamp && cached.configKey === configKey) {
+      return {
+        route: cached.route,
+        bounds: cached.bounds,
+      }
     }
 
-    const route = calculateLinkerRoute(linker, getShapeById, { strategy: 'basic' })
+    const route = calculateLinkerRoute(linker, getShapeById, resolveLinkerRouteOptions(linker))
     const bounds = calculateLinkerBoundsFromRoute(route)
-    const layout = { route, bounds }
     linkerLayoutCache.set(linker.id, {
       stamp,
-      layout,
+      configKey,
+      route,
+      bounds,
     })
-    return layout
+    return { route, bounds }
+  }
+
+  function resolveLinkerRouteOptions(linker: LinkerElement) {
+    const routeConfig = linkerRouteConfig()
+    const strategy = routeConfig.strategies[linker.linkerType] ?? 'basic'
+
+    if (strategy === 'basic') {
+      return { strategy }
+    }
+
+    return {
+      strategy,
+      obstacleElements: element.elements(),
+      obstacleConfig: routeConfig.obstacleConfig,
+      obstacleOptions: routeConfig.obstacleOptions,
+    }
+  }
+
+  function resolveLinkerRouteJumps(linker: LinkerElement, route: LinkerRoute) {
+    if (!diagramPage().lineJumps) return []
+    if (element.linkers().length > DEFAULTS.DISABLE_LINE_JUMPS_THRESHOLD) return []
+
+    // 依赖全局连线场景版本，确保任意相关布局变化都能刷新跳线。
+    linkerSceneStamp()
+
+    const routeConfig = linkerRouteConfig()
+    const linkers = element.linkers()
+    const currentIndex = linkers.findIndex(item => item.id === linker.id)
+    if (currentIndex <= 0) return []
+
+    const priorRoutes: LinkerRoute[] = []
+    for (let i = 0; i < currentIndex; i++) {
+      priorRoutes.push(getBaseLinkerLayout(linkers[i]).route)
+    }
+
+    return calculateLineJumps(route, priorRoutes, {
+      radius: routeConfig.lineJumpRadius,
+    })
   }
 
   function calculateLinkerBoundsFromRoute(route: LinkerRoute): Bounds {
@@ -407,6 +473,22 @@ export function createViewManager(
     ensureContainerFits,
     scheduleAutoGrow,
     flushAutoGrow,
+    linkerRouteConfig,
+    setLinkerRouteConfig: (next: Partial<typeof state.config.linkerRoute>) =>
+      batch(() => {
+        if (next.strategies) {
+          setState('config', 'linkerRoute', 'strategies', current => ({ ...current, ...next.strategies }))
+        }
+        if (next.obstacleConfig) {
+          setState('config', 'linkerRoute', 'obstacleConfig', current => ({ ...current, ...next.obstacleConfig }))
+        }
+        if (next.obstacleOptions) {
+          setState('config', 'linkerRoute', 'obstacleOptions', current => ({ ...current, ...next.obstacleOptions }))
+        }
+        if (next.lineJumpRadius !== undefined) {
+          setState('config', 'linkerRoute', 'lineJumpRadius', next.lineJumpRadius)
+        }
+      }),
 
     getLinkerLayout,
     getLinkerRoute,

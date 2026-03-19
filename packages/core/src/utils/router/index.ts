@@ -11,10 +11,13 @@
 export {
   calculateBasicLinkerRoute,
   calculateLinkerRoute,
+  type LinkerRouteJump,
   type LinkerRoute,
   type LinkerRouteOptions,
   type LinkerRouteStrategy
 } from './linkerRoute'
+
+export { calculateLineJumps, type CalculateLineJumpsOptions } from './lineJumps'
 
 // 障碍规避路由
 export {
@@ -30,4 +33,3 @@ export { findOrthogonalRoute, orthogonalRoute } from './orthogonal'
 export type { AStarRouteOptions } from './astar'
 export type { OrthogonalRouteOptions } from './orthogonal'
 export type { Obstacle, RouterConfig, RouteResult } from './types'
-

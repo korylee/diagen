@@ -1,6 +1,8 @@
 import type { Emitter, Size } from '@diagen/shared'
+import type { LinkerType } from '../constants'
 import type { Diagram } from '../model'
 import type { Viewport } from '../utils'
+import type { LinkerRouteStrategy, RouterConfig, RouterOptions } from '../utils'
 import type { ElementEvents, HistoryEvents, SelectionEvents } from './managers'
 
 /** 画布自增配置 */
@@ -21,6 +23,17 @@ export interface AutoGrowConfig {
   shrinkPadding: number
 }
 
+export interface LinkerRouteConfig {
+  /** 按连线类型分发主链路策略 */
+  strategies: Record<LinkerType, LinkerRouteStrategy>
+  /** 障碍规避的基础配置 */
+  obstacleConfig: Partial<RouterConfig>
+  /** 障碍规避的算法选择与参数 */
+  obstacleOptions: RouterOptions
+  /** 跳线半径（canvas 坐标） */
+  lineJumpRadius: number
+}
+
 /** 外部传入的编辑器配置（可选） */
 export interface EditorConfig {
   panelItemWidth: number
@@ -32,6 +45,7 @@ export interface EditorConfig {
   /** 画布容器外圈缓冲区（运行时，不持久化） */
   containerInset: number
   autoGrow: AutoGrowConfig
+  linkerRoute: LinkerRouteConfig
 }
 
 /** 编辑器状态 */

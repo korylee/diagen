@@ -1,4 +1,4 @@
-# 架构总览（2026-03-13）
+# 架构总览（2026-03-19）
 
 ## 1. 包级分层
 - 领域核心：`@diagen/core`
@@ -61,15 +61,30 @@
 4. 调用 core managers（`edit/selection/view/history`）
 5. Solid 响应更新 scene 与 overlay
 
-## 7. 与 `.processon` / draw.io 的映射
+## 7. 连线路由主链路
+- 主入口：`packages/core/src/designer/managers/view.ts`
+- 路由配置来自运行时 `state.config.linkerRoute`
+- 默认策略：
+  - `broken` / `orthogonal` -> `obstacle`
+  - `straight` / `curved` -> `basic`
+- 默认 obstacle 算法：`hybrid`
+- 约束：
+  - 显式控制点优先于自动路由
+  - `lineJumps` 只在 `diagram.page.lineJumps === true` 时参与最终 layout
+  - 跳线几何在 `core` 计算，Canvas 只负责绘制
+
+## 8. 与 `.processon` / draw.io 的映射
 - `.processon` 的 `toScale/restoreScale/getRelativePos`：
   - 对应 Diagen 的 `transform.ts + createCoordinateService`
 - `.processon` 的 `drawControls/showAnchors/showLinkerControls`：
   - 对应 `InteractionOverlay`
+- `.processon` 的 route + line jump 阅读性增强：
+  - 对应 Diagen 的 `view linker layout + calculateLineJumps + renderLinker`
 - draw.io/mxGraph 的 View 与 Handler 分层：
   - 对应 `view manager` 与 `renderer/primitives` 分离
 
-## 8. 当前主要架构风险
-- `router` 能力已实现，但尚未接入主连线路由链路。
+## 9. 当前主要架构风险
 - 缺少 move/resize 吸附线机制，影响复杂排版效率。
+- clipboard / group / linker 的结构联动仍未形成闭环。
+- `lineJumps` 当前为最小实现，仅覆盖正交/直线段的抬桥绘制，后续仍可继续细化视觉与性能策略。
 - 测试偏重 `core/utils`，交互层缺少自动化回归。

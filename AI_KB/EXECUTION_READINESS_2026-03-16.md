@@ -12,7 +12,7 @@
 2. 必须先补（P0）：
 - shape move/resize Guide（吸附线与吸附偏移）。
 - Clipboard manager（copy/cut/paste/duplicate）。
-- Router 主链路接入与 `lineJumps` 渲染闭环。
+- Router 主链路接入与 `lineJumps` 渲染闭环（已于 2026-03-19 完成 P1-A）。
 
 3. 当前主要风险：
 - 交互测试覆盖薄弱（仅 `core/utils` 为主）。
@@ -21,7 +21,7 @@
 ### PR-1 落地状态（2026-03-16）
 1. 已完成：历史事件类型补全（`history:execute/history:clear`）。
 2. 已完成：路由统一入口已收敛为 `calculateLinkerRoute`（支持 `basic/obstacle` 分发）。
-3. 待处理：恢复 Node 工具链后执行单测回归。
+3. 已完成：Node / pnpm 工具链可用，`viewManager` 路由回归已执行。
 
 ---
 
@@ -62,19 +62,17 @@
 
 ### 2.3 Router 主链路与 lineJumps
 
-现状（已有）：
+现状（2026-03-19）：
 1. Router 算法库在：`packages/core/src/utils/router/*`
 2. `lineJumps` 字段在模型层：`packages/core/src/model/page.ts`
+3. `view.getLinkerLayout` 已接入 route config：
+- 默认 `broken/orthogonal` -> `obstacle + hybrid`
+- 默认 `straight/curved` -> `basic`
+4. `renderLinker` 已消费 `route.jumps`，形成最小跳线绘制闭环。
 
-缺口（未有）：
-1. `view.getLinkerLayout` 当前调用统一入口 `calculateLinkerRoute`（当前策略为 `basic`）：
-- `packages/core/src/designer/managers/view.ts`
-2. `renderLinker` 尚未使用 `lineJumps` 信息：
-- `packages/renderer/src/utils/render-utils.ts`
-
-冻结建议：
-1. 在 `view` 增加路由策略入口（默认保留当前策略兜底）。
-2. `renderLinker` 接收 `lineJumps` 配置，先做可开关最小实现，再迭代视觉细节。
+剩余工作：
+1. 继续优化高密度场景性能。
+2. 细化 line jump 视觉规则与更多路径类型支持。
 
 ---
 
@@ -114,6 +112,7 @@
 6. PR-6（Router/lineJumps）：
 - Router 接入 `view` 主链路。
 - `lineJumps` 开关接入渲染层。
+- 当前状态：已完成。
 
 ---
 
@@ -125,9 +124,9 @@
 - [ ] 路由主入口冻结
 
 2. 环境门槛：
-- [ ] `node -v` 可用
-- [ ] `pnpm -v` 可用
-- [ ] `pnpm run test:unit` 可执行
+- [x] `node -v` 可用
+- [x] `pnpm -v` 可用
+- [ ] `pnpm run test:unit` 全量执行
 
 3. 验收门槛：
 - [ ] 每个 PR 都有最小回归用例

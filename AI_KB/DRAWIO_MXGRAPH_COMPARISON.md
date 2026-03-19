@@ -121,3 +121,6 @@ draw.io/mxGraph 对 Diagen 的最大价值不是“某个 API 名字”，而是
 - View/Model/Handler/Overlay/Undo 的职责边界。
 
 Diagen 已具备这套边界，下一阶段重点是沿着该边界补齐 `.processon` 的核心生产力能力。
+
+补充边界：
+- 评论/批注不属于基础架构能力，若有需求应在应用层基于 `core + renderer` 组合实现，而不是进入 `Diagram` 根模型。

@@ -14,6 +14,14 @@ export interface LinkerRoute {
   points: Point[]
   fromAngle: number
   toAngle: number
+  jumps?: LinkerRouteJump[]
+}
+
+export interface LinkerRouteJump {
+  segmentIndex: number
+  center: Point
+  orientation: 'horizontal' | 'vertical'
+  radius: number
 }
 
 /**
