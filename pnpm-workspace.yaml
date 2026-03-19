@@ -1,14 +1,15 @@
 packages:
-  - "packages/*"
-  - "playgrounds/*"
+  - 'packages/*'
+  - 'playgrounds/*'
 
 catalogs:
   dev:
-    "@rolldown-plugin/solid": 0.0.2
+    '@rolldown-plugin/solid': 0.0.2
     solid-js: ^1.9.11
     vite: ^7.3.1
     vite-plugin-solid: ^2.11.0
-    tsdown: ^0.20.3
+    tsdown: ^0.21.4
+    '@tsdown/css': ^0.21.4
     typescript: ^5.9.3
     prettier: ^3.8.1
     turbo: ^2.8.12
@@ -19,4 +20,3 @@ catalogs:
     jsdom: ^28.1.0
   types:
     '@types/node': ^25.1.0
-
