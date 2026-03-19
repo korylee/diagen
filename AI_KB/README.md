@@ -20,6 +20,7 @@
 当前版本要点（2026-03-19）：
 - 事件坐标归一化入口已迁移到 `createCoordinateService`：`packages/renderer/src/primitives/createCoordinateService.ts`。
 - 渲染容器采用三层契约：`world-layer` / `scene-layer` / `overlay-layer`。
+- 工具态基础设施已落地：`core` 新增 `tool manager`，运行时支持 `idle / create-shape / create-linker`。
 - 连线路由主链路已接入 `view` 配置：默认 `broken/orthogonal` 走 obstacle + hybrid，`straight/curved` 保持 basic。
 - `lineJumps` 已接入主渲染链：`diagram.page.lineJumps` 可驱动 `LinkerCanvas` 跳线绘制。
 - 连线端点候选选择已调整为“固定锚点优先、perimeter 回退”，提升创建/重连时的连接稳定性。

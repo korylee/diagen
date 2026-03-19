@@ -3,7 +3,7 @@
 ## 1. 推荐入口（core）
 - 设计器工厂：`packages/core/src/designer/index.ts` 的 `createDesigner`
 - manager 入口：
-  - `element` / `edit` / `selection` / `history` / `view`
+  - `element` / `edit` / `selection` / `history` / `view` / `tool`
 - 文档输入输出：
   - `serialize()`
   - `loadFromJSON()`
@@ -24,6 +24,10 @@
 - 历史：
   - `history.undo()` / `history.redo()`
   - `history.transaction.createScope(name)`
+- 工具态：
+  - `tool.setCreateShape(shapeId, options?)`
+  - `tool.setCreateLinker(linkerId?, options?)`
+  - `tool.setIdle()`
 
 ## 3. 视图与坐标集成注意点
 - 缩放与平移统一走 `view`：
@@ -54,3 +58,4 @@
 - 批量编辑优先放进 transaction，避免 undo 栈碎片化。
 - 不把 UI 几何临时态写入 Diagram（如 hover、drag ghost、DOM rect）。
 - 命中和吸附计算都以 canvas 坐标为准，overlay 只做 screen 呈现。
+- 创建类功能优先通过 `tool manager` 表达意图，不要继续把工具状态写死在 playground 组件里。

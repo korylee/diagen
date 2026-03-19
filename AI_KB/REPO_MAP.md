@@ -12,7 +12,7 @@
 ## 2. packages 分布
 - `packages/core/`
   - `src/model/`：Diagram/Shape/Linker/Page 模型
-  - `src/designer/`：Designer 与 managers（element/edit/selection/history/view）
+  - `src/designer/`：Designer 与 managers（element/edit/selection/history/view/tool）
   - `src/schema/`：默认图形与 schema 注册
   - `src/utils/`：坐标、路由、表达式、锚点等工具
   - `src/utils/transform.ts`：画布/屏幕坐标转换核心

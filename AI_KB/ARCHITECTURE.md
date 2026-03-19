@@ -21,6 +21,7 @@
 - 编辑器运行态（非文档）：
   - `viewport`（x/y/zoom）
   - `viewportSize`、`containerSize`
+  - `tool`（`idle / create-shape / create-linker`）
   - 交互会话态（drag/resize/selection 临时状态）
 - 结论：
   - DOM 几何信息（如 `viewportRect`）不进入 `diagram`。
@@ -57,9 +58,13 @@
 ## 6. 交互链路（简化）
 1. 事件进入 `RendererContainer`
 2. 通过 `coordinate.eventToCanvas` 归一化到 canvas 坐标
-3. primitives 判定动作（pan/drag/resize/boxSelect/linkerDrag）
+3. `tool manager` 提供当前工具态，primitives 判定动作（pan/drag/resize/boxSelect/linkerDrag）
 4. 调用 core managers（`edit/selection/view/history`）
 5. Solid 响应更新 scene 与 overlay
+
+补充：
+- `tool manager` 已进入 `core`，是运行时状态，不持久化到 `Diagram`
+- 当前只完成工具态基础设施，尚未完成 shape/linker 的正式画布创建闭环
 
 ## 7. 连线路由主链路
 - 主入口：`packages/core/src/designer/managers/view.ts`

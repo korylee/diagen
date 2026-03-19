@@ -13,6 +13,7 @@ import {
   createSelectionManager,
   createViewManager,
   createGroupManager,
+  createToolManager,
 } from './managers'
 import type { DesignerContext } from './managers/types'
 import type { DesignerEmitter, EditorConfig, EditorState } from './types'
@@ -111,6 +112,9 @@ function createInitialState(options: DesignerOptions): EditorState {
       height: pageHeight,
     },
     config: createResolvedConfig(options),
+    tool: {
+      type: 'idle',
+    },
   }
 }
 
@@ -137,6 +141,7 @@ export function createDesigner(options: DesignerOptions = {}) {
   const view = createViewManager(ctx, { element, selection })
   const edit = createEditManager(ctx, { element, selection, history })
   const group = createGroupManager(ctx, { edit })
+  const tool = createToolManager(ctx)
 
   function serialize(): string {
     return JSON.stringify(state.diagram, null, 2)
@@ -187,6 +192,7 @@ export function createDesigner(options: DesignerOptions = {}) {
     edit,
     view,
     group,
+    tool,
 
     // 快捷方式
     getElementById: element.getElementById,

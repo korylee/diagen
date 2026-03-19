@@ -34,6 +34,19 @@ export interface LinkerRouteConfig {
   lineJumpRadius: number
 }
 
+export type DesignerToolState =
+  | { type: 'idle' }
+  | {
+      type: 'create-shape'
+      shapeId: string
+      continuous: boolean
+    }
+  | {
+      type: 'create-linker'
+      linkerId: string
+      continuous: boolean
+    }
+
 /** 外部传入的编辑器配置（可选） */
 export interface EditorConfig {
   panelItemWidth: number
@@ -64,6 +77,9 @@ export interface EditorState {
 
   /** ui及性能配置 */
   config: EditorConfig
+
+  /** 工具态（运行时，不持久化） */
+  tool: DesignerToolState
 }
 
 export type DesignerEmitter = Emitter<

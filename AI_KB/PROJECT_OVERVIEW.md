@@ -42,6 +42,9 @@
   - `packages/core/src/designer/managers/view.ts`
   - 默认 `broken/orthogonal` -> `obstacle + hybrid`
   - 默认 `straight/curved` -> `basic`
+- `tool manager` 已进入 `core` 运行时：
+  - `packages/core/src/designer/managers/tool.ts`
+  - 当前支持 `idle / create-shape / create-linker`
 - `lineJumps` 已进入主渲染链：
   - 数据开关：`packages/core/src/model/page.ts`
   - 几何计算：`packages/core/src/utils/router/lineJumps.ts`

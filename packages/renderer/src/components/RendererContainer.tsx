@@ -21,7 +21,7 @@ export function RendererContainer(props: {
   /** resize 吸附容差（画布坐标） */
   resizeGuideTolerance?: number
 }) {
-  const { selection, edit, view, state, history } = useDesigner()
+  const { selection, edit, view, state, history, tool } = useDesigner()
 
   const [containerRef, setContainerRef] = createSignal<HTMLDivElement | null>(null)
   const [viewportRef, setViewportRef] = createSignal<HTMLDivElement | null>(null)
@@ -47,7 +47,12 @@ export function RendererContainer(props: {
   keyboard.bind('delete', () => edit.remove(selection.selectedIds()))
   keyboard.bind('ctrl+a', () => selection.selectAll())
   keyboard.bind('escape', () => {
-    pointer.machine.cancel()
+    if (pointer.machine.isActive()) {
+      pointer.machine.cancel()
+    }
+    if (!tool.isIdle()) {
+      tool.setIdle()
+    }
   })
   keyboard.bind('ctrl+z', () => {
     history.undo()
@@ -79,6 +84,8 @@ export function RendererContainer(props: {
         pointer.linkerDrag.isDragging() ||
         pointer.rotate.isRotating()
           ? 'grabbing'
+          : state.tool.type === 'create-shape' || state.tool.type === 'create-linker'
+            ? 'crosshair'
           : 'default',
     } as const
   })
