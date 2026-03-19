@@ -6,6 +6,7 @@
     "@diagen/core": "workspace:^",
     "@diagen/renderer": "workspace:^",
     "@diagen/shared": "workspace:^",
+    "@diagen/ui": "workspace:^",
     "solid-js": "catalog:dev"
   },
   "devDependencies": {

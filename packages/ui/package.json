@@ -1,9 +1,22 @@
 {
   "name": "@diagen/ui",
   "version": "1.0.0",
-  "main": "index.js",
-  "scripts": {},
-  "author": "",
-  "license": "ISC",
-  "description": ""
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "solid": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsdown"
+  },
+  "peerDependencies": {
+    "solid-js": "^1.9.11"
+  }
 }

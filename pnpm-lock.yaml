@@ -127,7 +127,11 @@ importers:
 
   packages/shared: {}
 
-  packages/ui: {}
+  packages/ui:
+    dependencies:
+      solid-js:
+        specifier: ^1.9.11
+        version: 1.9.11
 
   playgrounds/vite:
     dependencies:
@@ -140,6 +144,9 @@ importers:
       '@diagen/shared':
         specifier: workspace:^
         version: link:../../packages/shared
+      '@diagen/ui':
+        specifier: workspace:^
+        version: link:../../packages/ui
       solid-js:
         specifier: catalog:dev
         version: 1.9.11

@@ -27,10 +27,16 @@
 - `packages/shared/`
   - 数学与基础类型（Point/Bounds/Size 等）
 - `packages/ui/`
-  - UI 包（当前占位）
+  - 编辑器壳层 UI 包（Sidebar / Topbar / TopMenu / ContextMenu 等）
+  - 当前已落地：
+    - `src/components/sidebar.tsx`：Sidebar 主视图与子视图编排
+    - `src/components/sidebar.types.ts`：Sidebar 类型定义
+    - `src/components/sidebar.styles.ts`：Sidebar 样式常量
+  - Sidebar 当前定位为可扩展面板框架，支持搜索、折叠 section、grid/list 双布局、palette tile 与 readonly 态
 
 ## 3. playgrounds
 - `playgrounds/vite/`：Vite 开发入口，联调 core + renderer
+  - 已接入 `@diagen/ui` 的 shape panel 风格 Sidebar，并在 `vite.config.ts` 中加入源码 alias
 
 ## 4. 重点对照文件（`.processon`）
 - `designer.core.js`：核心模型、交互、绘制、历史、剪贴板

@@ -10,6 +10,7 @@ export default defineConfig({
       '@diagen/shared': path.resolve(__dirname, '../../packages/shared/src'),
       '@diagen/primitives': path.resolve(__dirname, '../../packages/primitives/src'),
       '@diagen/renderer': path.resolve(__dirname, '../../packages/renderer/src'),
+      '@diagen/ui': path.resolve(__dirname, '../../packages/ui/src'),
     },
   },
 })

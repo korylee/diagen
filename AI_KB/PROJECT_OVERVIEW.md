@@ -26,7 +26,8 @@
 - `@diagen/shared`
   - 数学、对象工具、事件器、通用类型
 - `@diagen/ui`
-  - UI 组件包（当前占位）
+  - 编辑器壳层 UI 组件（Sidebar / Topbar / TopMenu / ContextMenu）
+  - 当前已落地结构化 `Sidebar`，定位为可扩展的图元/动作面板框架组件
 
 ## 4. 当前架构关键事实（2026-03-19）
 - 渲染容器采用三层契约：
@@ -45,6 +46,13 @@
 - `tool manager` 已进入 `core` 运行时：
   - `packages/core/src/designer/managers/tool.ts`
   - 当前支持 `idle / create-shape / create-linker`
+- `@diagen/ui` 已建立独立构建与导出：
+  - `packages/ui/package.json`
+  - `packages/ui/src/components/sidebar.tsx`
+  - `packages/ui/src/components/sidebar.types.ts`
+  - `packages/ui/src/components/sidebar.styles.ts`
+  - 当前 Sidebar 支持 `sections / activeItemId / header / footer / search / onItemSelect / onSectionToggle`
+  - Section 具备 `grid/list` 双布局，可同时承载图元 palette 与动作列表
 - `lineJumps` 已进入主渲染链：
   - 数据开关：`packages/core/src/model/page.ts`
   - 几何计算：`packages/core/src/utils/router/lineJumps.ts`
@@ -62,6 +70,10 @@
 
 补充原则：
 - 评论/批注属于应用层能力，不进入基础架构 `Diagram` 根模型。
+- `packages/ui` 负责应用壳层与菜单/面板类组件，不承载图语义、交互状态机或绘制算法。
+- playground 对 Sidebar 的动作绑定仅用于演示接线，业务语义仍留在宿主层。
+- `.processon` 中 `shape_panel` 的“搜索 + 分类折叠 + 图元栅格”组织方式适合作为 `Sidebar` 的结构参考，但不照搬其 jQuery/DOM 耦合实现。
+- Sidebar 当前重点是 API 与内部结构清晰，便于后续增加 My Shapes、hover preview、拖出创建、面板宽度调整等能力。
 
 ## 6. 运行入口
 - Playground：`playgrounds/vite`

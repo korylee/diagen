@@ -24,6 +24,7 @@
 - 连线路由主链路已接入 `view` 配置：默认 `broken/orthogonal` 走 obstacle + hybrid，`straight/curved` 保持 basic。
 - `lineJumps` 已接入主渲染链：`diagram.page.lineJumps` 可驱动 `LinkerCanvas` 跳线绘制。
 - 连线端点候选选择已调整为“固定锚点优先、perimeter 回退”，提升创建/重连时的连接稳定性。
+- `packages/ui` 已不再是占位包，现已提供结构化 `Sidebar` 面板框架：支持搜索、折叠分组、grid/list 双布局，并拆分为样式/类型/主视图三层。
 - `.processon` 深度对照已补充吸附线、剪贴板、历史与扩容机制的源码级分析。
 - 已新增未来 1-2 周详尽开发计划，后续阶段仅保留滚动简版路线。
 - 已新增执行前就绪审查文档（阻塞项、PR 切分、开工门槛）。
