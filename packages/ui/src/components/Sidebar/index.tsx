@@ -1,12 +1,11 @@
 import { For, Show, createMemo, createSignal, splitProps } from 'solid-js'
 import type { JSX } from 'solid-js'
 
-import { sidebarCss } from './sidebar.styles'
-import type { SidebarItem, SidebarProps, SidebarSearchProps, SidebarSection, SidebarSectionLayout } from './sidebar.types'
+import './index.css'
+import type { SidebarItem, SidebarProps, SidebarSearchProps, SidebarSection, SidebarSectionLayout } from './types'
+import { createBem } from '@diagen/shared'
 
-function joinClass(...parts: Array<string | undefined | false>): string {
-  return parts.filter(Boolean).join(' ')
-}
+const bem = createBem('dg', 'sidebar')
 
 function getSectionKey(section: SidebarSection, index: number): string {
   return section.id ?? `section-${index}`
@@ -24,11 +23,11 @@ function resolveSectionEmptyState(section: SidebarSection, fallback: JSX.Element
   return section.emptyState ?? fallback ?? 'No items'
 }
 
-function SidebarSearchBox(props: { search: SidebarSearchProps }): JSX.Element {
+function SidebarSearchBox(props: { search: SidebarSearchProps }) {
   return (
-    <label class="dg-sidebar__search">
+    <label class={bem('search')}>
       <input
-        class="dg-sidebar__search-input"
+        class={bem('search-input')}
         type="text"
         value={props.search.value}
         placeholder={props.search.placeholder ?? 'Search'}
@@ -37,7 +36,7 @@ function SidebarSearchBox(props: { search: SidebarSearchProps }): JSX.Element {
       <Show when={props.search.value.length > 0}>
         <button
           type="button"
-          class="dg-sidebar__search-clear"
+          class={bem('search-clear')}
           aria-label="Clear search"
           onClick={() => {
             props.search.onClear?.()
@@ -58,7 +57,7 @@ function SidebarItemView(props: {
   activeItemId?: string
   readonly?: boolean
   onItemSelect?: (item: SidebarItem, section: SidebarSection) => void
-}): JSX.Element {
+}) {
   const isTile = () => props.layout === 'grid'
   const isActive = () => props.item.active ?? props.item.id === props.activeItemId
   const isDisabled = () => Boolean(props.readonly || props.item.disabled)
@@ -67,7 +66,7 @@ function SidebarItemView(props: {
     <button
       type="button"
       role="listitem"
-      class={joinClass('dg-sidebar__item', isTile() ? 'dg-sidebar__item--tile' : 'dg-sidebar__item--row')}
+      class={bem('item', [isTile() ? 'tile' : 'row'])}
       disabled={isDisabled()}
       title={props.item.title ?? props.item.label}
       data-active={isActive() ? 'true' : undefined}
@@ -87,7 +86,7 @@ function SidebarItemView(props: {
         </span>
       </Show>
 
-      <span class="dg-sidebar__item-copy">
+      <span class={bem('item-copy')}>
         <span class="dg-sidebar__item-title-row">
           <span class="dg-sidebar__item-label">{props.item.label}</span>
           <Show when={!isTile() && props.item.meta}>
@@ -165,13 +164,7 @@ function SidebarSectionView(props: {
           when={props.section.items.length > 0}
           fallback={<div class="dg-sidebar__empty">{resolveSectionEmptyState(props.section, props.emptyState)}</div>}
         >
-          <div
-            class={joinClass(
-              'dg-sidebar__section-content',
-              layout() === 'grid' ? 'dg-sidebar__section-content--grid' : 'dg-sidebar__section-content--list',
-            )}
-            role="list"
-          >
+          <div class={bem('section-content', [layout() === 'grid' ? 'grid' : 'list'])} role="list">
             <For each={props.section.items}>
               {item => (
                 <SidebarItemView
@@ -243,10 +236,9 @@ export function Sidebar(props: SidebarProps): JSX.Element {
 
   return (
     <>
-      <style>{sidebarCss}</style>
       <aside
         {...rest}
-        class={joinClass('dg-sidebar', local.readonly && 'dg-sidebar--readonly', local.class)}
+        class={bem({ readonly: local.readonly }) + ' ' + local.class}
         aria-label={(rest['aria-label'] as string | undefined) ?? 'Sidebar'}
       >
         <Show when={local.header}>
@@ -287,4 +279,4 @@ export function Sidebar(props: SidebarProps): JSX.Element {
   )
 }
 
-export type { SidebarItem, SidebarProps, SidebarSearchProps, SidebarSection, SidebarSectionLayout } from './sidebar.types'
+export type { SidebarItem, SidebarProps, SidebarSearchProps, SidebarSection, SidebarSectionLayout } from './types'

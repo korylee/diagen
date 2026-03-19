@@ -1,4 +1,4 @@
-export const sidebarCss = `
+
 .dg-sidebar {
   display: flex;
   flex-direction: column;
@@ -299,4 +299,3 @@ export const sidebarCss = `
   line-height: 1.5;
   text-align: center;
 }
-`
