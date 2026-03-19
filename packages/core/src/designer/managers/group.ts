@@ -1,17 +1,13 @@
 import { generateId } from '@diagen/shared'
 import { isLinker, type DiagramElement } from '../../model'
-import type { EditManager } from './edit'
+import type { EditManager, EditOptions } from './edit'
 import type { DesignerContext } from './types'
 
 interface CreateGroupManagerDeps {
   edit: Pick<EditManager, 'update'>
 }
 
-export interface GroupCommandOptions {
-  record?: boolean
-}
-
-export interface GroupOptions extends GroupCommandOptions {
+export interface GroupOptions extends EditOptions {
   groupId?: string
 }
 
@@ -215,7 +211,7 @@ export function createGroupManager(ctx: DesignerContext, deps: CreateGroupManage
     return groupId
   }
 
-  function ungroup(groupId: string, options: GroupCommandOptions = {}): string[] {
+  function ungroup(groupId: string, options: EditOptions = {}): string[] {
     const { record = true } = options
     const ids = getMemberIds(groupId)
     if (ids.length === 0) return []
@@ -224,15 +220,15 @@ export function createGroupManager(ctx: DesignerContext, deps: CreateGroupManage
     return ids
   }
 
-  function ungroupByElements(ids: string[], options: GroupCommandOptions = {}): string[] {
+  function ungroupByElements(ids: string[], options: EditOptions = {}): string[] {
     const { record = true } = options
     const current = context()
-    const groups = getGroupsFromElementIds(ids, current)
+    const groups = getGroupsFromElements(ids)
     if (groups.size === 0) return []
 
     const affected = new Set<string>()
     for (const groupId of groups) {
-      for (const id of getGroupMemberIds(groupId, current)) {
+      for (const id of getMemberIds(groupId)) {
         affected.add(id)
       }
     }

@@ -1,10 +1,229 @@
-import { deepClone, ensureArray, generateId, keys } from '@diagen/shared'
+import {
+  deepClone,
+  ensureArray,
+  isObject,
+  keys,
+  MaybeArray,
+  shallowEqual,
+  UnionKeyOf,
+  UnionNestedKeyOf,
+  UnionNestedValue,
+  UnionValue,
+} from '@diagen/shared'
 import { batch } from 'solid-js'
+import type { StoreSetter } from 'solid-js/store'
 import type { DiagramElement } from '../../model'
-import { CreateMethods, type ElementManager } from './element'
-import { Command, createCommand, HistoryManager } from './history'
+import type { CreateMethods, ElementManager } from './element'
+import { type Command, createCommand, type HistoryManager } from './history'
 import { type SelectionManager } from './selection'
-import { DesignerContext } from './types'
+import type { DesignerContext } from './types'
+
+interface EditDeps {
+  element: ElementManager
+  selection: SelectionManager
+  history: HistoryManager
+}
+
+export interface EditOptions {
+  /**
+   * @default true
+   */
+  record?: boolean
+}
+
+type ChangeEntry<T> = {
+  id: string
+  before: T
+  after: T
+}
+
+function isEditOptions(value: unknown): value is EditOptions {
+  return isObject(value) && 'record' in value
+}
+
+function normalizeIds(id: MaybeArray<string>): string[] {
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const current of ensureArray(id)) {
+    if (seen.has(current)) continue
+    seen.add(current)
+    result.push(current)
+  }
+  return result
+}
+
+function takeEditOptions(args: unknown[]): EditOptions {
+  const lastArg = args[args.length - 1]
+  if (!isEditOptions(lastArg)) return {}
+  args.pop()
+  return lastArg
+}
+
+function hasChanged(prev: unknown, next: unknown): boolean {
+  if (shallowEqual(prev, next)) return false
+
+  try {
+    return JSON.stringify(prev) !== JSON.stringify(next)
+  } catch {
+    return true
+  }
+}
+
+/**
+ * 兼容 value/setter/produce 三类写法，且不会污染原始 state。
+ */
+function resolveSetter<T>(prev: T, setter: StoreSetter<T, any>): T {
+  if (typeof setter !== 'function') return setter as T
+  const draft = deepClone(prev)
+  const maybeNext = (setter as (value: T) => T | void)(draft)
+  return (maybeNext === undefined ? draft : maybeNext) as T
+}
+
+function createChangeCommand<T>(name: string, entries: ChangeEntry<T>[], apply: (id: string, value: T) => void) {
+  return createCommand({
+    isNoOp: entries.length === 0,
+    name,
+    execute() {
+      batch(() => {
+        for (const entry of entries) {
+          apply(entry.id, entry.after)
+        }
+      })
+    },
+    undo() {
+      batch(() => {
+        for (const entry of entries) {
+          apply(entry.id, entry.before)
+        }
+      })
+    },
+  })
+}
+
+function createPatchChangeEntries(
+  deps: EditDeps,
+  ids: string[],
+  patch: Partial<DiagramElement>,
+): ChangeEntry<Partial<DiagramElement>>[] {
+  const patchKeys = keys(patch)
+  if (patchKeys.length === 0) return []
+
+  const entries: ChangeEntry<Partial<DiagramElement>>[] = []
+
+  for (const id of ids) {
+    const el = deps.element.getElementById(id)
+    if (!el) continue
+
+    const before: Partial<DiagramElement> = {}
+    const after: Partial<DiagramElement> = {}
+    let changed = false
+
+    for (const key of patchKeys) {
+      const prevValue = el[key]
+      const nextValue = patch[key]
+      if (Object.is(prevValue, nextValue)) continue
+      changed = true
+      ;(before as any)[key] = deepClone(prevValue)
+      ;(after as any)[key] = deepClone(nextValue)
+    }
+
+    if (!changed) continue
+    entries.push({ id, before, after })
+  }
+
+  return entries
+}
+
+function collectSetterChangeEntries<T>(
+  deps: EditDeps,
+  ids: string[],
+  readValue: (el: DiagramElement) => T,
+  setter: StoreSetter<T, any>,
+): ChangeEntry<T>[] {
+  const entries: ChangeEntry<T>[] = []
+  for (const id of ids) {
+    const el = deps.element.getElementById(id)
+    if (!el) continue
+
+    const prev = readValue(el)
+    const next = resolveSetter(prev, setter)
+    if (!hasChanged(prev, next)) continue
+
+    entries.push({
+      id,
+      before: deepClone(prev),
+      after: deepClone(next),
+    })
+  }
+  return entries
+}
+
+function createUpdatePatchCommand(deps: EditDeps, ids: string[], patch: Partial<DiagramElement>) {
+  const entries = createPatchChangeEntries(deps, ids, patch)
+  return createChangeCommand('update_els', entries, (id, value) => {
+    deps.element.update(id, value)
+  })
+}
+
+function createUpdateRootSetterCommand(deps: EditDeps, ids: string[], setter: StoreSetter<DiagramElement>) {
+  const entries = collectSetterChangeEntries(deps, ids, el => el, setter)
+  return createChangeCommand('update_els_by_setter', entries, (id, value) => {
+    deps.element.update(id, value)
+  })
+}
+
+function createUpdateByPathCommand<K1 extends UnionKeyOf<DiagramElement>>(
+  deps: EditDeps,
+  ids: string[],
+  k1: K1,
+  setter: StoreSetter<UnionValue<DiagramElement, K1>, [K1]>,
+) {
+  const entries = collectSetterChangeEntries(deps, ids, el => (el as any)[k1] as UnionValue<DiagramElement, K1>, setter)
+  return createChangeCommand('update_els_by_path', entries, (id, value) => {
+    deps.element.update(id, k1 as any, value as any)
+  })
+}
+
+function createUpdateByNestedPathCommand<
+  K1 extends UnionKeyOf<DiagramElement>,
+  K2 extends UnionNestedKeyOf<DiagramElement, K1>,
+>(
+  deps: EditDeps,
+  ids: string[],
+  k1: K1,
+  k2: K2,
+  setter: StoreSetter<UnionNestedValue<DiagramElement, K1, K2>, [K2, K1]>,
+) {
+  const entries = collectSetterChangeEntries(
+    deps,
+    ids,
+    el => ((el as any)[k1] as any)?.[k2] as UnionNestedValue<DiagramElement, K1, K2>,
+    setter,
+  )
+  return createChangeCommand('update_els_by_nested_path', entries, (id, value) => {
+    deps.element.update(id, k1 as any, k2 as any, value as any)
+  })
+}
+
+function createUpdateCommand(deps: EditDeps, ids: string[], args: unknown[]) {
+  if (args.length === 1) {
+    const updatePayload = args[0]
+    if (typeof updatePayload === 'function') {
+      return createUpdateRootSetterCommand(deps, ids, updatePayload as StoreSetter<DiagramElement>)
+    }
+    return createUpdatePatchCommand(deps, ids, updatePayload as Partial<DiagramElement>)
+  }
+
+  if (args.length === 2) {
+    return createUpdateByPathCommand(deps, ids, args[0] as UnionKeyOf<DiagramElement>, args[1] as any)
+  }
+
+  if (args.length === 3) {
+    return createUpdateByNestedPathCommand(deps, ids, ...(args as [any, any, any]))
+  }
+
+  throw new Error('edit.update 参数不合法')
+}
 
 function createAddCommand(deps: EditDeps, elements: DiagramElement[]) {
   const { element } = deps
@@ -51,7 +270,7 @@ function createRemoveCommand(deps: EditDeps, elements: DiagramElement[]) {
       element.add(elements)
     },
     canMergeWith(next: Command): boolean {
-      return next.name !== name && Date.now() - next.timestamp < 300
+      return next.name === name && Date.now() - next.timestamp < 300
     },
     merge<K extends Command>(next: K): K extends RemoveCommand ? RemoveCommand : null {
       return (next.name !== name ? null : createRemoveCommand(deps, [...elements, ...(next as any).payload])) as any
@@ -59,119 +278,70 @@ function createRemoveCommand(deps: EditDeps, elements: DiagramElement[]) {
   })
 }
 
-class UpdateCommand implements Command {
-  id = generateId()
-  name = 'update_els'
-  readonly timestamp = Date.now()
-  cache: Record<string, Partial<DiagramElement>>
-  constructor(
-    private readonly deps: EditDeps,
-    private readonly ids: string[],
-    private readonly overrides: Partial<DiagramElement>,
-  ) {
-    const _keys = keys(overrides)
-    this.cache = ids.reduce(
-      (acc, id) => {
-        const el = deps.element.getById(id)
-        acc[id] = _keys.reduce((acc, cur) => {
-          acc[cur] = deepClone(el[cur])
-          return acc
-        }, {} as any)
-        return acc
-      },
-      {} as Record<string, Partial<DiagramElement>>,
-    )
+function createMoveCommand(deps: EditDeps, elements: DiagramElement[], dx: number, dy: number) {
+  const name = 'el_move'
+  const targetIds = elements.map(el => el.id)
+
+  type MovePayload = {
+    targetIds: string[]
+    dx: number
+    dy: number
   }
-  execute() {
-    batch(() => {
-      this.ids.forEach(id => {
-        this.deps.element.update(id, deepClone(this.overrides))
-      })
-    })
+
+  type MoveCommand = Command & {
+    payload: MovePayload
   }
-  undo() {
-    batch(() => {
-      this.ids.forEach(id => {
-        this.deps.element.update(id, deepClone(this.cache[id]))
-      })
-    })
+
+  const payload: MovePayload = {
+    targetIds: [...targetIds],
+    dx,
+    dy,
   }
-  redo() {
-    this.execute()
-  }
+
+  const command = createCommand({
+    name,
+    payload,
+    execute() {
+      deps.element.move(elements, dx, dy)
+    },
+    undo() {
+      deps.element.move(elements, -dx, -dy)
+    },
+    canMergeWith(next: Command): boolean {
+      if (next.name !== name) return false
+      const nextPayload = (next as MoveCommand).payload
+      return (
+        nextPayload.targetIds.length === targetIds.length &&
+        nextPayload.targetIds.every((id, index) => id === targetIds[index])
+      )
+    },
+    merge(next: Command): MoveCommand | null {
+      if (!command.canMergeWith?.(next)) return null
+      const nextPayload = (next as MoveCommand).payload
+      command.payload.dx += nextPayload.dx
+      command.payload.dy += nextPayload.dy
+      return command
+    },
+  }) as MoveCommand
+
+  return command
 }
 
-class MoveCommand implements Command {
-  id = generateId()
-  name = 'move_els'
-  readonly timestamp = Date.now()
-  constructor(
-    private readonly deps: EditDeps,
-    private readonly elements: DiagramElement[],
-    private dx: number,
-    private dy: number,
-  ) {}
+function createClearCommand(ctx: DesignerContext, deps: EditDeps) {
+  const { element, selection } = deps
+  const snapshotElements = deepClone(element.elementMap())
+  const snapshotOrderList = element.orderList().slice()
 
-  execute() {
-    this.deps.element.move(this.elements, this.dx, this.dy)
-  }
-  undo() {
-    this.deps.element.move(this.elements, -this.dx, -this.dy)
-  }
-  redo() {
-    this.execute()
-  }
-  canMergeWith(next: Command): boolean {
-    return (
-      next instanceof MoveCommand &&
-      next.elements.length === this.elements.length &&
-      next.elements.every((el, i) => el.id === this.elements[i].id)
-    )
-  }
-  merge(next: Command) {
-    if (!(next instanceof MoveCommand)) return null
-    this.dx += next.dx
-    this.dy += next.dy
-    return this
-  }
-}
-
-class ClearCommand implements Command {
-  id = generateId()
-  name = 'clear_els'
-  readonly timestamp = Date.now()
-  private readonly elements: Record<string, DiagramElement>
-  private readonly orderList: string[]
-
-  constructor(
-    private readonly ctx: DesignerContext,
-    private readonly deps: EditDeps,
-  ) {
-    const { element } = deps
-    this.elements = element.elementMap()
-    this.orderList = element.orderList().slice()
-  }
-
-  execute() {
-    const { element, selection } = this.deps
-    element.clear()
-    selection.clear()
-  }
-  undo() {
-    batch(() => {
-      this.ctx.setState('diagram', 'elements', this.elements)
-      this.ctx.setState('diagram', 'orderList', this.orderList)
-    })
-  }
-  redo() {
-    this.execute()
-  }
-}
-
-interface EditDeps {
-  element: ElementManager
-  selection: SelectionManager
-  history: HistoryManager
+  return createCommand({
+    name: 'clear_els',
+    execute() {
+      element.clear()
+      selection.clear()
+    },
+    undo() {
+      element.load(snapshotElements, snapshotOrderList)
+    },
+  })
 }
 
 export function createEditManager(ctx: DesignerContext, deps: EditDeps) {
@@ -181,79 +351,98 @@ export function createEditManager(ctx: DesignerContext, deps: EditDeps) {
     const { record = true, select = true } = options
     if (!record) {
       element.add(elements)
-      select && selection.select(elements.map(el => el.id))
+      if (select) selection.select(elements.map(el => el.id))
       return
     }
-    const cmd = createAddCommand(deps, elements)
 
-    history.execute(cmd)
+    history.execute(createAddCommand(deps, elements))
   }
 
   function create<T extends keyof CreateMethods>(
     type: T,
-    ...args: [...Parameters<CreateMethods[T]>, options?: { select?: boolean; record?: boolean }]
+    ...args: [...Parameters<CreateMethods[T]>, options?: { select?: boolean } & EditOptions]
   ): ReturnType<CreateMethods[T]> {
     const lastArg = args[args.length - 1]
     const hasOptions = typeof lastArg === 'object' && lastArg !== null && ('select' in lastArg || 'record' in lastArg)
 
-    const options = (hasOptions ? lastArg : {}) as { select?: boolean; record?: boolean }
+    const options = (hasOptions ? lastArg : {}) as { select?: boolean } & EditOptions
     const createArgs = (hasOptions ? args.slice(0, -1) : args) as any
 
     const createdElement = element.create(type, ...createArgs)
-
     if (!createdElement) return null as any
+
     add([createdElement], options)
     return createdElement as any
   }
 
-  function remove(id: string | string[], options: { record?: boolean } = {}): void {
+  function remove(id: string | string[], options: EditOptions = {}): void {
     const ids = ensureArray(id)
     const { record = true } = options
-    const els = ids.map(id => element.getById(id))
+    const elements = element.getElementsByIds(ids)
+
     if (!record) {
       element.remove(ids)
       selection.deselect(ids)
       return
     }
-    const cmd = createRemoveCommand(deps, els)
 
-    history.execute(cmd)
+    history.execute(createRemoveCommand(deps, elements))
   }
 
-  function update(id: string | string[], patch: Partial<DiagramElement>, options: { record?: boolean } = {}): void {
+  function update<K1 extends UnionKeyOf<DiagramElement>, K2 extends UnionNestedKeyOf<DiagramElement, K1>>(
+    id: MaybeArray<string>,
+    k1: K1,
+    k2: K2,
+    setter: StoreSetter<UnionNestedValue<DiagramElement, K1, K2>, [K2, K1]>,
+    options?: EditOptions,
+  ): void
+  function update<K1 extends UnionKeyOf<DiagramElement>>(
+    id: MaybeArray<string>,
+    k1: K1,
+    setter: StoreSetter<UnionValue<DiagramElement, K1>, [K1]>,
+    options?: EditOptions,
+  ): void
+  function update(id: MaybeArray<string>, setter: StoreSetter<DiagramElement>, options?: EditOptions): void
+  function update(id: MaybeArray<string>, ...args: unknown[]): void {
+    const ids = normalizeIds(id)
+    if (ids.length === 0 || args.length === 0) return
+
+    const options = takeEditOptions(args)
     const { record = true } = options
-    const ids = ensureArray(id)
+    if (args.length === 0) return
 
     if (!record) {
-      element.update(ids, patch)
+      element.update(ids, ...(args as [any]))
       return
     }
-    const cmd = new UpdateCommand(deps, ids, patch)
-    history.execute(cmd)
+
+    const command = createUpdateCommand(deps, ids, args)
+
+    history.execute(command)
   }
 
-  function clear(options: { record?: boolean } = {}): void {
+  function clear(options: EditOptions = {}): void {
     const { record = true } = options
     if (!record) {
       element.clear()
       selection.clear()
       return
     }
-    const cmd = new ClearCommand(ctx, deps)
-    history.execute(cmd)
+
+    history.execute(createClearCommand(ctx, deps))
   }
 
-  function move(ids: string[], dx: number, dy: number, options: { record?: boolean } = {}): void {
+  function move(ids: string[], dx: number, dy: number, options: EditOptions = {}): void {
     const { record = true } = options
-    const els = ids.map(id => element.getById(id)).filter(Boolean) as DiagramElement[]
-    if (els.length === 0) return
+    const elements = element.getElementsByIds(ids)
+    if (elements.length === 0) return
 
     if (!record) {
-      element.move(els, dx, dy)
+      element.move(elements, dx, dy)
       return
     }
-    const cmd = new MoveCommand(deps, els, dx, dy)
-    history.execute(cmd)
+
+    history.execute(createMoveCommand(deps, elements, dx, dy))
   }
 
   return {

@@ -1,4 +1,13 @@
-import { ensureArray, generateId, KeyOf, MaybeArray } from '@diagen/shared'
+import {
+  ensureArray,
+  generateId,
+  keys,
+  type MaybeArray,
+  type UnionKeyOf,
+  type UnionNestedKeyOf,
+  type UnionNestedValue,
+  type UnionValue,
+} from '@diagen/shared'
 import { batch, createMemo } from 'solid-js'
 import { produce, StoreSetter } from 'solid-js/store'
 import { BoxProps, DiagramElement, isLinker, isShape, LinkerElement, LinkerEndpoint, ShapeElement } from '../../model'
@@ -29,18 +38,15 @@ export interface ElementEvents {
 
 export const createElementManager = (ctx: DesignerContext) => {
   const { state, setState, emitter } = ctx
+
   const elementMap = createMemo(() => state.diagram.elements)
+  const getElementById = <T extends DiagramElement = DiagramElement>(id: string) => elementMap()[id] as T | undefined
+  const getElementsByIds = (ids: string[]) => ids.map(id => getElementById(id)).filter(Boolean) as DiagramElement[]
   const orderList = createMemo(() => state.diagram.orderList)
-  const elements = createMemo(() =>
-    orderList()
-      .map(id => elementMap()[id])
-      .filter(Boolean),
-  )
+  const elements = createMemo(() => getElementsByIds(orderList()))
   const elementCount = createMemo(() => elements().length)
   const shapes = createMemo(() => elements().filter(el => isShape(el)) as ShapeElement[])
   const linkers = createMemo(() => elements().filter(el => isLinker(el)) as LinkerElement[])
-
-  const getById = (id: string) => elementMap()[id]
 
   /**
    * Get all linkers connected to a specific shape
@@ -64,7 +70,7 @@ export const createElementManager = (ctx: DesignerContext) => {
 
   function remove(els: MaybeArray<string | DiagramElement>) {
     const ids = ensureArray(els).map(el => (typeof el === 'string' ? el : el.id))
-    const elements = ids.map(id => getById(id)).filter(Boolean)
+    const elements = getElementsByIds(ids)
     batch(() => {
       setState(
         'diagram',
@@ -81,24 +87,29 @@ export const createElementManager = (ctx: DesignerContext) => {
     emitter.emit('element:removed', { elements })
   }
 
-  function update<K1 extends KeyOf<DiagramElement>, K2 extends KeyOf<DiagramElement[K1]>>(
+  function update<K1 extends UnionKeyOf<DiagramElement>, K2 extends UnionNestedKeyOf<DiagramElement, K1>>(
     id: MaybeArray<string>,
     k1: K1,
     k2: K2,
-    setter: StoreSetter<DiagramElement[K1][K2], [K2, K1]>,
+    setter: StoreSetter<UnionNestedValue<DiagramElement, K1, K2>, [K2, K1]>,
   ): void
-  function update<K1 extends KeyOf<DiagramElement>>(
+  function update<K1 extends UnionKeyOf<DiagramElement>>(
     id: MaybeArray<string>,
     k1: K1,
-    setter: StoreSetter<DiagramElement[K1], [K1]>,
+    setter: StoreSetter<UnionValue<DiagramElement, K1>, [K1]>,
   ): void
   function update(id: MaybeArray<string>, setter: StoreSetter<DiagramElement>): void
   function update(id: MaybeArray<string>, ...args: unknown[]) {
     setState('diagram', 'elements', id, ...(args as [any]))
-    const elements = ensureArray(id)
-      .map(id => getById(id))
-      .filter(Boolean)
+    const elements = getElementsByIds(ensureArray(id))
     emitter.emit('element:updated', { elements })
+  }
+
+  function load(elements: Record<string, DiagramElement>, orderList: string[] = []) {
+    batch(() => {
+      setState('diagram', 'elements', elements)
+      setState('diagram', 'orderList', orderList ?? keys(elements))
+    })
   }
 
   function clear() {
@@ -113,7 +124,7 @@ export const createElementManager = (ctx: DesignerContext) => {
   function move(els: MaybeArray<string | DiagramElement>, dx: number, dy: number) {
     if (dx === 0 && dy === 0) return
     const ids = ensureArray(els).map(el => (typeof el === 'string' ? el : el.id))
-    const elements = ids.map(id => getById(id))
+    const elements = getElementsByIds(ids)
 
     update(
       ids,
@@ -358,7 +369,12 @@ export const createElementManager = (ctx: DesignerContext) => {
     shapes,
     linkers,
 
-    getById,
+    /**
+     * @deprecated Use getElementById instead.
+     */
+    getById: getElementById,
+    getElementById,
+    getElementsByIds,
     getRelatedLinkers,
 
     create,
@@ -366,6 +382,7 @@ export const createElementManager = (ctx: DesignerContext) => {
     remove,
     update,
     clear,
+    load,
     move,
     align,
     distribute,

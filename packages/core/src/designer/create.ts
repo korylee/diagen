@@ -157,7 +157,7 @@ export function createDesigner(options: DesignerOptions = {}) {
     group,
 
     // 快捷方式
-    getElementById: element.getById,
+    getElementById: element.getElementById,
 
     addElements: edit.add,
     removeElements: edit.remove,

@@ -104,7 +104,7 @@ describe('group manager', () => {
       })
 
       const fromManager = designer.group.resolveSelectionForClipboard([shapeA.id])
-      const fromShortcut = designer.resolveSelectionForClipboard([shapeA.id])
+      const fromShortcut = designer.group.resolveSelectionForClipboard([shapeA.id])
 
       expect(fromManager).toEqual([shapeB.id, shapeA.id, internalLinker.id])
       expect(fromShortcut).toEqual(fromManager)

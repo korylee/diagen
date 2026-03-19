@@ -1,7 +1,7 @@
 import { batch, createSignal, onCleanup } from 'solid-js'
 import { isRotatable, isShape } from '@diagen/core'
-import { getRotatedBoxBounds } from '@diagen/shared'
 import type { Point } from '@diagen/shared'
+import { getRotatedBoxBounds } from '@diagen/shared'
 import { useDesigner } from '../components'
 import type { EventToCanvas } from './createCoordinateService'
 import type { CreateDragSessionOptions } from './createDragSession'
@@ -21,7 +21,7 @@ function normalizeAngle(angle: number): number {
 }
 
 function normalizeDeltaAngle(delta: number): number {
-  let val = ((delta + 180) % 360 + 360) % 360 - 180
+  let val = ((((delta + 180) % 360) + 360) % 360) - 180
   if (val === -180) val = 180
   return val
 }
@@ -29,8 +29,8 @@ function normalizeDeltaAngle(delta: number): number {
 export function createRotate(options: CreateRotateOptions = {}) {
   const { threshold = 2, snapStep = 15, eventToCanvas } = options
   const designer = useDesigner()
-  const { element, edit, view } = designer
-  const transaction = designer.history.transaction.createScope('旋转图形')
+  const { element, edit, view, history } = designer
+  const transaction = history.transaction.createScope('旋转图形')
   const session = createTransactionalSession({
     threshold,
     transaction,
@@ -49,7 +49,7 @@ export function createRotate(options: CreateRotateOptions = {}) {
   }
 
   function start(id: string, e: MouseEvent): boolean {
-    const shape = element.getById(id)
+    const shape = element.getElementById(id)
     if (!shape || !isShape(shape) || !isRotatable(shape)) return false
     if (!eventToCanvas) return false
 
@@ -77,7 +77,7 @@ export function createRotate(options: CreateRotateOptions = {}) {
     const centerPoint = center()
     if (!id || !centerPoint) return
 
-    const shape = element.getById(id)
+    const shape = element.getElementById(id)
     if (!shape || !isShape(shape)) {
       cancel()
       return
@@ -95,11 +95,9 @@ export function createRotate(options: CreateRotateOptions = {}) {
 
     if (shape.props.angle === nextAngle) return
 
-    edit.update(id, {
-      props: {
-        ...shape.props,
-        angle: nextAngle,
-      },
+    edit.update(id, 'props', {
+      ...shape.props,
+      angle: nextAngle,
     })
 
     view.scheduleAutoGrow(

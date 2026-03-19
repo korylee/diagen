@@ -46,7 +46,7 @@ export function createResize(
   const isResizing = () => targetId() !== null
 
   const start = (id: string, dir: ResizeDirection, e: MouseEvent) => {
-    const el = element.getById(id)
+    const el = element.getElementById(id)
     if (!el || !isShape(el)) return
 
     const bounds = view.getElementBounds(el)
@@ -140,7 +140,7 @@ export function createResize(
     h = snappedBounds.h
     setGuides(snapped.guides)
 
-    const el = element.getById(id)
+    const el = element.getElementById(id)
     if (el && isShape(el)) {
       edit.update(id, { props: { ...el.props, x, y, w, h } })
       view.scheduleAutoGrow(
@@ -185,7 +185,7 @@ export function createResize(
     if (selected.length !== 1) return null
 
     const id = selected[0]
-    const el = element.getById(id)
+    const el = element.getElementById(id)
     if (!el || !isShape(el)) return null
 
     const { x, y, w, h } = el.props

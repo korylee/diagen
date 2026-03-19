@@ -34,7 +34,7 @@ export function createViewManager(
   const [bounds, setBounds] = createSignal<Bounds>(createInitialBounds())
   const selectionBounds = createMemo((): Bounds | null => {
     const ids = selection.selectedIds()
-    const els = ids.map(id => element.getById(id))
+    const els = element.getElementsByIds(ids)
 
     return getElementsBounds(els)
   })
@@ -291,7 +291,7 @@ export function createViewManager(
   }
 
   const getShapeById = (id: string) => {
-    const el = element.getById(id)
+    const el = element.getElementById(id)
     return el && isShape(el) ? el : null
   }
 

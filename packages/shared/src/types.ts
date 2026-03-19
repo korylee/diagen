@@ -32,6 +32,16 @@ export type KeyOf<T> = number extends keyof T
         : keyof T
   : keyof T
 
+export type UnionKeyOf<U> = U extends unknown ? KeyOf<U> : never
+
+export type UnionValue<U, K extends UnionKeyOf<U>> = U extends unknown ? (K extends KeyOf<U> ? U[K] : never) : never
+
+export type UnionNestedKeyOf<U, K extends UnionKeyOf<U>> = KeyOf<NonNullable<UnionValue<U, K>>>
+
+export type UnionNestedValue<U, K extends UnionKeyOf<U>, NK extends UnionNestedKeyOf<U, K>> = NonNullable<
+  UnionValue<U, K>
+>[NK]
+
 export type ValueOf<T> = T[KeyOf<T>]
 
 export type Mutable<T> = {

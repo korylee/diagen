@@ -12,6 +12,7 @@ export interface Command {
   execute: () => void
   undo: () => void
   redo: () => void
+  isNoOp?: boolean
   canMergeWith?(next: Command): boolean
   merge?(next: Command): Command | null
 }
@@ -151,6 +152,7 @@ export function createHistoryManager(ctx: DesignerContext) {
   }
 
   function execute(command: Command, meta?: CommandMeta) {
+    if (command.isNoOp) return
     const enrichedCommand = Object.assign(command, meta)
 
     if (state.transaction) {
