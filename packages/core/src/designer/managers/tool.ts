@@ -64,6 +64,7 @@ export function createToolManager(ctx: DesignerContext) {
 
   return {
     tool,
+    
     isIdle,
     setIdle,
     clear: setIdle,

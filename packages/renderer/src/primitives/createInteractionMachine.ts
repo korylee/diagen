@@ -100,6 +100,34 @@ export function createInteractionMachine(options: CreateInteractionMachineOption
     return true
   }
 
+  const startCreateLinkerFromPoint = (
+    e: MouseEvent,
+    options: {
+      linkerId: string
+      point: Point
+    },
+  ): boolean => {
+    if (!isIdle()) return false
+    const started = linkerDrag.startCreateFromPoint(e, options)
+    if (!started || !linkerDrag.isPending()) return false
+    setMode('draggingLinker')
+    return true
+  }
+
+  const startQuickCreateLinker = (
+    e: MouseEvent,
+    options: {
+      sourceShapeId: string
+      linkerId: string
+    },
+  ): boolean => {
+    if (!isIdle()) return false
+    const started = linkerDrag.startCreateFromShape(e, options)
+    if (!started || !linkerDrag.isPending()) return false
+    setMode('draggingLinker')
+    return true
+  }
+
   const move = (e: MouseEvent): void => {
     switch (mode()) {
       case 'panning':
@@ -188,6 +216,8 @@ export function createInteractionMachine(options: CreateInteractionMachineOption
     startResize,
     startRotate,
     startLinkerDrag,
+    startCreateLinkerFromPoint,
+    startQuickCreateLinker,
     move,
     end,
     cancel,

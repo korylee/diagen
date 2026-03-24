@@ -1,0 +1,27 @@
+{
+  "name": "@diagen/designer-ui",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "solid": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsdown"
+  },
+  "dependencies": {
+    "@diagen/core": "workspace:^",
+    "@diagen/icons": "workspace:^",
+    "@diagen/ui": "workspace:^"
+  },
+  "peerDependencies": {
+    "solid-js": "^1.9.11"
+  }
+}

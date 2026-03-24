@@ -1,5 +1,5 @@
 export * from './array'
-export * from './bem'
+export * from './web'
 export * from './emitter'
 export * from './general'
 export * from './geometry'

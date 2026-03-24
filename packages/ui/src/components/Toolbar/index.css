@@ -1,0 +1,128 @@
+.dg-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 6px 10px;
+  background: #fffdfa;
+  border-bottom: 1px solid #ddd5c8;
+}
+
+.dg-toolbar__button,
+.dg-toolbar__link,
+.dg-toolbar__spinner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #2f3742;
+  white-space: nowrap;
+}
+
+.dg-toolbar__button,
+.dg-toolbar__link {
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.dg-toolbar__button:hover,
+.dg-toolbar__link:hover {
+  background: #f7f1e6;
+  border-color: #ddd5c8;
+}
+
+.dg-toolbar__button:disabled,
+.dg-toolbar__button[aria-disabled='true'],
+.dg-toolbar__link[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.dg-toolbar__button--active,
+.dg-toolbar__button--selected,
+.dg-toolbar__link--active,
+.dg-toolbar__link--selected {
+  background: #edf7f4;
+  border-color: #9fc7be;
+  color: #17453c;
+}
+
+.dg-toolbar__icon,
+.dg-toolbar__caret,
+.dg-toolbar__text,
+.dg-toolbar__color {
+  flex-shrink: 0;
+}
+
+.dg-toolbar__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 14px;
+  min-height: 14px;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.dg-toolbar__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.dg-toolbar__color {
+  width: 12px;
+  height: 12px;
+  border: 1px solid rgba(47, 55, 66, 0.18);
+  border-radius: 999px;
+}
+
+.dg-toolbar__caret {
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid #7d7467;
+}
+
+.dg-toolbar__spinner {
+  justify-content: flex-start;
+  padding: 0 8px;
+  border-color: #ddd5c8;
+  background: #fff;
+}
+
+.dg-toolbar__divider {
+  flex-shrink: 0;
+  width: 1px;
+  height: 22px;
+  margin: 0 6px;
+  background: #ddd5c8;
+}
+
+.dg-toolbar__divider--small {
+  height: 16px;
+  margin: 0 4px;
+  opacity: 0.8;
+}
+
+.dg-toolbar__spacer {
+  flex: 1;
+  min-width: 0;
+}
+
+.dg-toolbar__right {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  margin-left: auto;
+}

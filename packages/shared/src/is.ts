@@ -11,3 +11,9 @@ export const isFunction = (val: unknown): val is Function => typeof val === 'fun
 export const isArray: <T = any>(val: unknown) => val is T[] = Array.isArray
 
 export const isString = (val: unknown): val is string => typeof val === 'string'
+
+export const isNumber = (val: unknown): val is number => typeof val === 'number'
+
+export const isNumString = (str: unknown): boolean => isString(str) && /^\d+(\.\d+)?$/.test(str)
+
+export const isNumeric = (val: unknown): val is string | number => isNumber(val) || isNumString(val)

@@ -1,11 +1,12 @@
-import { For, Show, createMemo, createSignal, splitProps } from 'solid-js'
 import type { JSX } from 'solid-js'
+import { createMemo, createSignal, For, Show, splitProps } from 'solid-js'
+
+import { createDgBem } from '@diagen/shared'
+import type { SidebarItem, SidebarProps, SidebarSearchProps, SidebarSection, SidebarSectionLayout } from './types'
 
 import './index.css'
-import type { SidebarItem, SidebarProps, SidebarSearchProps, SidebarSection, SidebarSectionLayout } from './types'
-import { createBem } from '@diagen/shared'
 
-const bem = createBem('dg', 'sidebar')
+const bem = createDgBem('sidebar')
 
 function getSectionKey(section: SidebarSection, index: number): string {
   return section.id ?? `section-${index}`
@@ -17,10 +18,6 @@ function resolveSectionLayout(section: SidebarSection): SidebarSectionLayout {
 
 function hasSectionHeader(section: SidebarSection): boolean {
   return Boolean(section.title || section.description || section.meta || section.headerAction)
-}
-
-function resolveSectionEmptyState(section: SidebarSection, fallback: JSX.Element | undefined): JSX.Element | string {
-  return section.emptyState ?? fallback ?? 'No items'
 }
 
 function SidebarSearchBox(props: { search: SidebarSearchProps }) {
@@ -87,22 +84,22 @@ function SidebarItemView(props: {
       </Show>
 
       <span class={bem('item-copy')}>
-        <span class="dg-sidebar__item-title-row">
-          <span class="dg-sidebar__item-label">{props.item.label}</span>
+        <span class={bem('item-title-row')}>
+          <span class={bem('item-label')}>{props.item.label}</span>
           <Show when={!isTile() && props.item.meta}>
-            <span class="dg-sidebar__item-meta">{props.item.meta}</span>
+            <span class={bem('item-meta')}>{props.item.meta}</span>
           </Show>
         </span>
         <Show when={props.item.description}>
-          <span class="dg-sidebar__item-description">{props.item.description}</span>
+          <span class={bem('item-description')}>{props.item.description}</span>
         </Show>
         <Show when={isTile() && props.item.meta}>
-          <span class="dg-sidebar__item-meta">{props.item.meta}</span>
+          <span class={bem('item-meta')}>{props.item.meta}</span>
         </Show>
       </span>
 
       <Show when={props.item.badge}>
-        <span class="dg-sidebar__item-badge">{props.item.badge}</span>
+        <span class={bem('item-badge')}>{props.item.badge}</span>
       </Show>
     </button>
   )
@@ -122,39 +119,41 @@ function SidebarSectionView(props: {
   const collapsed = createMemo<boolean>(() => props.isCollapsed(props.section, props.index))
 
   return (
-    <section class="dg-sidebar__section" data-layout={layout()}>
+    <section class={bem('section')} data-layout={layout()}>
       <Show when={hasSectionHeader(props.section)}>
         <div
-          class="dg-sidebar__section-head"
+          class={bem('section-head')}
           data-collapsible={props.section.collapsible ? 'true' : undefined}
           onClick={() => props.onToggleSection(props.section, props.index)}
         >
-          <div class="dg-sidebar__section-heading">
-            <span class="dg-sidebar__section-caret">{props.section.collapsible ? (collapsed() ? '+' : '-') : ''}</span>
-            <div class="dg-sidebar__section-copy">
-              <div class="dg-sidebar__section-title-row">
+          <div class={bem('section-heading')}>
+            <span class={bem('section-caret')}>{props.section.collapsible ? (collapsed() ? '+' : '-') : ''}</span>
+            <div class={bem('section-copy')}>
+              <div class={bem('section-title-row')}>
                 <Show when={props.section.title}>
-                  <span class="dg-sidebar__section-title">{props.section.title}</span>
+                  <span class={bem('section-title')}>{props.section.title}</span>
                 </Show>
                 <Show when={props.section.meta}>
-                  <span class="dg-sidebar__section-meta">{props.section.meta}</span>
+                  <span class={bem('section-meta')}>{props.section.meta}</span>
                 </Show>
               </div>
               <Show when={props.section.description}>
-                <div class="dg-sidebar__section-description">{props.section.description}</div>
+                <div class={bem('section-description')}>{props.section.description}</div>
               </Show>
             </div>
           </div>
 
           <Show when={props.section.headerAction}>
-            <div
-              class="dg-sidebar__section-action"
-              onClick={event => {
-                event.stopPropagation()
-              }}
-            >
-              {props.section.headerAction}
-            </div>
+            {headerAction => (
+              <div
+                class={bem('section-action')}
+                onClick={event => {
+                  event.stopPropagation()
+                }}
+              >
+                {headerAction()}
+              </div>
+            )}
           </Show>
         </div>
       </Show>
@@ -162,7 +161,7 @@ function SidebarSectionView(props: {
       <Show when={!collapsed()}>
         <Show
           when={props.section.items.length > 0}
-          fallback={<div class="dg-sidebar__empty">{resolveSectionEmptyState(props.section, props.emptyState)}</div>}
+          fallback={<div class={bem('section-empty')}>{props.section.emptyState ?? props.emptyState ?? 'empty'}</div>}
         >
           <div class={bem('section-content', [layout() === 'grid' ? 'grid' : 'list'])} role="list">
             <For each={props.section.items}>
@@ -242,7 +241,7 @@ export function Sidebar(props: SidebarProps): JSX.Element {
         aria-label={(rest['aria-label'] as string | undefined) ?? 'Sidebar'}
       >
         <Show when={local.header}>
-          <div class="dg-sidebar__header">{local.header}</div>
+          <div class={bem('header')}>{local.header}</div>
         </Show>
 
         <Show when={local.search}>
@@ -279,4 +278,5 @@ export function Sidebar(props: SidebarProps): JSX.Element {
   )
 }
 
+export * from './stencil'
 export type { SidebarItem, SidebarProps, SidebarSearchProps, SidebarSection, SidebarSectionLayout } from './types'

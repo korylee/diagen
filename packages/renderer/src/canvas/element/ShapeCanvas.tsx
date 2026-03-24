@@ -8,7 +8,7 @@ import { renderShape } from '../../utils'
 
 export interface ShapeCanvasProps {
   shape: ShapeElement
-  onMouseDown?: (event: MouseEvent) => void
+  onMouseDown?: (event: MouseEvent) => boolean | void
 }
 
 export function ShapeCanvas(props: ShapeCanvasProps) {
@@ -90,8 +90,9 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
   createEffect(() => updateCanvas())
 
   const handleMouseDown = (e: MouseEvent) => {
+    const handled = props.onMouseDown?.(e)
+    if (handled === false) return
     e.stopPropagation()
-    props.onMouseDown?.(e)
   }
 
   return (

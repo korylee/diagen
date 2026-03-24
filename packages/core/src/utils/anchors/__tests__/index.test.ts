@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createLinker, createShape } from '../../../model'
-import { getShapeAnchorAngle, getShapeAnchorInfo } from '..'
+import { getShapeAnchorAngle, getShapeAnchorInfo, resolvePreferredCreateAnchor } from '..'
 import { calculateBasicLinkerRoute, calculateLinkerRoute } from '../../router'
 
 describe('anchors', () => {
@@ -50,6 +50,88 @@ describe('anchors', () => {
       expect(angle).not.toBeNull()
       // 右侧边界外法线为 0，旋转 90 度后应为 PI/2
       expect(angle ?? 0).toBeCloseTo(Math.PI / 2)
+    })
+  })
+
+  describe('resolvePreferredCreateAnchor', () => {
+    it('应优先选择右侧固定锚点', () => {
+      const shape = createShape({
+        id: 'shape_preferred_right',
+        name: 'shape_preferred_right',
+        props: { x: 10, y: 20, w: 100, h: 60, angle: 0 },
+        anchors: [
+          { id: 'top', x: 'w/2', y: '0', direction: 'top' },
+          { id: 'right', x: 'w', y: 'h/2', direction: 'right' },
+          { id: 'bottom', x: 'w/2', y: 'h', direction: 'bottom' },
+          { id: 'left', x: '0', y: 'h/2', direction: 'left' },
+        ],
+      })
+
+      const anchor = resolvePreferredCreateAnchor(shape)
+      expect(anchor).not.toBeNull()
+      expect(anchor?.type).toBe('fixed')
+      if (anchor?.type !== 'fixed') throw new Error('应返回 fixed 锚点')
+      expect(anchor.id).toBe('right')
+      expect(anchor.direction).toBe('right')
+      expect(anchor.point.x).toBeCloseTo(110)
+      expect(anchor.point.y).toBeCloseTo(50)
+    })
+
+    it('应在缺少右侧锚点时回退到顶部锚点', () => {
+      const shape = createShape({
+        id: 'shape_preferred_top',
+        name: 'shape_preferred_top',
+        props: { x: 0, y: 0, w: 120, h: 80, angle: 0 },
+        anchors: [
+          { id: 'top', x: 'w/2', y: '0', direction: 'top' },
+          { id: 'bottom', x: 'w/2', y: 'h', direction: 'bottom' },
+        ],
+      })
+
+      const anchor = resolvePreferredCreateAnchor(shape)
+      expect(anchor).not.toBeNull()
+      expect(anchor?.type).toBe('fixed')
+      if (anchor?.type !== 'fixed') throw new Error('应返回 fixed 锚点')
+      expect(anchor.id).toBe('top')
+      expect(anchor.direction).toBe('top')
+    })
+
+    it('应在无 direction 时稳定选择最接近右上的固定锚点', () => {
+      const shape = createShape({
+        id: 'shape_quadrant_fixed',
+        name: 'shape_quadrant_fixed',
+        props: { x: 0, y: 0, w: 100, h: 60, angle: 0 },
+        anchors: [
+          { id: 'left_top', x: '10', y: '10' },
+          { id: 'near_right_top', x: 'w', y: '10' },
+          { id: 'bottom_center', x: 'w/2', y: 'h' },
+        ],
+      })
+
+      const anchor = resolvePreferredCreateAnchor(shape)
+      expect(anchor).not.toBeNull()
+      expect(anchor?.type).toBe('fixed')
+      if (anchor?.type !== 'fixed') throw new Error('应返回 fixed 锚点')
+      expect(anchor.id).toBe('near_right_top')
+      expect(anchor.direction).toBe('center')
+      expect(anchor.point.x).toBeCloseTo(100)
+      expect(anchor.point.y).toBeCloseTo(10)
+    })
+
+    it('应在无固定锚点时回退到 perimeter 绑定', () => {
+      const shape = createShape({
+        id: 'shape_perimeter_fallback',
+        name: 'shape_perimeter_fallback',
+        props: { x: 0, y: 0, w: 100, h: 60, angle: 0 },
+        anchors: [],
+      })
+
+      const anchor = resolvePreferredCreateAnchor(shape)
+      expect(anchor).not.toBeNull()
+      expect(anchor?.type).toBe('perimeter')
+      if (anchor?.type !== 'perimeter') throw new Error('应返回 perimeter 绑定')
+      expect(anchor.point.x).toBeCloseTo(100)
+      expect(anchor.point.y).toBeCloseTo(0)
     })
   })
 

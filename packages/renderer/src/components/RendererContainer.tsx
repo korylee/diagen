@@ -1,4 +1,5 @@
-import { createEffect, createMemo, createSignal, JSX, onMount } from 'solid-js'
+import { batch, createEffect, createMemo, createSignal, JSX, onMount } from 'solid-js'
+import { Schema } from '@diagen/core'
 import { createEventListener, createKeyboard, createScroll } from '@diagen/primitives'
 import { createPointerInteraction } from '../primitives'
 import { DesignerGrids } from './DesignerGrids'
@@ -133,6 +134,22 @@ export function RendererContainer(props: {
     }
     if (!pointer.machine.isIdle()) return
 
+    if (e.button === 0) {
+      if (state.tool.type === 'create-shape') {
+        if (startShapeCreate(e)) {
+          e.preventDefault()
+          return
+        }
+      }
+
+      if (state.tool.type === 'create-linker') {
+        if (startLinkerCreate(e)) {
+          e.preventDefault()
+          return
+        }
+      }
+    }
+
     // 左键 - 框选
     if (e.button === 0) {
       selection.clear()
@@ -228,6 +245,52 @@ export function RendererContainer(props: {
     const val = Math.max(0, state.config.containerInset - 10)
     scroll.scrollTo(val, val)
   })
+
+  const startShapeCreate = (e: MouseEvent): boolean => {
+    const currentTool = state.tool
+    if (currentTool.type !== 'create-shape') return false
+
+    const definition = Schema.getShape(currentTool.shapeId)
+    if (!definition) return false
+
+    const point = coordinate.eventToCanvas(e)
+    const width = definition.props.w
+    const height = definition.props.h
+    const shape = Schema.createShape(currentTool.shapeId, {
+      x: Math.round(point.x - width / 2),
+      y: Math.round(point.y - height / 2),
+      w: width,
+      h: height,
+      angle: 0,
+    })
+    if (!shape) return false
+
+    batch(() => {
+      edit.add([shape])
+      selection.replace([shape.id])
+      view.scheduleAutoGrow(view.getShapeBounds(shape))
+      view.flushAutoGrow()
+      if (!currentTool.continuous) {
+        tool.setIdle()
+      }
+    })
+
+    return true
+  }
+
+  const startLinkerCreate = (e: MouseEvent): boolean => {
+    const currentTool = state.tool
+    if (currentTool.type !== 'create-linker') return false
+
+    const started = pointer.machine.startCreateLinkerFromPoint(e, {
+      linkerId: currentTool.linkerId,
+      point: coordinate.eventToCanvas(e),
+    })
+    if (started && !currentTool.continuous) {
+      tool.setIdle()
+    }
+    return started
+  }
 
   return (
     <InteractionProvider interaction={interaction}>

@@ -4,9 +4,11 @@ import {
   getShapeAnchorInfoById,
   getShapePerimeterInfo,
   isLinker,
+  resolvePreferredCreateAnchor,
   resolveShapePerimeterInfo,
   type LinkerElement,
   type LinkerEndpointBinding,
+  type LinkerEndpoint,
   type LinkerRoute,
 } from '@diagen/core'
 import type { Point } from '@diagen/shared'
@@ -30,6 +32,11 @@ interface DragState {
   startRawFrom: LinkerElement['from']
   startRawTo: LinkerElement['to']
   startPoints: Point[]
+}
+
+interface CreateContext {
+  createdLinkerId: string
+  linkerId: string
 }
 
 export interface AnchorHit {
@@ -93,6 +100,7 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
 
   const [dragState, setDragState] = createSignal<DragState | null>(null)
   const [candidateAnchor, setCandidateAnchor] = createSignal<AnchorHit | null>(null)
+  const [createContext, setCreateContext] = createSignal<CreateContext | null>(null)
 
   function isShapeLinkable(shapeId: string, state?: DragState): boolean {
     const shape = designer.element.getById(shapeId)
@@ -212,16 +220,153 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
       startPoints,
     }
 
-    if (!transaction.begin()) return false
-    if (hit.type === 'segment') {
-      edit.update(linkerId, { points: startPoints })
+    return activateDrag(e, state, {
+      prepare: () => {
+        if (hit.type === 'segment') {
+          edit.update(linkerId, { points: startPoints })
+        }
+      },
+    })
+  }
+
+  function startCreateFromPoint(
+    e: MouseEvent,
+    options: {
+      linkerId: string
+      point: Point
+    },
+  ): boolean {
+    const point = options.point
+    const linker = element.create(
+      'linker',
+      options.linkerId,
+      {
+        id: null,
+        x: point.x,
+        y: point.y,
+        binding: { type: 'free' },
+      },
+      {
+        id: null,
+        x: point.x,
+        y: point.y,
+        binding: { type: 'free' },
+      },
+    )
+    if (!linker || !isLinker(linker)) return false
+
+    const state: DragState = {
+      linkerId: linker.id,
+      mode: 'to',
+      oppositeShapeId: null,
+      startFrom: { x: point.x, y: point.y },
+      startTo: { x: point.x, y: point.y },
+      startRawFrom: { ...linker.from },
+      startRawTo: { ...linker.to },
+      startPoints: [],
     }
 
-    setCandidateAnchor(null)
-    setDragState(state)
-    pointerDelta.setStartFromEvent(e)
-    session.begin({ x: e.clientX, y: e.clientY })
-    return true
+    return activateDrag(e, state, {
+      createContext: {
+        createdLinkerId: linker.id,
+        linkerId: options.linkerId,
+      },
+      prepare: () => {
+        edit.add([linker])
+      },
+    })
+  }
+
+  function startCreateFromShape(
+    e: MouseEvent,
+    options: {
+      sourceShapeId: string
+      linkerId: string
+    },
+  ): boolean {
+    const sourceShape = designer.element.getById(options.sourceShapeId)
+    if (!sourceShape || sourceShape.type !== 'shape') return false
+
+    const preferredAnchor = resolvePreferredCreateAnchor(sourceShape)
+    if (!preferredAnchor) return false
+
+    const fromBinding: LinkerEndpointBinding =
+      preferredAnchor.type === 'fixed'
+        ? { type: 'fixed', anchorId: preferredAnchor.id }
+        : {
+            type: 'perimeter',
+            pathIndex: preferredAnchor.pathIndex,
+            segmentIndex: preferredAnchor.segmentIndex,
+            t: preferredAnchor.t,
+          }
+
+    const fromEndpoint: LinkerEndpoint = {
+      id: sourceShape.id,
+      x: preferredAnchor.point.x,
+      y: preferredAnchor.point.y,
+      angle: preferredAnchor.angle,
+      binding: fromBinding,
+    }
+
+    const toEndpoint: LinkerEndpoint = {
+      id: null,
+      x: preferredAnchor.point.x,
+      y: preferredAnchor.point.y,
+      angle: preferredAnchor.angle,
+      binding: { type: 'free' },
+    }
+
+    const linker = element.create('linker', options.linkerId, fromEndpoint, toEndpoint)
+    if (!linker || !isLinker(linker)) return false
+
+    const state: DragState = {
+      linkerId: linker.id,
+      mode: 'to',
+      oppositeShapeId: sourceShape.id,
+      startFrom: { x: fromEndpoint.x, y: fromEndpoint.y },
+      startTo: { x: toEndpoint.x, y: toEndpoint.y },
+      startRawFrom: { ...linker.from },
+      startRawTo: { ...linker.to },
+      startPoints: [],
+    }
+
+    return activateDrag(e, state, {
+      createContext: {
+        createdLinkerId: linker.id,
+        linkerId: options.linkerId,
+      },
+      prepare: () => {
+        edit.add([linker])
+      },
+    })
+  }
+
+  function activateDrag(
+    e: MouseEvent,
+    state: DragState,
+    options: {
+      createContext?: CreateContext | null
+      prepare?: () => void
+    } = {},
+  ): boolean {
+    if (!transaction.begin()) return false
+
+    try {
+      options.prepare?.()
+      setCandidateAnchor(null)
+      setCreateContext(options.createContext ?? null)
+      setDragState(state)
+      pointerDelta.setStartFromEvent(e)
+      session.begin({ x: e.clientX, y: e.clientY })
+      return true
+    } catch (error) {
+      transaction.abort()
+      setCandidateAnchor(null)
+      setCreateContext(null)
+      setDragState(null)
+      pointerDelta.clear()
+      throw error
+    }
   }
 
   function move(e: MouseEvent): void {
@@ -344,6 +489,7 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     if (!session.isPending()) return
 
     const state = dragState()
+    const createState = createContext()
     const shouldCommit = session.finish()
 
     if (shouldCommit && state && (state.mode === 'from' || state.mode === 'to')) {
@@ -358,7 +504,12 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
       transaction.abort()
     }
 
+    if (shouldCommit && createState) {
+      designer.selection.replace([createState.createdLinkerId])
+    }
+
     setCandidateAnchor(null)
+    setCreateContext(null)
     setDragState(null)
     pointerDelta.clear()
   }
@@ -368,6 +519,7 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     transaction.abort()
     session.cancel()
     setCandidateAnchor(null)
+    setCreateContext(null)
     setDragState(null)
     pointerDelta.clear()
   }
@@ -537,6 +689,8 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     hitTestWithRoute,
     hitTest,
     start,
+    startCreateFromPoint,
+    startCreateFromShape,
     move,
     end,
     cancel,

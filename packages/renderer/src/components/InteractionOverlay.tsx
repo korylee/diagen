@@ -2,6 +2,7 @@ import { createMemo, For, Show } from 'solid-js'
 import { getShapeAnchors, isLinker, isShape, type GuideLine } from '@diagen/core'
 import type { Point } from '@diagen/shared'
 import { ShapeHighlightOverlay, type ShapeHighlightItem } from './ShapeHighlightOverlay'
+import { ShapeLinkerQuickCreateOverlay } from './ShapeLinkerQuickCreateOverlay'
 import { useDesigner } from './DesignerProvider'
 import { useInteraction } from './InteractionProvider'
 
@@ -166,10 +167,11 @@ function LinkerConnectableShapeHighlightOverlay() {
 }
 
 function LinkerSelectionOverlay() {
-  const { selection, element, view } = useDesigner()
+  const { selection, element, view, tool } = useDesigner()
   const { pointer, coordinate } = useInteraction()
 
   const selectedLinker = createMemo(() => {
+    if (!tool.isIdle()) return null
     const selectedIds = selection.selectedIds()
     if (selectedIds.length !== 1) return null
     const selected = element.getById(selectedIds[0])
@@ -353,10 +355,11 @@ function LinkerSelectionOverlay() {
 }
 
 function ShapeSelectionOverlay(props: ShapeSelectionLayerProps) {
-  const { selection, view, element } = useDesigner()
+  const { selection, view, element, tool } = useDesigner()
   const { pointer, coordinate } = useInteraction()
 
   const bounds = createMemo(() => {
+    if (!tool.isIdle()) return null
     const selectedIds = selection.selectedIds()
     if (selectedIds.length === 0) return null
 
@@ -474,6 +477,7 @@ export function SelectionOverlay(props: SelectionLayerProps) {
       <GuideOverlay />
       <LinkerConnectableShapeHighlightOverlay />
       <ShapeSelectionOverlay showRotateHandle={props.showRotateHandle} />
+      <ShapeLinkerQuickCreateOverlay />
       <LinkerSelectionOverlay />
     </>
   )
@@ -485,7 +489,7 @@ export function SelectionOverlay(props: SelectionLayerProps) {
 
 export function AnchorPreview(props: { elementId: string; highlightAnchor?: number | string }) {
   const { element } = useDesigner()
-  const { pointer, coordinate } = useInteraction()
+  const { coordinate } = useInteraction()
   const shape = createMemo(() => {
     const el = element.getById(props.elementId)
     return el && isShape(el) ? el : null

@@ -1,0 +1,26 @@
+{
+  "name": "@diagen/icons",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "solid": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "generate": "node ./scripts/build-icons.mjs",
+    "build": "node ./scripts/build-icons.mjs && tsdown"
+  },
+  "peerDependencies": {
+    "solid-js": "^1.9.11"
+  },
+  "devDependencies": {
+    "svgo": "^4.0.1"
+  }
+}

@@ -12,32 +12,38 @@
 5. `AI_KB/INTEGRATION_POINTS.md`
 6. `AI_KB/PROCESS_ON_COMPARISON.md`
 7. `AI_KB/DRAWIO_MXGRAPH_COMPARISON.md`
-8. `AI_KB/FOUNDATION_GAP_2026-03-19.md`
-9. `AI_KB/ROADMAP_2W_2026-03-13.md`
-10. `AI_KB/EXECUTION_READINESS_2026-03-16.md`
-11. `AI_KB/DEV_GUIDE.md`
+8. `AI_KB/SHAPE_LINKER_QUICK_CREATE_DESIGN.md`
+9. `AI_KB/ROADMAP.md`
+10. `AI_KB/DEV_GUIDE.md`
 
-当前版本要点（2026-03-19）：
+当前版本要点（2026-03-24）：
 - 事件坐标归一化入口已迁移到 `createCoordinateService`：`packages/renderer/src/primitives/createCoordinateService.ts`。
 - 渲染容器采用三层契约：`world-layer` / `scene-layer` / `overlay-layer`。
 - 工具态基础设施已落地：`core` 新增 `tool manager`，运行时支持 `idle / create-shape / create-linker`。
+- shape / linker 正式创建链路已接入 renderer 主链路：工具态下可直接点击画布或点按 shape 创建。
 - 连线路由主链路已接入 `view` 配置：默认 `broken/orthogonal` 走 obstacle + hybrid，`straight/curved` 保持 basic。
 - `lineJumps` 已接入主渲染链：`diagram.page.lineJumps` 可驱动 `LinkerCanvas` 跳线绘制。
 - 连线端点候选选择已调整为“固定锚点优先、perimeter 回退”，提升创建/重连时的连接稳定性。
-- `packages/ui` 已不再是占位包，现已提供结构化 `Sidebar` 面板框架：支持搜索、折叠分组、grid/list 双布局，并拆分为样式/类型/主视图三层。
+- `packages/ui` 已不再是占位包，现已提供结构化 `Sidebar` 面板框架与 `Toolbar` 复合组件。
+- 已新增 `packages/icons` 纯图标资产包，当前采用 `assets + svgo + src/generated` 生成流程。
+- 已新增 `packages/designer-ui` 作为 bridge 层，当前包含 `createToolbarBridge` / `DesignerToolbar`、`createShapeLibraryBridge` / `createSidebarActionBridge` / `DesignerSidebar`，负责将 `Designer` 状态/命令映射并渲染到 Toolbar / Sidebar。
+- Sidebar preview 已下沉到 `designer-ui/sidebar` 注册侧，可按 item 语义自由组装。
+- `packages/designer-ui/src/designerIconRegistry.tsx` 作为语义映射层，负责将 `undo/group/shape-rectangle` 等设计器语义键映射到 `@diagen/icons` 组件。
+- playground 已将顶部工具栏与左侧 Sidebar 的 `Designer` 接线下沉到 `designer-ui`，宿主层仅保留数据加载、布局和少量状态插槽。
 - `.processon` 深度对照已补充吸附线、剪贴板、历史与扩容机制的源码级分析。
-- 已新增未来 1-2 周详尽开发计划，后续阶段仅保留滚动简版路线。
-- 已新增执行前就绪审查文档（阻塞项、PR 切分、开工门槛）。
-- 已新增基础能力差距评估，聚焦“块/线创建工具链路”和与 `.processon` 的真实差距。
+- 近期执行信息已统一收敛到 `ROADMAP.md`，不再拆分多份计划/审查文档。
+- 已新增 shape 右上角快捷建线设计，明确 UI、锚点决策、事务边界与复用策略。
+- “从锚点拖出创建新线”专项计划已并入 `ROADMAP.md` 的 D4 专项章节。
+- 当前唯一剩余 P0 主阻塞项为 clipboard manager。
 
 更新规则：
 - 新增/调整包结构：更新 `REPO_MAP.md`、`PROJECT_OVERVIEW.md`
 - 修改坐标、交互、渲染链路：更新 `ARCHITECTURE.md`、`INTEGRATION_POINTS.md`
 - 修改模型字段或持久化格式：更新 `DOMAIN_MODEL.md`
 - 对标参考框架结论变化：更新 `PROCESS_ON_COMPARISON.md`、`DRAWIO_MXGRAPH_COMPARISON.md`
-- 基础能力差距结论变化：更新 `FOUNDATION_GAP_2026-03-19.md`
-- 计划与节奏变化：更新 `ROADMAP_2W_2026-03-13.md`
-- 执行前准备与阻塞项变化：更新 `EXECUTION_READINESS_2026-03-16.md`
+- shape 快捷建线方案变化：更新 `SHAPE_LINKER_QUICK_CREATE_DESIGN.md`
+- 锚点拖出建线实施计划变化：更新 `ROADMAP.md` 的 D4 专项章节
+- 计划与节奏变化：更新 `ROADMAP.md`
 - 命令或调试流程变化：更新 `DEV_GUIDE.md`
 
-最后更新日期：2026-03-19
+最后更新日期：2026-03-24

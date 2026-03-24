@@ -17,6 +17,16 @@ export interface ShapeAnchorInfo {
   angle: number
 }
 
+export interface PreferredCreateFixedAnchorInfo extends ShapeAnchorInfo {
+  type: 'fixed'
+}
+
+export type PreferredCreateAnchor = PreferredCreateFixedAnchorInfo | ShapePerimeterInfo
+
+export interface ResolvePreferredCreateAnchorOptions {
+  preferredDirections?: AnchorDirection[]
+}
+
 type PerimeterBinding = Extract<LinkerEndpointBinding, { type: 'perimeter' }>
 
 export interface ShapePerimeterInfo extends PerimeterBinding {
@@ -168,8 +178,8 @@ export function getShapeAnchorIndexById(shape: ShapeElement, anchorId: string): 
  */
 export function getShapeAnchors(shape: ShapeElement): Point[] {
   const { anchors, props } = shape
-  const relativeAnchors = resolveAnchors(anchors, props.w, props.h)
-  return relativeAnchors.map(anchor => {
+  const localAnchors = resolveAnchors(anchors, props.w, props.h)
+  return localAnchors.map(anchor => {
     const rotated = rotatePointInBox(anchor, props.w, props.h, props.angle)
     return {
       x: props.x + rotated.x,
@@ -455,14 +465,14 @@ function buildPerimeterInfo(
   t: number,
   distance: number,
 ): ShapePerimeterInfo | null {
-  const nextT = Math.max(0, Math.min(1, t))
+  const clampedT = Math.max(0, Math.min(1, t))
   const localPoint = {
-    x: segment.fromLocal.x + (segment.toLocal.x - segment.fromLocal.x) * nextT,
-    y: segment.fromLocal.y + (segment.toLocal.y - segment.fromLocal.y) * nextT,
+    x: segment.fromLocal.x + (segment.toLocal.x - segment.fromLocal.x) * clampedT,
+    y: segment.fromLocal.y + (segment.toLocal.y - segment.fromLocal.y) * clampedT,
   }
   const canvasPoint = {
-    x: segment.fromCanvas.x + (segment.toCanvas.x - segment.fromCanvas.x) * nextT,
-    y: segment.fromCanvas.y + (segment.toCanvas.y - segment.fromCanvas.y) * nextT,
+    x: segment.fromCanvas.x + (segment.toCanvas.x - segment.fromCanvas.x) * clampedT,
+    y: segment.fromCanvas.y + (segment.toCanvas.y - segment.fromCanvas.y) * clampedT,
   }
   const tangentLocal = {
     x: segment.toLocal.x - segment.fromLocal.x,
@@ -476,7 +486,7 @@ function buildPerimeterInfo(
     type: 'perimeter',
     pathIndex: segment.pathIndex,
     segmentIndex: segment.segmentIndex,
-    t: nextT,
+    t: clampedT,
     point: canvasPoint,
     angle,
     distance,
@@ -565,11 +575,11 @@ export function getShapeAnchorInfo(shape: ShapeElement, anchorIndex: number): Sh
   const angle = getShapeAnchorAngle(shape, anchorIndex)
   if (!point || angle === null) return null
 
-  const def = shape.anchors[anchorIndex]
+  const anchorDef = shape.anchors[anchorIndex]
   return {
     index: anchorIndex,
     id: getAnchorId(shape, anchorIndex),
-    direction: def.direction ?? 'center',
+    direction: anchorDef.direction ?? 'center',
     point,
     angle,
   }
@@ -579,6 +589,79 @@ export function getShapeAnchorInfoById(shape: ShapeElement, anchorId: string): S
   const index = getShapeAnchorIndexById(shape, anchorId)
   if (index < 0) return null
   return getShapeAnchorInfo(shape, index)
+}
+
+function getCreateAnchorReferencePoint(shape: ShapeElement): Point {
+  return {
+    x: shape.props.x + shape.props.w,
+    y: shape.props.y,
+  }
+}
+
+function toPreferredFixedAnchor(anchor: ShapeAnchorInfo): PreferredCreateFixedAnchorInfo {
+  return {
+    type: 'fixed',
+    ...anchor,
+  }
+}
+
+function getFixedAnchorInfos(shape: ShapeElement): ShapeAnchorInfo[] {
+  const anchors: ShapeAnchorInfo[] = []
+  for (let index = 0; index < shape.anchors.length; index++) {
+    const info = getShapeAnchorInfo(shape, index)
+    if (info) anchors.push(info)
+  }
+  return anchors
+}
+
+function findAnchorByDirections(anchors: ShapeAnchorInfo[], directions: AnchorDirection[]): ShapeAnchorInfo | null {
+  for (const direction of directions) {
+    const matched = anchors.find(anchor => anchor.direction === direction)
+    if (matched) return matched
+  }
+  return null
+}
+
+function comparePreferredFixedAnchors(a: ShapeAnchorInfo, b: ShapeAnchorInfo, reference: Point): number {
+  const aDistance = Math.hypot(a.point.x - reference.x, a.point.y - reference.y)
+  const bDistance = Math.hypot(b.point.x - reference.x, b.point.y - reference.y)
+  const distanceDiff = aDistance - bDistance
+  if (Math.abs(distanceDiff) > 1e-6) return distanceDiff
+
+  const xDiff = b.point.x - a.point.x
+  if (Math.abs(xDiff) > 1e-6) return xDiff
+
+  const yDiff = a.point.y - b.point.y
+  if (Math.abs(yDiff) > 1e-6) return yDiff
+
+  return a.index - b.index
+}
+
+/**
+ * 解析快捷建线的首选 source anchor
+ * 规则：
+ * - 优先使用指定 direction 的固定锚点
+ * - 否则选择最靠近图形右上参考点的固定锚点
+ * - 最后回退到 perimeter 绑定
+ */
+export function resolvePreferredCreateAnchor(
+  shape: ShapeElement,
+  options?: ResolvePreferredCreateAnchorOptions,
+): PreferredCreateAnchor | null {
+  const directions = options?.preferredDirections ?? ['right', 'top']
+  const reference = getCreateAnchorReferencePoint(shape)
+  const fixedAnchors = getFixedAnchorInfos(shape)
+  const matched = findAnchorByDirections(fixedAnchors, directions)
+
+  if (matched) return toPreferredFixedAnchor(matched)
+  if (fixedAnchors.length === 0) return getShapePerimeterInfo(shape, reference)
+
+  const bestAnchor = fixedAnchors.reduce((best, anchor) => {
+    if (!best) return anchor
+    return comparePreferredFixedAnchors(anchor, best, reference) < 0 ? anchor : best
+  }, null as ShapeAnchorInfo | null)
+
+  return bestAnchor ? toPreferredFixedAnchor(bestAnchor) : getShapePerimeterInfo(shape, reference)
 }
 
 /**

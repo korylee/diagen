@@ -7,7 +7,7 @@ export interface CanvasRendererProps {}
 
 export function CanvasRenderer(props: CanvasRendererProps) {
   const designer = useDesigner()
-  const { element, selection } = designer
+  const { element, selection, tool } = designer
   const { pointer, coordinate } = useInteraction()
 
   const applySelection = (id: string, event: MouseEvent) => {
@@ -19,6 +19,23 @@ export function CanvasRenderer(props: CanvasRendererProps) {
   }
 
   const onShapeMouseDown = (e: MouseEvent, id: string): boolean => {
+    const currentTool = tool.tool()
+    if (currentTool.type === 'create-shape') {
+      return false
+    }
+    if (currentTool.type === 'create-linker') {
+      e.stopPropagation()
+      e.preventDefault()
+      const started = pointer.machine.startQuickCreateLinker(e, {
+        sourceShapeId: id,
+        linkerId: currentTool.linkerId,
+      })
+      if (started && !currentTool.continuous) {
+        tool.setIdle()
+      }
+      return started
+    }
+
     e.stopPropagation()
     e.preventDefault()
 
@@ -37,6 +54,10 @@ export function CanvasRenderer(props: CanvasRendererProps) {
   }
 
   const onLinkerMouseDown = (e: MouseEvent, id: string): boolean => {
+    if (tool.tool().type === 'create-shape' || tool.tool().type === 'create-linker') {
+      return false
+    }
+
     const target = element.getById(id)
     if (!target || !isLinker(target)) return false
 
