@@ -13,6 +13,7 @@ import {
   createSelectionManager,
   createViewManager,
   createGroupManager,
+  createClipboardManager,
   createToolManager,
 } from './managers'
 import type { DesignerContext } from './managers/types'
@@ -141,6 +142,7 @@ export function createDesigner(options: DesignerOptions = {}) {
   const view = createViewManager(ctx, { element, selection })
   const edit = createEditManager(ctx, { element, selection, history })
   const group = createGroupManager(ctx, { edit })
+  const clipboard = createClipboardManager({ element, selection, group, edit, history })
   const tool = createToolManager(ctx)
 
   function serialize(): string {
@@ -192,6 +194,7 @@ export function createDesigner(options: DesignerOptions = {}) {
     edit,
     view,
     group,
+    clipboard,
     tool,
 
     // 快捷方式
@@ -202,6 +205,10 @@ export function createDesigner(options: DesignerOptions = {}) {
     updateElement: edit.update,
     clearElements: edit.clear,
     moveElements: edit.move,
+    copy: clipboard.copy,
+    cut: clipboard.cut,
+    paste: clipboard.paste,
+    duplicate: clipboard.duplicate,
 
     undo: history.undo,
     redo: history.redo,
