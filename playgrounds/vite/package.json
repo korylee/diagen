@@ -4,11 +4,11 @@
   "main": "index.js",
   "dependencies": {
     "@diagen/core": "workspace:^",
-    "@diagen/designer-ui": "workspace:^",
+    "@diagen/ui": "workspace:^",
     "@diagen/icons": "workspace:^",
     "@diagen/renderer": "workspace:^",
     "@diagen/shared": "workspace:^",
-    "@diagen/ui": "workspace:^",
+    "@diagen/components": "workspace:^",
     "solid-js": "catalog:dev"
   },
   "devDependencies": {

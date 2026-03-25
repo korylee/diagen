@@ -1,10 +1,10 @@
 import { For, Match, Show, Switch, splitProps } from 'solid-js'
 import type { JSX } from 'solid-js'
 import type { Designer } from '@diagen/core'
-import { ActionBar, ActionBarButton, ActionBarDivider, ActionBarSpacer } from '@diagen/ui'
-import type { ActionBarProps } from '@diagen/ui'
+import { ActionBar, ActionBarButton, ActionBarDivider, ActionBarSpacer } from '@diagen/components'
+import type { ActionBarProps } from '@diagen/components'
 
-import { createIconRegistry, renderIcon, type IconRegistryOverrides } from '../designerIconRegistry'
+import { createIconRegistry, renderIcon, type IconRegistryOverrides } from '../iconRegistry'
 import { createToolbarBridge } from './createToolbarBridge'
 import type { ToolbarBridgeButtonItem, ToolbarBridgeItem } from './types'
 import { pick } from '@diagen/shared'

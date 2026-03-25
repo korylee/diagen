@@ -43,16 +43,16 @@
     - `src/components/actionBar/index.css`：统一 `--dg-action-bar-*` 样式变量与基础样式
   - 当前定位是“纯基础构件层”，不再以内建 `Sidebar / Toolbar` 成品语义作为主入口
 - `packages/designer-ui/`
-  - 编辑器壳层 bridge 包，连接 `@diagen/core` 与 `@diagen/ui`
+  - 编辑器壳层 bridge 包，连接 `@diagen/core` 与 `@diagen/components`
   - 当前已落地：
     - `src/designerIconRegistry.tsx`：设计器语义键到 `@diagen/icons` 资产组件的映射层
     - `src/toolbar/createToolbarBridge.ts`：将 `Designer` 映射为 Toolbar bridge items
-    - `src/toolbar/Toolbar.tsx`：组合 `@diagen/ui/actionBar` 渲染 bridge
+    - `src/toolbar/Toolbar.tsx`：组合 `@diagen/components/actionBar` 渲染 bridge
     - `src/toolbar/types.ts`：Toolbar bridge 类型定义
     - `src/sidebar/createSidebarBridge.tsx`：聚合 Shape Library / Action 两类 sidebar bridge
     - `src/sidebar/createShapeLibraryBridge.tsx`：将 shape palette 与工具态映射为 Sidebar stencil sections
     - `src/sidebar/createSidebarActionBridge.tsx`：将分组、历史、视图动作映射为 Sidebar action sections
-    - `src/sidebar/Sidebar.tsx`：组合 `@diagen/ui/panel` 基础构件渲染设计器侧 Sidebar
+    - `src/sidebar/Sidebar.tsx`：组合 `@diagen/components/panel` 基础构件渲染设计器侧 Sidebar
     - `src/sidebar/sidebar.css`：设计器侧 Sidebar 专用布局样式
     - `src/sidebar/search.ts`：设计器侧搜索过滤、搜索结果 section、分类生成
     - `src/sidebar/SidebarCanvasPreview.tsx`：Sidebar 本地 canvas preview，preview 在注册 item 时创建
@@ -60,7 +60,7 @@
 
 ## 3. playgrounds
 - `playgrounds/vite/`：Vite 开发入口，联调 core + renderer
-  - 已接入 `@diagen/designer-ui` 的 `Toolbar` / `Sidebar`
+  - 已接入 `@diagen/ui` 的 `Toolbar` / `Sidebar`
   - 宿主层仅保留样例数据、布局与状态插槽，并在 `vite.config.ts` 中加入源码 alias
 
 ## 4. 重点对照文件（`.processon`）

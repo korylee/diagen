@@ -1,6 +1,6 @@
 import { createMemo, type Accessor } from 'solid-js'
 import { Schema, type Designer } from '@diagen/core'
-import type { PanelSectionData } from '@diagen/ui'
+import type { PanelSectionData } from '@diagen/components'
 
 import { SidebarCanvasPreview } from './SidebarCanvasPreview'
 import { selectLinkerCreationTool, selectShapeCreationTool, type SidebarCreationMode } from './creationMode'

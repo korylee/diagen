@@ -1,5 +1,5 @@
 import type { Designer } from '@diagen/core'
-import type { PanelItemData } from '@diagen/ui'
+import type { PanelItemData } from '@diagen/components'
 
 import { createShapeLibraryBridge } from './createShapeLibraryBridge'
 import type { SidebarBridge } from './types'

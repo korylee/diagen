@@ -1,4 +1,4 @@
-import type { PanelRailItem, PanelSectionData } from '@diagen/ui'
+import type { PanelRailItem, PanelSectionData } from '@diagen/components'
 
 function matchesPanelItem(
   query: string,

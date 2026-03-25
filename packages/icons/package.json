@@ -19,8 +19,5 @@
   },
   "peerDependencies": {
     "solid-js": "^1.9.11"
-  },
-  "devDependencies": {
-    "svgo": "^4.0.1"
   }
 }

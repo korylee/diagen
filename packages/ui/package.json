@@ -16,6 +16,11 @@
   "scripts": {
     "build": "tsdown"
   },
+  "dependencies": {
+    "@diagen/core": "workspace:^",
+    "@diagen/icons": "workspace:^",
+    "@diagen/components": "workspace:^"
+  },
   "peerDependencies": {
     "solid-js": "^1.9.11"
   }

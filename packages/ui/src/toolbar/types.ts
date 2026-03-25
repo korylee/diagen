@@ -1,5 +1,5 @@
 import type { Accessor } from 'solid-js'
-import type { IconKey } from '../designerIconRegistry'
+import type { IconKey } from '../iconRegistry'
 
 export interface ToolbarBridgeBaseItem {
   id: string

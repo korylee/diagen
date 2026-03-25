@@ -7,7 +7,7 @@ import { batch, createMemo, onMount } from 'solid-js'
 import type { Accessor, JSX } from 'solid-js'
 import type { Designer, LinkerElement, ShapeElement } from '@diagen/core'
 import { createDesigner, Schema } from '@diagen/core'
-import { Sidebar, Toolbar } from '@diagen/designer-ui'
+import { Sidebar, Toolbar } from '@diagen/ui'
 import { DesignerProvider, Renderer, useDesigner } from '@diagen/renderer'
 import { generateId } from '@diagen/shared'
 

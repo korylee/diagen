@@ -28,10 +28,10 @@
 - `@diagen/icons`
   - 纯 SVG 图标资产包
   - 不依赖 `Designer` 语义，不承载 Sidebar preview 或 palette 注册逻辑
-- `@diagen/ui`
+- `@diagen/components`
   - 高复用 UI 基础构件
   - 当前主入口为 `panel` 与 `actionBar`，不再以内建 `Sidebar / Toolbar` 成品组件作为包边界
-- `@diagen/designer-ui`
+- `@diagen/ui`
   - 编辑器壳层 bridge 层，负责将 `Designer` 命令/状态映射为 UI 可消费模型
   - 同时承载业务侧 preview 组装，例如 Sidebar item 注册时的 canvas preview
 
@@ -58,7 +58,7 @@
   - `create-linker` 下支持从空白点开始创建 linker
   - `packages/renderer/src/canvas/CanvasRenderer.tsx`
   - `create-linker` 下点按 shape 可直接进入快速建线
-- `@diagen/ui` 已建立独立构建与导出：
+- `@diagen/components` 已建立独立构建与导出：
   - `packages/ui/package.json`
   - `packages/ui/src/components/panel/index.tsx`
   - `packages/ui/src/components/panel/types.ts`
@@ -69,7 +69,7 @@
   - `panel` 当前覆盖 frame/header/body/footer/search/section/rail 等基础构件
   - `actionBar` 当前覆盖 bar/button/link/field/divider/spacer 等基础构件
   - `ui` 已移除 `variant / kind / source` 这类设计器专属语义，只保留通用数据结构与交互 props
-- `@diagen/designer-ui` 已建立最小 bridge 结构：
+- `@diagen/ui` 已建立最小 bridge 结构：
   - `packages/designer-ui/package.json`
   - `packages/designer-ui/src/designerIconRegistry.tsx`
   - `packages/designer-ui/src/toolbar/createToolbarBridge.ts`
@@ -85,8 +85,8 @@
   - Sidebar preview 已改为在 `designer-ui/sidebar` bridge 注册 item 时创建，不再由 `@diagen/icons` 提供
   - 当前 `createToolbarBridge` 仅桥接已稳定命令：工具切换、撤销重做、分组解组、删除、缩放/适配
   - 当前 Sidebar bridge 已拆为 shape library 与 action 两条子桥：palette、快捷创建、分组删除、历史与视图动作分别组装
-  - `Toolbar` 已改为直接组合 `@diagen/ui/actionBar`
-  - `Sidebar` 已改为直接组合 `@diagen/ui/panel`，内建搜索过滤、分类 rail、library/action 分区，但仍保留 header/footer 等宿主插槽
+  - `Toolbar` 已改为直接组合 `@diagen/components/actionBar`
+  - `Sidebar` 已改为直接组合 `@diagen/components/panel`，内建搜索过滤、分类 rail、library/action 分区，但仍保留 header/footer 等宿主插槽
 - `@diagen/icons` 已采用生成式资产管线：
   - `packages/icons/assets/*.svg`
   - `packages/icons/scripts/build-icons.mjs`

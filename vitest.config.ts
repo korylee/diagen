@@ -10,6 +10,8 @@ export default defineConfig({
       '@diagen/shared': path.resolve(import.meta.dirname, 'packages/shared/src'),
       '@diagen/primitives': path.resolve(import.meta.dirname, 'packages/primitives/src'),
       '@diagen/renderer': path.resolve(import.meta.dirname, 'packages/renderer/src'),
+      '@diagen/components': path.resolve(import.meta.dirname, 'packages/components/src'),
+      '@diagen/ui': path.resolve(import.meta.dirname, 'packages/ui/src'),
     },
     dedupe: ['solid-js'],
   },

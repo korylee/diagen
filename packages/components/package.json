@@ -1,5 +1,5 @@
 {
-  "name": "@diagen/designer-ui",
+  "name": "@diagen/components",
   "version": "1.0.0",
   "type": "module",
   "main": "dist/index.js",
@@ -15,11 +15,6 @@
   },
   "scripts": {
     "build": "tsdown"
-  },
-  "dependencies": {
-    "@diagen/core": "workspace:^",
-    "@diagen/icons": "workspace:^",
-    "@diagen/ui": "workspace:^"
   },
   "peerDependencies": {
     "solid-js": "^1.9.11"

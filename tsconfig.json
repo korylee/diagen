@@ -28,8 +28,8 @@
       "@diagen/primitives": ["./packages/primitives/src/index.ts"],
       "@diagen/renderer": ["./packages/renderer/src/index.ts"],
       "@diagen/icons": ["./packages/icons/src/index.ts"],
-      "@diagen/ui": ["./packages/ui/src/index.ts"],
-      "@diagen/designer-ui": ["./packages/designer-ui/src/index.ts"],
+      "@diagen/components": ["./packages/components/src/index.ts"],
+      "@diagen/ui": ["./packages/ui/src/index.ts"]
     },
     "isolatedDeclarations": false,
     "composite": true,

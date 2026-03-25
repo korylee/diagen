@@ -30,8 +30,8 @@
 - 已新增 `packages/designer-ui` 作为 bridge 层，当前包含 `createToolbarBridge` / `Toolbar`、`createShapeLibraryBridge` / `createSidebarActionBridge` / `Sidebar`，负责将 `Designer` 状态/命令映射并渲染到 Toolbar / Sidebar。
 - Sidebar preview 已下沉到 `designer-ui/sidebar` 注册侧，可按 item 语义自由组装。
 - `packages/designer-ui/sidebar/search.ts` 已负责搜索过滤、搜索结果 section 与分类生成，避免把设计器语义继续抬进 `ui`。
-- `packages/designer-ui/Sidebar` 已改为直接组合 `@diagen/ui/panel`，专用 library shell 布局样式位于 `designer-ui/sidebar/sidebar.css`。
-- `packages/designer-ui/Toolbar` 已改为直接组合 `@diagen/ui/actionBar`。
+- `packages/designer-ui/Sidebar` 已改为直接组合 `@diagen/components/panel`，专用 library shell 布局样式位于 `designer-ui/sidebar/sidebar.css`。
+- `packages/designer-ui/Toolbar` 已改为直接组合 `@diagen/components/actionBar`。
 - `packages/designer-ui/src/designerIconRegistry.tsx` 作为语义映射层，负责将 `undo/group/shape-rectangle` 等设计器语义键映射到 `@diagen/icons` 组件。
 - playground 已将顶部工具栏与左侧 Sidebar 的 `Designer` 接线下沉到 `designer-ui`，宿主层仅保留数据加载、布局和少量状态插槽。
 - `.processon` 深度对照已补充吸附线、剪贴板、历史与扩容机制的源码级分析。

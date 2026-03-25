@@ -13,13 +13,13 @@ import {
   type PanelItemData,
   type PanelRailItem,
   type PanelSectionData,
-} from '@diagen/ui'
+} from '@diagen/components'
 
 import {
   createIconRegistry,
   renderIcon,
   type IconRegistryOverrides,
-} from '../designerIconRegistry'
+} from '../iconRegistry'
 import { syncCreationModeForActiveTool, type SidebarCreationMode } from './creationMode'
 import { createShapeLibraryBridge } from './createShapeLibraryBridge'
 import { createPanelRailItems, createPanelSearchSections, filterPanelSections } from './search'

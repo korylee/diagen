@@ -17,7 +17,6 @@ import type {
 export * from './types'
 
 import './index.css'
-import { vi } from 'vitest'
 
 const bem = createDgBem('panel')
 

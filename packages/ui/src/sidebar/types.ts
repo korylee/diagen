@@ -1,5 +1,5 @@
 import type { Accessor } from 'solid-js'
-import type { PanelItemData, PanelSectionData } from '@diagen/ui'
+import type { PanelItemData, PanelSectionData } from '@diagen/components'
 
 export interface SidebarBridge {
   sections: Accessor<readonly PanelSectionData[]>
