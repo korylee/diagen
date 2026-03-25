@@ -1,6 +1,6 @@
 import { createMemo } from 'solid-js'
 import { Schema, type Designer } from '@diagen/core'
-import type { SidebarSection } from '@diagen/ui'
+import type { PanelSectionData } from '@diagen/ui'
 
 import { SidebarCanvasPreview } from './SidebarCanvasPreview'
 
@@ -29,7 +29,7 @@ function createLinkerPreview(linkerId: string) {
 export function createShapeLibraryBridge(designer: Designer) {
   const activeItemId = createMemo<string | undefined>(() => resolveActiveItemId(designer))
 
-  const shapeSections = createMemo<SidebarSection[]>(() =>
+  const shapeSections = createMemo<PanelSectionData[]>(() =>
     Schema.getAllCategories().map(category => {
       const shapes = Schema.getShapesByCategory(category.id)
 
@@ -39,13 +39,12 @@ export function createShapeLibraryBridge(designer: Designer) {
         description: '选择图形后进入创建态',
         meta: shapes.length.toString(),
         layout: 'grid',
-        collapsible: true,
-        defaultCollapsed: false,
         items: shapes.map(shape => ({
           id: `tool:shape:${shape.id}`,
           label: shape.title,
           description: shape.name,
           preview: createShapePreview(shape.id),
+          meta: category.name,
           keywords: [shape.id, shape.name, shape.title, category.id, category.name],
           onSelect: () => {
             designer.tool.toggleCreateShape(shape.id)
@@ -55,19 +54,18 @@ export function createShapeLibraryBridge(designer: Designer) {
     }),
   )
 
-  const linkerSection = createMemo<SidebarSection>(() => ({
+  const linkerSection = createMemo<PanelSectionData>(() => ({
     id: 'category:linkers',
     title: '连线',
     description: '选择连线类型后直接在画布发起创建',
     meta: '3',
     layout: 'grid',
-    collapsible: true,
-    defaultCollapsed: false,
     items: Schema.getAllLinkers().map(linker => ({
       id: `tool:linker:${linker.id}`,
       label: linker.title,
       description: linker.name,
       preview: createLinkerPreview(linker.id),
+      meta: '连线',
       keywords: [linker.id, linker.name, linker.title, 'line', 'linker', 'connector'],
       onSelect: () => {
         designer.tool.toggleCreateLinker(linker.id)
@@ -75,7 +73,7 @@ export function createShapeLibraryBridge(designer: Designer) {
     })),
   }))
 
-  const sections = createMemo<readonly SidebarSection[]>(() => [...shapeSections(), linkerSection()])
+  const sections = createMemo<readonly PanelSectionData[]>(() => [...shapeSections(), linkerSection()])
 
   return {
     sections,

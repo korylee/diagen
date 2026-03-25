@@ -1,4 +1,4 @@
-import { createEffect } from 'solid-js'
+import { createEffect, onMount } from 'solid-js'
 
 export interface SidebarCanvasPreviewProps {
   shapeId?: string
@@ -11,6 +11,13 @@ export interface SidebarCanvasPreviewProps {
 
 const DEFAULT_WIDTH = 64
 const DEFAULT_HEIGHT = 48
+const DEFAULT_ACCENT = '#475569'
+
+function drawMarker(ctx: CanvasRenderingContext2D, x: number, y: number): void {
+  ctx.beginPath()
+  ctx.arc(x, y, 2.5, 0, Math.PI * 2)
+  ctx.fill()
+}
 
 function drawRoundedRect(
   ctx: CanvasRenderingContext2D,
@@ -38,7 +45,7 @@ function drawPreview(
   accent: string,
 ): void {
   ctx.clearRect(0, 0, width, height)
-  ctx.lineWidth = 3
+  ctx.lineWidth = 2
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
   ctx.strokeStyle = accent
@@ -46,11 +53,11 @@ function drawPreview(
 
   switch (props.shapeId) {
     case 'rectangle':
-      drawRoundedRect(ctx, 11, 10, 42, 28, 6)
+      drawRoundedRect(ctx, 12, 10, 40, 26, 4)
       ctx.stroke()
       return
     case 'roundedRectangle':
-      drawRoundedRect(ctx, 10, 10, 44, 28, 10)
+      drawRoundedRect(ctx, 11, 10, 42, 26, 8)
       ctx.stroke()
       return
     case 'circle':
@@ -60,19 +67,19 @@ function drawPreview(
       return
     case 'diamond':
       ctx.beginPath()
-      ctx.moveTo(width / 2, 8)
-      ctx.lineTo(width - 12, height / 2)
-      ctx.lineTo(width / 2, height - 8)
-      ctx.lineTo(12, height / 2)
+      ctx.moveTo(width / 2, 9)
+      ctx.lineTo(width - 13, height / 2)
+      ctx.lineTo(width / 2, height - 9)
+      ctx.lineTo(13, height / 2)
       ctx.closePath()
       ctx.stroke()
       return
     case 'parallelogram':
       ctx.beginPath()
-      ctx.moveTo(18, 10)
-      ctx.lineTo(54, 10)
-      ctx.lineTo(46, 38)
-      ctx.lineTo(10, 38)
+      ctx.moveTo(17, 11)
+      ctx.lineTo(51, 11)
+      ctx.lineTo(45, 37)
+      ctx.lineTo(11, 37)
       ctx.closePath()
       ctx.stroke()
       return
@@ -87,24 +94,16 @@ function drawPreview(
 
   switch (props.linkerId) {
     case 'straight_linker':
-      ctx.beginPath()
-      ctx.arc(14, 24, 3, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.beginPath()
-      ctx.arc(50, 24, 3, 0, Math.PI * 2)
-      ctx.fill()
+      drawMarker(ctx, 14, 24)
+      drawMarker(ctx, 50, 24)
       ctx.beginPath()
       ctx.moveTo(18, 24)
       ctx.lineTo(46, 24)
       ctx.stroke()
       return
     case 'curve_linker':
-      ctx.beginPath()
-      ctx.arc(14, 30, 3, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.beginPath()
-      ctx.arc(50, 18, 3, 0, Math.PI * 2)
-      ctx.fill()
+      drawMarker(ctx, 14, 30)
+      drawMarker(ctx, 50, 18)
       ctx.beginPath()
       ctx.moveTo(18, 30)
       ctx.bezierCurveTo(28, 30, 34, 18, 46, 18)
@@ -112,12 +111,8 @@ function drawPreview(
       return
     case 'linker':
     default:
-      ctx.beginPath()
-      ctx.arc(14, 24, 3, 0, Math.PI * 2)
-      ctx.fill()
-      ctx.beginPath()
-      ctx.arc(50, 24, 3, 0, Math.PI * 2)
-      ctx.fill()
+      drawMarker(ctx, 14, 24)
+      drawMarker(ctx, 50, 24)
       ctx.beginPath()
       ctx.moveTo(18, 24)
       ctx.lineTo(28, 24)
@@ -148,7 +143,7 @@ export function SidebarCanvasPreview(props: SidebarCanvasPreviewProps) {
     if (!ctx) return
 
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0)
-    drawPreview(ctx, props, width, height, props.accent ?? '#2563eb')
+    drawPreview(ctx, props, width, height, props.accent ?? DEFAULT_ACCENT)
   }
 
   createEffect(() => {
@@ -157,6 +152,9 @@ export function SidebarCanvasPreview(props: SidebarCanvasPreviewProps) {
     props.width
     props.height
     props.accent
+    sync()
+  })
+  onMount(() => {
     sync()
   })
 

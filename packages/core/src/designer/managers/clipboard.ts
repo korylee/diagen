@@ -21,10 +21,6 @@ interface ClipboardDeps {
   history: Pick<HistoryManager, 'isInTransaction' | 'transaction'>
 }
 
-interface ClipboardPasteOptions {
-  offset?: Point
-}
-
 const DefaultPasteOffset = { x: 24, y: 24 } as const
 
 function cloneData<T>(value: T): T {
@@ -182,7 +178,7 @@ export function createClipboardManager(deps: ClipboardDeps) {
     return true
   }
 
-  function paste(options: ClipboardPasteOptions = {}): string[] {
+  function paste(options: { offset?: Point } = {}): string[] {
     if (!snapshot) return []
 
     const delta = resolvePasteDelta(options.offset, pasteCount + 1)

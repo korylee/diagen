@@ -2,7 +2,7 @@ import { createMemo, For, Show } from 'solid-js'
 import { getShapeAnchors, isLinker, isShape, type GuideLine } from '@diagen/core'
 import type { Point } from '@diagen/shared'
 import { ShapeHighlightOverlay, type ShapeHighlightItem } from './ShapeHighlightOverlay'
-import { ShapeLinkerQuickCreateOverlay } from './ShapeLinkerQuickCreateOverlay'
+import { LinkCreateOverlay } from './LinkCreateOverlay'
 import { useDesigner } from './DesignerProvider'
 import { useInteraction } from './InteractionProvider'
 
@@ -136,19 +136,18 @@ interface ShapeSelectionLayerProps {
   showRotateHandle?: boolean
 }
 
-function LinkerConnectableShapeHighlightOverlay() {
+function LinkTargetOverlay() {
   const { element, view } = useDesigner()
   const { pointer, coordinate } = useInteraction()
 
-  const dragSnapshot = createMemo(() => pointer.linkerDrag.dragSnapshot())
-  const isEndpointDragging = createMemo(() => {
-    const snapshot = dragSnapshot()
-    return !!snapshot && pointer.linkerDrag.isPending() && (snapshot.mode === 'from' || snapshot.mode === 'to')
+  const isLinkEndDragging = createMemo(() => {
+    const mode = pointer.linkerDrag.dragSnapshot()?.mode
+    return pointer.linkerDrag.isPending() && (mode === 'from' || mode === 'to')
   })
-  const candidateShapeId = createMemo(() => pointer.linkerDrag.candidateAnchor()?.shapeId ?? null)
 
-  const highlightItems = createMemo<ShapeHighlightItem[]>(() => {
-    if (!isEndpointDragging()) return []
+  const linkTargetItems = createMemo<ShapeHighlightItem[]>(() => {
+    if (!isLinkEndDragging()) return []
+    const activeId = pointer.linkerDrag.candidateAnchor()?.shapeId ?? null
 
     return element
       .shapes()
@@ -157,13 +156,11 @@ function LinkerConnectableShapeHighlightOverlay() {
         id: shape.id,
         bounds: coordinate.canvasToScreen(view.getShapeBounds(shape)),
         tone: 'connectable',
-        active: candidateShapeId() === shape.id,
+        active: activeId === shape.id,
       }))
   })
 
-  return (
-    <ShapeHighlightOverlay items={highlightItems} visible={isEndpointDragging} zIndex={999} />
-  )
+  return <ShapeHighlightOverlay items={linkTargetItems} visible={isLinkEndDragging} zIndex={999} />
 }
 
 function LinkerSelectionOverlay() {
@@ -358,38 +355,58 @@ function ShapeSelectionOverlay(props: ShapeSelectionLayerProps) {
   const { selection, view, element, tool } = useDesigner()
   const { pointer, coordinate } = useInteraction()
 
-  const bounds = createMemo(() => {
+  const selectedShapes = createMemo(() => {
     if (!tool.isIdle()) return null
     const selectedIds = selection.selectedIds()
     if (selectedIds.length === 0) return null
 
     const selectedElements = selectedIds.map(id => element.getById(id))
-    if (selectedElements.some(el => !el || !isShape(el))) {
-      return null
+    return selectedElements.every(el => !!el && isShape(el)) ? selectedElements : null
+  })
+
+  const frame = createMemo(() => {
+    const shapes = selectedShapes()
+    if (!shapes || shapes.length === 0) return null
+
+    if (shapes.length === 1) {
+      const shape = shapes[0]
+      const bounds = coordinate.canvasToScreen(view.getShapeBounds(shape))
+      return {
+        bounds,
+        angle: shape.props.angle ?? 0,
+      }
     }
 
-    const b = view.getElementsBounds(selectedElements)
-    return b && coordinate.canvasToScreen(b)
+    const bounds = view.getElementsBounds(shapes)
+    return bounds
+      ? {
+          bounds: coordinate.canvasToScreen(bounds),
+          angle: 0,
+        }
+      : null
   })
 
   const canRotate = createMemo(() => {
-    const selectedIds = selection.selectedIds()
-    if (selectedIds.length !== 1) return false
-    const target = element.getById(selectedIds[0])
-    return !!(target && isShape(target) && target.attribute.rotatable && !target.locked)
+    if (!props.showRotateHandle) return false
+    const shapes = selectedShapes()
+    if (!shapes || shapes.length !== 1) return false
+    const target = shapes[0]
+    return target.attribute.rotatable && !target.locked
   })
 
   return (
-    <Show when={bounds()}>
-      {bounds => (
+    <Show when={frame()}>
+      {frame => (
         <div
           style={{
             position: 'absolute',
-            left: `${bounds().x - 1}px`,
-            top: `${bounds().y - 1}px`,
-            width: `${bounds().w + 2}px`,
-            height: `${bounds().h + 2}px`,
+            left: `${frame().bounds.x - 1}px`,
+            top: `${frame().bounds.y - 1}px`,
+            width: `${frame().bounds.w + 2}px`,
+            height: `${frame().bounds.h + 2}px`,
             border: `var(--dg-selection-border)`,
+            transform: frame().angle ? `rotate(${frame().angle}deg)` : undefined,
+            'transform-origin': 'center center',
             'pointer-events': 'none',
             'z-index': 1000,
           }}
@@ -424,7 +441,7 @@ function ShapeSelectionOverlay(props: ShapeSelectionLayerProps) {
           </For>
 
           {/* 旋转手柄 */}
-          <Show when={(props.showRotateHandle ?? true) && canRotate()}>
+          <Show when={canRotate()}>
             <>
               <div
                 style={{
@@ -468,16 +485,16 @@ function ShapeSelectionOverlay(props: ShapeSelectionLayerProps) {
   )
 }
 
-
 export interface SelectionLayerProps extends ShapeSelectionLayerProps {}
 
 export function SelectionOverlay(props: SelectionLayerProps) {
   return (
     <>
       <GuideOverlay />
-      <LinkerConnectableShapeHighlightOverlay />
+      <LinkTargetOverlay />
+      <LinkCreateOverlay />
+
       <ShapeSelectionOverlay showRotateHandle={props.showRotateHandle} />
-      <ShapeLinkerQuickCreateOverlay />
       <LinkerSelectionOverlay />
     </>
   )

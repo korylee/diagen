@@ -5,30 +5,28 @@ import { createDgBem, cx, pick, toUnit } from '@diagen/shared'
 
 import './index.css'
 import type {
-  ToolbarButtonProps,
-  ToolbarDividerProps,
-  ToolbarLinkProps,
-  ToolbarProps,
-  ToolbarRightProps,
-  ToolbarSpacerProps,
-  ToolbarSpinnerProps,
+  ActionBarButtonProps,
+  ActionBarDividerProps,
+  ActionBarFieldProps,
+  ActionBarLinkProps,
+  ActionBarProps,
+  ActionBarSpacerProps,
 } from './types'
 
-const bem = createDgBem('toolbar')
+const bem = createDgBem('action-bar')
 
-function mergeStyle(width: number | string | undefined, style: string | undefined) {
-  let sty = style ? style.trim() : ''
-
+function mergeStyle(width: number | string | undefined, style: string | undefined): string {
+  let resolvedStyle = style ? style.trim() : ''
   const widthValue = toUnit(width)
 
   if (widthValue) {
-    sty = `width:${widthValue};` + sty
+    resolvedStyle = `width:${widthValue};${resolvedStyle}`
   }
 
-  return sty
+  return resolvedStyle
 }
 
-function ToolbarItemContent(props: {
+function ActionBarItemContent(props: {
   icon?: JSX.Element
   text?: JSX.Element
   color?: string
@@ -55,11 +53,10 @@ function ToolbarItemContent(props: {
 }
 
 function resolveItemClass(name: string, props: { class?: string; active?: boolean; selected?: boolean }): string {
-  const base = bem(name, { active: props.active, selected: props.selected })
-  return cx(base, props.class)
+  return cx(bem(name, { active: props.active, selected: props.selected }), props.class)
 }
 
-export function Toolbar(props: ToolbarProps): JSX.Element {
+export function ActionBar(props: ActionBarProps): JSX.Element {
   const [local, rest] = splitProps(props, ['class', 'style', 'width', 'children'])
 
   return (
@@ -69,23 +66,12 @@ export function Toolbar(props: ToolbarProps): JSX.Element {
   )
 }
 
-export function ToolbarRight(props: ToolbarRightProps): JSX.Element {
-  const [local, rest] = splitProps(props, ['class', 'style', 'width', 'children'])
-
-  return (
-    <div {...rest} class={cx(bem('right'), local.class)} style={mergeStyle(local.width, local.style)}>
-      {local.children}
-    </div>
-  )
-}
-
-export function ToolbarSpacer(props: ToolbarSpacerProps): JSX.Element {
+export function ActionBarSpacer(props: ActionBarSpacerProps): JSX.Element {
   const [local, rest] = splitProps(props, ['class', 'style'])
-
   return <div {...rest} class={cx(bem('spacer'), local.class)} style={local.style}></div>
 }
 
-export function ToolbarDivider(props: ToolbarDividerProps): JSX.Element {
+export function ActionBarDivider(props: ActionBarDividerProps): JSX.Element {
   const [local, rest] = splitProps(props, ['class', 'style', 'size'])
 
   return (
@@ -97,7 +83,7 @@ export function ToolbarDivider(props: ToolbarDividerProps): JSX.Element {
   )
 }
 
-export function ToolbarButton(props: ToolbarButtonProps): JSX.Element {
+export function ActionBarButton(props: ActionBarButtonProps): JSX.Element {
   const [local, rest] = splitProps(props, [
     'class',
     'style',
@@ -118,12 +104,14 @@ export function ToolbarButton(props: ToolbarButtonProps): JSX.Element {
       class={resolveItemClass('button', local)}
       style={mergeStyle(local.width, local.style)}
     >
-      <ToolbarItemContent {...pick(local, ['icon', 'text', 'color', 'dropdown'])}>{local.children}</ToolbarItemContent>
+      <ActionBarItemContent {...pick(local, ['icon', 'text', 'color', 'dropdown'])}>
+        {local.children}
+      </ActionBarItemContent>
     </button>
   )
 }
 
-export function ToolbarLink(props: ToolbarLinkProps): JSX.Element {
+export function ActionBarLink(props: ActionBarLinkProps): JSX.Element {
   const [local, rest] = splitProps(props, [
     'class',
     'style',
@@ -139,16 +127,18 @@ export function ToolbarLink(props: ToolbarLinkProps): JSX.Element {
 
   return (
     <a {...rest} class={resolveItemClass('link', local)} style={mergeStyle(local.width, local.style)}>
-      <ToolbarItemContent {...pick(local, ['icon', 'text', 'color', 'dropdown'])}>{local.children}</ToolbarItemContent>
+      <ActionBarItemContent {...pick(local, ['icon', 'text', 'color', 'dropdown'])}>
+        {local.children}
+      </ActionBarItemContent>
     </a>
   )
 }
 
-export function ToolbarSpinner(props: ToolbarSpinnerProps): JSX.Element {
+export function ActionBarField(props: ActionBarFieldProps): JSX.Element {
   const [local, rest] = splitProps(props, ['class', 'style', 'width', 'value', 'children'])
 
   return (
-    <div {...rest} class={cx(bem('spinner'), local.class)} style={mergeStyle(local.width, local.style)}>
+    <div {...rest} class={cx(bem('field'), local.class)} style={mergeStyle(local.width, local.style)}>
       <Show when={local.value}>
         <span class={bem('text')}>{local.value}</span>
       </Show>
@@ -157,13 +147,4 @@ export function ToolbarSpinner(props: ToolbarSpinnerProps): JSX.Element {
   )
 }
 
-export type {
-  ToolbarButtonProps,
-  ToolbarDividerProps,
-  ToolbarLinkProps,
-  ToolbarProps,
-  ToolbarRightProps,
-  ToolbarSharedProps,
-  ToolbarSpacerProps,
-  ToolbarSpinnerProps,
-} from './types'
+export * from './types'

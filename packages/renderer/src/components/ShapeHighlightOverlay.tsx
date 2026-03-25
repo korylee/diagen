@@ -1,15 +1,11 @@
+import { Bounds } from '@diagen/shared'
 import { createMemo, For, Show } from 'solid-js'
 
 export type ShapeHighlightTone = 'connectable' | 'forbidden' | 'custom'
 
 export interface ShapeHighlightItem {
   id: string
-  bounds: {
-    x: number
-    y: number
-    w: number
-    h: number
-  }
+  bounds: Bounds
   tone?: ShapeHighlightTone
   active?: boolean
   outline?: string

@@ -7,7 +7,7 @@ import { batch, createMemo, onMount } from 'solid-js'
 import type { Accessor, JSX } from 'solid-js'
 import type { Designer, LinkerElement, ShapeElement } from '@diagen/core'
 import { createDesigner, Schema } from '@diagen/core'
-import { DesignerSidebar, DesignerToolbar } from '@diagen/designer-ui'
+import { Sidebar, Toolbar } from '@diagen/designer-ui'
 import { DesignerProvider, Renderer, useDesigner } from '@diagen/renderer'
 import { generateId } from '@diagen/shared'
 
@@ -47,7 +47,7 @@ function ToolbarStatus(props: { status: EditorStatus }): JSX.Element {
 
 function SidebarPanel(props: { designer: Designer; status: EditorStatus }): JSX.Element {
   return (
-    <DesignerSidebar
+    <Sidebar
       designer={props.designer}
       class="app-sidebar"
       searchPlaceholder="Search shapes or actions"
@@ -55,7 +55,7 @@ function SidebarPanel(props: { designer: Designer; status: EditorStatus }): JSX.
       header={
         <>
           <div class="sidebar-brand">Diagen</div>
-          <div class="sidebar-caption">designer-ui 负责将 Designer 状态映射为 Sidebar sections，宿主仅保留壳层插槽。</div>
+          <div class="sidebar-caption">designer-ui 将 Designer 状态映射到 panel/action-bar 基础构件，宿主只保留插槽。</div>
         </>
       }
       footer={
@@ -85,7 +85,7 @@ function EditorShell(): JSX.Element {
   return (
     <div class="app">
       <SampleDataLoader />
-      <DesignerToolbar designer={designer} rightSlot={<ToolbarStatus status={status} />} />
+      <Toolbar designer={designer} rightSlot={<ToolbarStatus status={status} />} />
       <div class="app-body">
         <SidebarPanel designer={designer} status={status} />
         <Editor />

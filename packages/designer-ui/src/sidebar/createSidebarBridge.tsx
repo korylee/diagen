@@ -1,6 +1,6 @@
 import { createMemo } from 'solid-js'
 import type { Designer } from '@diagen/core'
-import type { SidebarItem } from '@diagen/ui'
+import type { PanelItemData } from '@diagen/ui'
 
 import type { DesignerIconRegistryOverrides } from '../designerIconRegistry'
 import { createShapeLibraryBridge } from './createShapeLibraryBridge'
@@ -19,7 +19,7 @@ export function createSidebarBridge(designer: Designer, options: CreateSidebarBr
 
   const sections = createMemo(() => [...shapeLibrary.sections(), ...actions.sections()])
 
-  function getItemById(id: string): SidebarItem | undefined {
+  function getItemById(id: string): PanelItemData | undefined {
     for (const section of sections()) {
       const matched = section.items.find(item => item.id === id)
       if (matched) return matched

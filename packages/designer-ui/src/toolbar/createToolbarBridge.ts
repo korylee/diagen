@@ -35,27 +35,6 @@ export function createToolbarBridge(designer: Designer): ToolbarBridge {
 
   const leftItems = createMemo<readonly ToolbarBridgeItem[]>(() => [
     createButton({
-      id: 'tool:shape:rectangle',
-      text: 'Rectangle',
-      title: '创建矩形',
-      iconKey: 'shape-rectangle',
-      selected: currentTool().type === 'create-shape' && currentTool().shapeId === 'rectangle',
-      execute: () => {
-        designer.tool.toggleCreateShape('rectangle')
-      },
-    }),
-    createButton({
-      id: 'tool:linker:linker',
-      text: 'Linker',
-      title: '创建连线',
-      iconKey: 'linker',
-      selected: currentTool().type === 'create-linker' && currentTool().linkerId === 'linker',
-      execute: () => {
-        designer.tool.toggleCreateLinker('linker')
-      },
-    }),
-    createDivider('divider:tool'),
-    createButton({
       id: 'history:undo',
       title: '撤销 (Ctrl+Z)',
       iconKey: 'undo',

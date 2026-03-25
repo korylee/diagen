@@ -2,7 +2,7 @@ import type { ShapeElement } from '@diagen/core'
 import { isBoundsVisible } from '@diagen/core'
 import { createDevicePixelRatio } from '@diagen/primitives'
 import { getRotatedBoxBounds } from '@diagen/shared'
-import { createEffect, createMemo } from 'solid-js'
+import { createEffect, createMemo, onMount } from 'solid-js'
 import { useDesigner } from '../../components'
 import { renderShape } from '../../utils'
 
@@ -17,20 +17,12 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
 
   const { selection, view } = useDesigner()
   const pixelRatio = createDevicePixelRatio()
-  const renderBounds = createMemo(() =>
-    getRotatedBoxBounds({
-      x: props.shape.props.x,
-      y: props.shape.props.y,
-      w: props.shape.props.w,
-      h: props.shape.props.h,
-      angle: props.shape.props.angle,
-    }),
-  )
+  const renderBounds = createMemo(() => getRotatedBoxBounds(props.shape.props))
 
   const padding = 4
 
   /** 屏幕坐标系中的位置（DOM 定位用） */
-  const getScreenBounds = () => {
+  const getScreenBounds = createMemo(() => {
     const vp = view.viewport()
     const b = renderBounds()
     return {
@@ -39,55 +31,63 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
       w: b.w * vp.zoom + padding * 2,
       h: b.h * vp.zoom + padding * 2,
     }
-  }
+  })
 
-  /** 是否在可见区域内 */
-  const isVisible = () => {
+  const renderFrame = createMemo(() => {
     const vp = view.viewport()
     const vpSize = view.viewportSize()
-    return isBoundsVisible(renderBounds(), vp, { width: vpSize.width, height: vpSize.height })
-  }
+    const bounds = getScreenBounds()
+    const rotatedBounds = renderBounds()
+    const width = Math.max(1, Math.ceil(bounds.w))
+    const height = Math.max(1, Math.ceil(bounds.h))
 
-  const doRender = () => {
+    return {
+      visible: isBoundsVisible(rotatedBounds, vp, { width: vpSize.width, height: vpSize.height }),
+      zoom: vp.zoom,
+      ratio: pixelRatio(),
+      pixelWidth: width * pixelRatio(),
+      pixelHeight: height * pixelRatio(),
+      offsetX: props.shape.props.x - rotatedBounds.x,
+      offsetY: props.shape.props.y - rotatedBounds.y,
+    }
+  })
+
+  const renderToCanvas = (frame: ReturnType<typeof renderFrame>) => {
     if (!canvasRef) return
     const ctx = canvasRef.getContext('2d')
     if (!ctx) return
 
-    const vp = view.viewport()
-    const bounds = getScreenBounds()
-    const width = Math.max(1, Math.ceil(bounds.w))
-    const height = Math.max(1, Math.ceil(bounds.h))
-    const shapeBounds = renderBounds()
-    const offsetX = props.shape.props.x - shapeBounds.x
-    const offsetY = props.shape.props.y - shapeBounds.y
-
-    ctx.clearRect(0, 0, width * pixelRatio(), height * pixelRatio())
+    ctx.clearRect(0, 0, frame.pixelWidth, frame.pixelHeight)
     ctx.save()
-    ctx.scale(pixelRatio(), pixelRatio())
-    ctx.scale(vp.zoom, vp.zoom)
-    ctx.translate(offsetX + padding / vp.zoom, offsetY + padding / vp.zoom)
+    ctx.scale(frame.ratio, frame.ratio)
+    ctx.scale(frame.zoom, frame.zoom)
+    ctx.translate(frame.offsetX + padding / frame.zoom, frame.offsetY + padding / frame.zoom)
     renderShape(ctx, props.shape)
     ctx.restore()
   }
 
-  const updateCanvas = () => {
-    if (!isVisible()) {
+  const syncCanvas = () => {
+    const frame = renderFrame()
+    if (!frame.visible) {
       if (containerRef) containerRef.style.display = 'none'
       return
     }
     if (containerRef) containerRef.style.display = 'block'
 
-    const rect = getScreenBounds()
-    const width = Math.max(1, Math.ceil(rect.w))
-    const height = Math.max(1, Math.ceil(rect.h))
     if (canvasRef) {
-      canvasRef.width = width * pixelRatio()
-      canvasRef.height = height * pixelRatio()
+      if (canvasRef.width !== frame.pixelWidth) {
+        canvasRef.width = frame.pixelWidth
+      }
+      if (canvasRef.height !== frame.pixelHeight) {
+        canvasRef.height = frame.pixelHeight
+      }
     }
-    doRender()
+    renderToCanvas(frame)
   }
 
-  createEffect(() => updateCanvas())
+  createEffect(() => {
+    syncCanvas()
+  })
 
   const handleMouseDown = (e: MouseEvent) => {
     const handled = props.onMouseDown?.(e)
@@ -110,8 +110,6 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
     >
       <canvas
         ref={canvasRef}
-        width={getScreenBounds().w * pixelRatio()}
-        height={getScreenBounds().h * pixelRatio()}
         style={{
           width: `${getScreenBounds().w}px`,
           height: `${getScreenBounds().h}px`,

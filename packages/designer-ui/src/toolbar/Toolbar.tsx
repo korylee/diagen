@@ -1,8 +1,8 @@
 import { For, Match, Show, Switch, splitProps } from 'solid-js'
 import type { JSX } from 'solid-js'
 import type { Designer } from '@diagen/core'
-import { Toolbar, ToolbarButton, ToolbarDivider, ToolbarRight, ToolbarSpacer } from '@diagen/ui'
-import type { ToolbarProps } from '@diagen/ui'
+import { ActionBar, ActionBarButton, ActionBarDivider, ActionBarSpacer } from '@diagen/ui'
+import type { ActionBarProps } from '@diagen/ui'
 
 import {
   createDesignerIconRegistry,
@@ -13,7 +13,7 @@ import { createToolbarBridge } from './createToolbarBridge'
 import type { ToolbarBridgeButtonItem, ToolbarBridgeItem } from './types'
 import { pick } from '@diagen/shared'
 
-export interface DesignerToolbarProps extends Omit<ToolbarProps, 'children'> {
+export interface ToolbarProps extends Omit<ActionBarProps, 'children'> {
   designer: Designer
   rightSlot?: JSX.Element
   iconRegistry?: DesignerIconRegistryOverrides
@@ -22,13 +22,13 @@ export interface DesignerToolbarProps extends Omit<ToolbarProps, 'children'> {
 
 function ToolbarBridgeItemView(props: {
   item: ToolbarBridgeItem
-  renderIcon: NonNullable<DesignerToolbarProps['renderIcon']>
+  renderIcon: NonNullable<ToolbarProps['renderIcon']>
 }) {
   return (
     <Switch>
       <Match when={props.item.kind === 'button' ? props.item : false}>
         {button => (
-          <ToolbarButton
+          <ActionBarButton
             {...pick(button(), ['title', 'text', 'color', 'dropdown', 'disabled', 'active', 'selected', 'width'])}
             icon={props.renderIcon(button().iconKey, button())}
             onClick={() => {
@@ -38,16 +38,16 @@ function ToolbarBridgeItemView(props: {
         )}
       </Match>
       <Match when={props.item.kind === 'divider' ? props.item : false}>
-        {divider => <ToolbarDivider size={divider().size} />}
+        {divider => <ActionBarDivider size={divider().size} />}
       </Match>
       <Match when={props.item.kind === 'spacer'}>
-        <ToolbarSpacer />
+        <ActionBarSpacer />
       </Match>
     </Switch>
   )
 }
 
-export function DesignerToolbar(props: DesignerToolbarProps) {
+export function Toolbar(props: ToolbarProps) {
   const [local, rest] = splitProps(props, [
     'designer',
     'rightSlot',
@@ -59,31 +59,30 @@ export function DesignerToolbar(props: DesignerToolbarProps) {
   ])
   const bridge = createToolbarBridge(local.designer)
   const iconRegistry = createDesignerIconRegistry(local.iconRegistry)
-  const renderToolbarIcon: DesignerToolbarProps['renderIcon'] = (iconKey, item) => {
+  const renderToolbarIcon: ToolbarProps['renderIcon'] = (iconKey, item) => {
     return local.renderIcon
       ? local.renderIcon(iconKey, item)
       : (renderDesignerIcon(iconKey, iconRegistry, { size: 16 }) ?? <span>•</span>)
   }
 
   return (
-    <Toolbar
+    <ActionBar
       {...rest}
       class={local.class}
       style={local.style}
       width={local.width}
-      aria-label={rest['aria-label'] ?? 'Designer Toolbar'}
+      aria-label={rest['aria-label'] ?? 'Toolbar'}
     >
       <For each={bridge.leftItems()}>
         {item => <ToolbarBridgeItemView item={item} renderIcon={renderToolbarIcon} />}
       </For>
       <Show when={bridge.rightItems().length > 0 || local.rightSlot}>
-        <ToolbarRight>
-          <For each={bridge.rightItems()}>
-            {item => <ToolbarBridgeItemView item={item} renderIcon={renderToolbarIcon} />}
-          </For>
-          {local.rightSlot}
-        </ToolbarRight>
+        <ActionBarSpacer />
+        <For each={bridge.rightItems()}>
+          {item => <ToolbarBridgeItemView item={item} renderIcon={renderToolbarIcon} />}
+        </For>
+        {local.rightSlot}
       </Show>
-    </Toolbar>
+    </ActionBar>
   )
 }

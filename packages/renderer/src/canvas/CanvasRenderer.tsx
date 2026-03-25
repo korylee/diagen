@@ -63,9 +63,8 @@ export function CanvasRenderer(props: CanvasRendererProps) {
 
     const point = coordinate.eventToCanvas(e)
     const hitResult = pointer.linkerDrag.hitTestWithRoute(id, point)
-    const hit = hitResult?.hit
     const linkerHit =
-      hit ??
+      hitResult?.hit ??
       (selection.isSelected(id) && !e.ctrlKey && !e.metaKey
         ? ({
             type: 'line',

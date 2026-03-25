@@ -15,7 +15,7 @@
    - `RendererContainer.tsx` 已支持 `create-linker` 从空白点开始创建
    - `CanvasRenderer.tsx` 已支持 `create-linker` 下点按 shape 直接进入快速建线
 3. `packages/ui` 已完成第一阶段壳层能力，`Sidebar` 与 `Toolbar` 已可用于 playground 最小集成。
-4. `packages/designer-ui` 已建立 bridge 层，包含 `createToolbarBridge`、`createShapeLibraryBridge`、`createSidebarActionBridge` 与 `DesignerSidebar / DesignerToolbar`。
+4. `packages/designer-ui` 已建立 bridge 层，包含 `createToolbarBridge`、`createShapeLibraryBridge`、`createSidebarActionBridge` 与 `Sidebar / Toolbar`。
 5. `packages/icons` 已形成“平铺 assets + svgo 规范化 + generated icon component”流水线。
 6. “从锚点拖出创建新线”已完成 `Phase 1`：
    - `packages/core/src/utils/anchors/index.ts` 已新增 `resolvePreferredCreateAnchor(...)`

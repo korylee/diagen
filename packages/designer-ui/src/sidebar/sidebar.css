@@ -1,0 +1,51 @@
+.dg-sidebar__body {
+  gap: 8px;
+}
+
+.dg-sidebar__stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dg-sidebar__library-shell {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  border: 1px solid var(--dg-panel-section-border);
+  border-radius: var(--dg-panel-radius);
+  background: var(--dg-panel-section-bg);
+  overflow: hidden;
+}
+
+.dg-sidebar__rail {
+  border-right: 1px solid var(--dg-panel-section-border);
+}
+
+.dg-sidebar__library-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.dg-sidebar__library-panel .dg-panel__section {
+  border: 0;
+  border-radius: 0;
+}
+
+.dg-sidebar__library-panel .dg-panel__section + .dg-panel__section {
+  border-top: 1px solid var(--dg-panel-section-border);
+}
+
+.sidebar-preview {
+  width: 58px;
+  height: 38px;
+}
+
+.sidebar-chip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}

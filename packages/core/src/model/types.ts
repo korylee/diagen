@@ -2,19 +2,18 @@
  * 核心模型类型定义
  */
 
-import { KeyOf, Mutable } from '@diagen/shared'
+import { RotatableBounds } from '@diagen/shared'
 import type {
-  ElementType,
-  ShapeCategory,
   ArrowStyle,
-  LineStyleType,
+  ElementType,
   FillType,
   GradientType,
+  LineStyleType,
+  ShapeCategory,
   TextAlign,
-  VerticalAlign,
   TextOrientation,
+  VerticalAlign,
 } from '../constants'
-import { DeepMutable } from 'solid-js/store'
 
 // ============================================================================
 // 基础类型
@@ -35,13 +34,7 @@ export interface BaseElement {
 }
 
 /** 位置和尺寸属性 */
-export interface BoxProps {
-  x: number
-  y: number
-  w: number
-  h: number
-  angle: number // 旋转角度（度）
-}
+export interface BoxProps extends Required<RotatableBounds> {}
 
 // ============================================================================
 // 样式类型
@@ -127,10 +120,10 @@ export interface RelativeRect {
 
 /** 元素行为属性 */
 export interface ElementAttribute {
-  container: boolean     // 是否为容器
+  container: boolean // 是否为容器
   visible: boolean
   rotatable: boolean
-  linkable: boolean      // 是否可连接
+  linkable: boolean // 是否可连接
   collapsable: boolean
   collapsed: boolean
   markerOffset: number

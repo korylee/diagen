@@ -66,7 +66,7 @@ export function RendererContainer(props: {
     pointer,
     keyboard,
     scroll,
-    coordinate
+    coordinate,
   }
 
   const containerStyle = createMemo(() => {
@@ -87,7 +87,7 @@ export function RendererContainer(props: {
           ? 'grabbing'
           : state.tool.type === 'create-shape' || state.tool.type === 'create-linker'
             ? 'crosshair'
-          : 'default',
+            : 'default',
     } as const
   })
   const layerStyle = createMemo(() => {
@@ -243,7 +243,10 @@ export function RendererContainer(props: {
 
   onMount(() => {
     const val = Math.max(0, state.config.containerInset - 10)
-    scroll.scrollTo(val, val)
+    const el = viewportRef()
+    if (!el) return
+    el.scrollLeft = val
+    el.scrollTop = val
   })
 
   const startShapeCreate = (e: MouseEvent): boolean => {
