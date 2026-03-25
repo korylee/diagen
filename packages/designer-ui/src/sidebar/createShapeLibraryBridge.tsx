@@ -1,8 +1,9 @@
-import { createMemo } from 'solid-js'
+import { createMemo, type Accessor } from 'solid-js'
 import { Schema, type Designer } from '@diagen/core'
 import type { PanelSectionData } from '@diagen/ui'
 
 import { SidebarCanvasPreview } from './SidebarCanvasPreview'
+import { selectLinkerCreationTool, selectShapeCreationTool, type SidebarCreationMode } from './creationMode'
 
 function resolveActiveItemId(designer: Designer): string | undefined {
   const current = designer.tool.tool()
@@ -26,7 +27,15 @@ function createLinkerPreview(linkerId: string) {
   return <SidebarCanvasPreview linkerId={linkerId} class="sidebar-preview" accent="#0f766e" />
 }
 
-export function createShapeLibraryBridge(designer: Designer) {
+export interface CreateShapeLibraryBridgeOptions {
+  creationMode?: Accessor<SidebarCreationMode>
+}
+
+function resolveCreationMode(creationMode?: Accessor<SidebarCreationMode>): SidebarCreationMode {
+  return creationMode?.() ?? 'batch'
+}
+
+export function createShapeLibraryBridge(designer: Designer, options: CreateShapeLibraryBridgeOptions = {}) {
   const activeItemId = createMemo<string | undefined>(() => resolveActiveItemId(designer))
 
   const shapeSections = createMemo<PanelSectionData[]>(() =>
@@ -47,7 +56,7 @@ export function createShapeLibraryBridge(designer: Designer) {
           meta: category.name,
           keywords: [shape.id, shape.name, shape.title, category.id, category.name],
           onSelect: () => {
-            designer.tool.toggleCreateShape(shape.id)
+            selectShapeCreationTool(designer, shape.id, resolveCreationMode(options.creationMode))
           },
         })),
       }
@@ -68,7 +77,7 @@ export function createShapeLibraryBridge(designer: Designer) {
       meta: '连线',
       keywords: [linker.id, linker.name, linker.title, 'line', 'linker', 'connector'],
       onSelect: () => {
-        designer.tool.toggleCreateLinker(linker.id)
+        selectLinkerCreationTool(designer, linker.id, resolveCreationMode(options.creationMode))
       },
     })),
   }))

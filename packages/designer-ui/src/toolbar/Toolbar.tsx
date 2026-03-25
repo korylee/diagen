@@ -4,11 +4,7 @@ import type { Designer } from '@diagen/core'
 import { ActionBar, ActionBarButton, ActionBarDivider, ActionBarSpacer } from '@diagen/ui'
 import type { ActionBarProps } from '@diagen/ui'
 
-import {
-  createDesignerIconRegistry,
-  renderDesignerIcon,
-  type DesignerIconRegistryOverrides,
-} from '../designerIconRegistry'
+import { createIconRegistry, renderIcon, type IconRegistryOverrides } from '../designerIconRegistry'
 import { createToolbarBridge } from './createToolbarBridge'
 import type { ToolbarBridgeButtonItem, ToolbarBridgeItem } from './types'
 import { pick } from '@diagen/shared'
@@ -16,7 +12,7 @@ import { pick } from '@diagen/shared'
 export interface ToolbarProps extends Omit<ActionBarProps, 'children'> {
   designer: Designer
   rightSlot?: JSX.Element
-  iconRegistry?: DesignerIconRegistryOverrides
+  iconRegistry?: IconRegistryOverrides
   renderIcon?: (iconKey: ToolbarBridgeButtonItem['iconKey'], item: ToolbarBridgeButtonItem) => JSX.Element
 }
 
@@ -48,31 +44,17 @@ function ToolbarBridgeItemView(props: {
 }
 
 export function Toolbar(props: ToolbarProps) {
-  const [local, rest] = splitProps(props, [
-    'designer',
-    'rightSlot',
-    'renderIcon',
-    'iconRegistry',
-    'class',
-    'style',
-    'width',
-  ])
+  const [local, rest] = splitProps(props, ['designer', 'rightSlot', 'renderIcon', 'iconRegistry'])
   const bridge = createToolbarBridge(local.designer)
-  const iconRegistry = createDesignerIconRegistry(local.iconRegistry)
+  const iconRegistry = createIconRegistry(local.iconRegistry)
   const renderToolbarIcon: ToolbarProps['renderIcon'] = (iconKey, item) => {
     return local.renderIcon
       ? local.renderIcon(iconKey, item)
-      : (renderDesignerIcon(iconKey, iconRegistry, { size: 16 }) ?? <span>•</span>)
+      : (renderIcon(iconKey, iconRegistry, { size: 16 }) ?? <span>•</span>)
   }
 
   return (
-    <ActionBar
-      {...rest}
-      class={local.class}
-      style={local.style}
-      width={local.width}
-      aria-label={rest['aria-label'] ?? 'Toolbar'}
-    >
+    <ActionBar {...rest} aria-label={rest['aria-label'] ?? 'Toolbar'}>
       <For each={bridge.leftItems()}>
         {item => <ToolbarBridgeItemView item={item} renderIcon={renderToolbarIcon} />}
       </For>

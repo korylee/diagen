@@ -1,5 +1,5 @@
 import type { Accessor } from 'solid-js'
-import type { DesignerIconKey } from '../designerIconRegistry'
+import type { IconKey } from '../designerIconRegistry'
 
 export interface ToolbarBridgeBaseItem {
   id: string
@@ -9,7 +9,7 @@ export interface ToolbarBridgeButtonItem extends ToolbarBridgeBaseItem {
   kind: 'button'
   text?: string
   title?: string
-  iconKey?: DesignerIconKey
+  iconKey?: IconKey
   color?: string
   dropdown?: boolean
   active?: boolean

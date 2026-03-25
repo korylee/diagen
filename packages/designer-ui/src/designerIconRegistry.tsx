@@ -4,6 +4,7 @@ import {
   DeleteIcon,
   FitIcon,
   GroupIcon,
+  IconBase,
   LinkerIcon,
   RectangleIcon,
   RedoIcon,
@@ -12,95 +13,76 @@ import {
   ZoomInIcon,
   ZoomOutIcon,
 } from '@diagen/icons'
+import { keys, type KeyOf } from '@diagen/shared'
 
-export type DesignerIconKey =
-  | 'shape-rectangle'
-  | 'linker'
-  | 'undo'
-  | 'redo'
-  | 'group'
-  | 'ungroup'
-  | 'delete'
-  | 'zoom-out'
-  | 'fit'
-  | 'zoom-in'
-  | 'quick-rectangle'
-  | 'connect'
-
-export interface DesignerIconDescriptor {
-  icon?: (props: IconProps) => JSX.Element
+interface Icon {
+  (props: IconProps): JSX.Element
 }
 
-export type DesignerIconRegistry = Record<DesignerIconKey, DesignerIconDescriptor>
-
-export type DesignerIconRegistryOverrides = Partial<Record<DesignerIconKey, Partial<DesignerIconDescriptor>>>
-
-export const defaultDesignerIconRegistry: DesignerIconRegistry = {
-  'shape-rectangle': {
-    icon: RectangleIcon,
-  },
-  linker: {
-    icon: LinkerIcon,
-  },
-  undo: {
-    icon: UndoIcon,
-  },
-  redo: {
-    icon: RedoIcon,
-  },
-  group: {
-    icon: GroupIcon,
-  },
-  ungroup: {
-    icon: UngroupIcon,
-  },
-  delete: {
-    icon: DeleteIcon,
-  },
-  'zoom-out': {
-    icon: ZoomOutIcon,
-  },
-  fit: {
-    icon: FitIcon,
-  },
-  'zoom-in': {
-    icon: ZoomInIcon,
-  },
-  'quick-rectangle': {
-    icon: RectangleIcon,
-  },
-  connect: {
-    icon: LinkerIcon,
-  },
+function CreateSingleIcon(props: IconProps): JSX.Element {
+  return (
+    <IconBase {...props} viewBox="0 0 16 16">
+      <rect x="2.5" y="3" width="6.5" height="6.5" rx="1.25" />
+      <path d="M11.5 5.5v6" />
+      <path d="M8.5 8.5h6" />
+    </IconBase>
+  )
 }
 
-export function createDesignerIconRegistry(overrides: DesignerIconRegistryOverrides = {}): DesignerIconRegistry {
-  const next = { ...defaultDesignerIconRegistry }
+function CreateBatchIcon(props: IconProps): JSX.Element {
+  return (
+    <IconBase {...props} viewBox="0 0 16 16">
+      <rect x="2.5" y="5.5" width="6.5" height="6.5" rx="1.25" />
+      <rect x="7" y="2" width="6.5" height="6.5" rx="1.25" />
+    </IconBase>
+  )
+}
 
-  for (const key of Object.keys(overrides) as DesignerIconKey[]) {
+export const defaultIconRegistry = {
+  'shape-rectangle': RectangleIcon,
+  linker: LinkerIcon,
+  undo: UndoIcon,
+  redo: RedoIcon,
+  group: GroupIcon,
+  ungroup: UngroupIcon,
+  delete: DeleteIcon,
+  'zoom-out': ZoomOutIcon,
+  fit: FitIcon,
+  'zoom-in': ZoomInIcon,
+  connect: LinkerIcon,
+  'create-single': CreateSingleIcon,
+  'create-batch': CreateBatchIcon,
+} as const
+
+export type IconKey = KeyOf<typeof defaultIconRegistry>
+
+export type IconRegistry = Record<IconKey, Icon>
+
+export type IconRegistryOverrides = Partial<IconRegistry>
+
+export function createIconRegistry(overrides: IconRegistryOverrides = {}): IconRegistry {
+  const next: IconRegistry = { ...defaultIconRegistry }
+
+  for (const key of keys(overrides)) {
     const override = overrides[key]
     if (!override) {
       continue
     }
 
-    next[key] = {
-      ...next[key],
-      ...override,
-    }
+    next[key] = override || next[key]
   }
 
   return next
 }
 
-export function renderDesignerIcon(
-  key: DesignerIconKey | undefined,
-  registry: DesignerIconRegistry = defaultDesignerIconRegistry,
+export function renderIcon(
+  key: IconKey | undefined,
+  registry: IconRegistry = defaultIconRegistry,
   props: IconProps = {},
-): JSX.Element | undefined {
+) {
   if (!key) {
     return undefined
   }
 
-  const icon = registry[key]?.icon
-  return icon ? icon(props) : undefined
+  return registry[key]?.(props)
 }

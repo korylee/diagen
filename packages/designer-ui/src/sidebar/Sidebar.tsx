@@ -1,8 +1,7 @@
-import { createMemo, createSignal, For, Show, splitProps, type JSX } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Show, splitProps, type JSX } from 'solid-js'
 import type { Designer } from '@diagen/core'
 import { createDgBem, cx, ensureArray } from '@diagen/shared'
 import {
-  createPanelSectionCollapse,
   PanelBody,
   PanelFooter,
   PanelFrame,
@@ -16,9 +15,13 @@ import {
   type PanelSectionData,
 } from '@diagen/ui'
 
-import type { DesignerIconRegistryOverrides } from '../designerIconRegistry'
+import {
+  createIconRegistry,
+  renderIcon,
+  type IconRegistryOverrides,
+} from '../designerIconRegistry'
+import { syncCreationModeForActiveTool, type SidebarCreationMode } from './creationMode'
 import { createShapeLibraryBridge } from './createShapeLibraryBridge'
-import { createSidebarActionBridge } from './createSidebarActionBridge'
 import { createPanelRailItems, createPanelSearchSections, filterPanelSections } from './search'
 
 import './sidebar.css'
@@ -27,7 +30,7 @@ export interface SidebarProps extends Omit<PanelFrameProps, 'children'> {
   designer: Designer
   searchable?: boolean
   searchPlaceholder?: string
-  iconRegistry?: DesignerIconRegistryOverrides
+  iconRegistry?: IconRegistryOverrides
   header?: JSX.Element
   footer?: JSX.Element
   emptyState?: JSX.Element
@@ -52,27 +55,24 @@ export function Sidebar(props: SidebarProps): JSX.Element {
     'class',
   ])
 
-  const shapeLibrary = createShapeLibraryBridge(local.designer)
-  const actionBridge = createSidebarActionBridge(local.designer, {
-    iconRegistry: local.iconRegistry,
+  const [creationMode, setCreationMode] = createSignal<SidebarCreationMode>('batch')
+  const iconRegistry = createIconRegistry(local.iconRegistry)
+  const shapeLibrary = createShapeLibraryBridge(local.designer, {
+    creationMode,
   })
 
   const [searchValue, setSearchValue] = createSignal<string>('')
   const [activeCategoryId, setActiveCategoryId] = createSignal<string | undefined>()
-  const { isCollapsed: isActionSectionCollapsed, toggleSection: toggleActionSection } =
-    createPanelSectionCollapse(local.onSectionToggle)
 
   const normalizedQuery = createMemo<string>(() => searchValue().trim().toLowerCase())
   const isSearching = createMemo<boolean>(() => normalizedQuery().length > 0)
   const librarySections = createMemo<readonly PanelSectionData[]>(() => shapeLibrary.sections())
-  const allActionSections = createMemo<readonly PanelSectionData[]>(() => actionBridge.sections())
   const librarySearchSections = createMemo<PanelSectionData[]>(() =>
     isSearching() ? filterPanelSections(librarySections(), normalizedQuery()) : [...librarySections()],
   )
   const searchSections = createMemo<PanelSectionData[]>(() =>
-    isSearching() ? createPanelSearchSections(librarySections(), allActionSections(), normalizedQuery()) : [],
+    isSearching() ? createPanelSearchSections(librarySections(), [], normalizedQuery()) : [],
   )
-  const actionSections = createMemo<PanelSectionData[]>(() => (isSearching() ? [] : [...allActionSections()]))
   const railItems = createMemo<PanelRailItem[]>(() => createPanelRailItems(librarySearchSections()))
 
   const resolvedActiveCategoryId = createMemo<string | undefined>(() => {
@@ -86,7 +86,9 @@ export function Sidebar(props: SidebarProps): JSX.Element {
 
     const activeToolId = shapeLibrary.activeItemId()
     if (activeToolId) {
-      const matchedSection = librarySearchSections().find(section => section.items.some(item => item.id === activeToolId))
+      const matchedSection = librarySearchSections().find(section =>
+        section.items.some(item => item.id === activeToolId),
+      )
       if (matchedSection?.id) {
         return matchedSection.id
       }
@@ -106,21 +108,57 @@ export function Sidebar(props: SidebarProps): JSX.Element {
 
   const hasSearchSections = createMemo<boolean>(() => searchSections().length > 0)
   const hasVisibleLibrarySections = createMemo<boolean>(() => visibleLibrarySections().length > 0)
-  const hasActionSections = createMemo<boolean>(() => actionSections().length > 0)
   const showRail = createMemo<boolean>(() => !isSearching() && railItems().length > 1)
-  const rootClass = createMemo(() => cx(bem(), local.class))
+
+  createEffect(() => {
+    syncCreationModeForActiveTool(local.designer, creationMode())
+  })
 
   return (
     <PanelFrame
       {...rest}
       readonly={local.readonly}
-      class={rootClass()}
+      class={cx(bem(), local.class)}
       data-searching={isSearching() ? 'true' : undefined}
       aria-label={rest['aria-label'] ?? 'Sidebar'}
     >
-      <Show when={local.header}>
-        <PanelHeader>{local.header}</PanelHeader>
-      </Show>
+      <PanelHeader class={bem('topbar')}>
+        <Show when={local.header}>
+          <div class={bem('header-slot')}>{local.header}</div>
+        </Show>
+
+        <div class={bem('mode-toggle')} role="group" aria-label="创建模式">
+          <button
+            type="button"
+            class={bem('mode-button')}
+            data-active={creationMode() === 'single' ? 'true' : undefined}
+            aria-pressed={creationMode() === 'single'}
+            aria-label="单个创建"
+            title="单个创建"
+            onClick={() => setCreationMode('single')}
+          >
+            {renderIcon('create-single', iconRegistry, {
+              size: 16,
+              class: bem('mode-icon'),
+            })}
+          </button>
+
+          <button
+            type="button"
+            class={bem('mode-button')}
+            data-active={creationMode() === 'batch' ? 'true' : undefined}
+            aria-pressed={creationMode() === 'batch'}
+            aria-label="批量创建"
+            title="批量创建"
+            onClick={() => setCreationMode('batch')}
+          >
+            {renderIcon('create-batch', iconRegistry, {
+              size: 16,
+              class: bem('mode-icon'),
+            })}
+          </button>
+        </div>
+      </PanelHeader>
 
       <Show when={local.searchable !== false}>
         <PanelSearchField
@@ -203,26 +241,8 @@ export function Sidebar(props: SidebarProps): JSX.Element {
           </Show>
         </Show>
 
-        <Show when={hasActionSections()}>
-          <div class={bem('stack')}>
-            <For each={actionSections()}>
-              {(section, index) => (
-                <PanelSection
-                  section={section}
-                  index={index()}
-                  readonly={local.readonly}
-                  emptyState={local.emptyState}
-                  isCollapsed={isActionSectionCollapsed}
-                  onToggleSection={toggleActionSection}
-                  onItemSelect={local.onItemSelect}
-                />
-              )}
-            </For>
-          </div>
-        </Show>
-
-        <Show when={!hasSearchSections() && !hasVisibleLibrarySections() && !hasActionSections()}>
-          <div class="dg-panel__empty">{local.emptyState ?? 'No items'}</div>
+        <Show when={!hasSearchSections() && !hasVisibleLibrarySections()}>
+          <div class={bem('empty')}>{local.emptyState ?? 'No items'}</div>
         </Show>
       </PanelBody>
 

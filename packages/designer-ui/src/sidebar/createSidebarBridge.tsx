@@ -1,26 +1,14 @@
-import { createMemo } from 'solid-js'
 import type { Designer } from '@diagen/core'
 import type { PanelItemData } from '@diagen/ui'
 
-import type { DesignerIconRegistryOverrides } from '../designerIconRegistry'
 import { createShapeLibraryBridge } from './createShapeLibraryBridge'
-import { createSidebarActionBridge } from './createSidebarActionBridge'
 import type { SidebarBridge } from './types'
 
-export interface CreateSidebarBridgeOptions {
-  iconRegistry?: DesignerIconRegistryOverrides
-}
-
-export function createSidebarBridge(designer: Designer, options: CreateSidebarBridgeOptions = {}): SidebarBridge {
+export function createSidebarBridge(designer: Designer): SidebarBridge {
   const shapeLibrary = createShapeLibraryBridge(designer)
-  const actions = createSidebarActionBridge(designer, {
-    iconRegistry: options.iconRegistry,
-  })
-
-  const sections = createMemo(() => [...shapeLibrary.sections(), ...actions.sections()])
 
   function getItemById(id: string): PanelItemData | undefined {
-    for (const section of sections()) {
+    for (const section of shapeLibrary.sections()) {
       const matched = section.items.find(item => item.id === id)
       if (matched) return matched
     }
@@ -35,7 +23,7 @@ export function createSidebarBridge(designer: Designer, options: CreateSidebarBr
   }
 
   return {
-    sections,
+    sections: shapeLibrary.sections,
     activeItemId: shapeLibrary.activeItemId,
     getItemById,
     execute,
