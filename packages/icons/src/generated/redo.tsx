@@ -8,7 +8,7 @@ import type { JSX } from 'solid-js'
 import { IconBase } from '../base'
 import type { IconProps } from '../types'
 
-export function RedoIcon(props: IconProps): JSX.Element {
+export function Redo(props: IconProps): JSX.Element {
   return (
     <IconBase {...props} viewBox="0 0 16 16">
       <path d="m10 4 2.5 2.5L10 9"/>

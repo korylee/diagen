@@ -29,12 +29,12 @@ function toCamelCase(value) {
 
 function componentNameFromFile(fileName) {
   const baseName = fileName.replace(/\.svg$/i, '')
-  return `${toPascalCase(baseName)}Icon`
+  return `${toPascalCase(baseName)}`
 }
 
 function componentFileNameFromFile(fileName) {
   const baseName = fileName.replace(/\.svg$/i, '')
-  return `${toCamelCase(baseName)}Icon.tsx`
+  return `${toCamelCase(baseName)}.tsx`
 }
 
 function extractSvgAttribute(attributes, name) {

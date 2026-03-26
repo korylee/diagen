@@ -8,11 +8,10 @@ import type { JSX } from 'solid-js'
 import { IconBase } from '../base'
 import type { IconProps } from '../types'
 
-export function ZoomInIcon(props: IconProps): JSX.Element {
+export function Rectangle(props: IconProps): JSX.Element {
   return (
     <IconBase {...props} viewBox="0 0 16 16">
-      <circle cx="7" cy="7" r="3.5"/>
-      <path d="M5.5 7h3M7 5.5v3m3 1.5 3 3"/>
+      <rect width="11" height="9" x="2.5" y="3.5" rx="1.5"/>
     </IconBase>
   )
 }

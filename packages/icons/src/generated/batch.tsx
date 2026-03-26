@@ -8,12 +8,11 @@ import type { JSX } from 'solid-js'
 import { IconBase } from '../base'
 import type { IconProps } from '../types'
 
-export function UngroupIcon(props: IconProps): JSX.Element {
+export function Batch(props: IconProps): JSX.Element {
   return (
     <IconBase {...props} viewBox="0 0 16 16">
-      <rect width="4.5" height="4.5" x="2.5" y="3.5" rx=".75"/>
-      <rect width="4.5" height="4.5" x="9" y="8" rx=".75"/>
-      <path d="m6 10 4-4"/>
+      <rect width="6.5" height="6.5" x="2.5" y="5.5" rx="1.25"/>
+      <rect width="6.5" height="6.5" x="7" y="2" rx="1.25"/>
     </IconBase>
   )
 }

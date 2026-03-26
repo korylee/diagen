@@ -8,7 +8,7 @@ import type { JSX } from 'solid-js'
 import { IconBase } from '../base'
 import type { IconProps } from '../types'
 
-export function FitIcon(props: IconProps): JSX.Element {
+export function Fit(props: IconProps): JSX.Element {
   return (
     <IconBase {...props} viewBox="0 0 16 16">
       <path d="M5.5 2.5h-3v3m8-3h3v3m-8 8h-3v-3m8 3h3v-3"/>

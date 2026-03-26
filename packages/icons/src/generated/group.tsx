@@ -8,11 +8,12 @@ import type { JSX } from 'solid-js'
 import { IconBase } from '../base'
 import type { IconProps } from '../types'
 
-export function ZoomOutIcon(props: IconProps): JSX.Element {
+export function Group(props: IconProps): JSX.Element {
   return (
     <IconBase {...props} viewBox="0 0 16 16">
-      <circle cx="7" cy="7" r="3.5"/>
-      <path d="M5.5 7h3m1.5 3 3 3"/>
+      <rect width="4.5" height="4.5" x="2.5" y="4.5" rx=".75"/>
+      <rect width="4.5" height="4.5" x="9" y="4.5" rx=".75"/>
+      <path d="M4.75 11.5h6.5"/>
     </IconBase>
   )
 }

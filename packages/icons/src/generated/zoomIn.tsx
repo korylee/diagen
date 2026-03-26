@@ -8,11 +8,11 @@ import type { JSX } from 'solid-js'
 import { IconBase } from '../base'
 import type { IconProps } from '../types'
 
-export function UndoIcon(props: IconProps): JSX.Element {
+export function ZoomIn(props: IconProps): JSX.Element {
   return (
     <IconBase {...props} viewBox="0 0 16 16">
-      <path d="M6 4 3.5 6.5 6 9"/>
-      <path d="M4 6.5h5.5c1.93 0 3.5 1.57 3.5 3.5s-1.57 3.5-3.5 3.5h-3"/>
+      <circle cx="7" cy="7" r="3.5"/>
+      <path d="M5.5 7h3M7 5.5v3m3 1.5 3 3"/>
     </IconBase>
   )
 }

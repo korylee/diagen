@@ -8,12 +8,11 @@ import type { JSX } from 'solid-js'
 import { IconBase } from '../base'
 import type { IconProps } from '../types'
 
-export function LinkerIcon(props: IconProps): JSX.Element {
+export function Delete(props: IconProps): JSX.Element {
   return (
     <IconBase {...props} viewBox="0 0 16 16">
-      <circle cx="3" cy="8" r="1.25" fill="currentColor"/>
-      <circle cx="13" cy="8" r="1.25" fill="currentColor"/>
-      <path d="M4.75 8h6.5"/>
+      <path d="m5.5 5.5 5 5m0-5-5 5"/>
+      <path d="M3.5 3.5h9" opacity=".4"/>
     </IconBase>
   )
 }

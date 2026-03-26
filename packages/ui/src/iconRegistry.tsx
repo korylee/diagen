@@ -1,18 +1,6 @@
 import type { JSX } from 'solid-js'
 import type { IconProps } from '@diagen/icons'
-import {
-  DeleteIcon,
-  FitIcon,
-  GroupIcon,
-  IconBase,
-  LinkerIcon,
-  RectangleIcon,
-  RedoIcon,
-  UndoIcon,
-  UngroupIcon,
-  ZoomInIcon,
-  ZoomOutIcon,
-} from '@diagen/icons'
+import { Delete, Batch, Fit, Group, IconBase, Linker, Redo, Undo, Ungroup, ZoomIn, ZoomOut } from '@diagen/icons'
 import { keys, type KeyOf } from '@diagen/shared'
 
 interface Icon {
@@ -29,29 +17,19 @@ function CreateSingleIcon(props: IconProps): JSX.Element {
   )
 }
 
-function CreateBatchIcon(props: IconProps): JSX.Element {
-  return (
-    <IconBase {...props} viewBox="0 0 16 16">
-      <rect x="2.5" y="5.5" width="6.5" height="6.5" rx="1.25" />
-      <rect x="7" y="2" width="6.5" height="6.5" rx="1.25" />
-    </IconBase>
-  )
-}
-
 export const defaultIconRegistry = {
-  'shape-rectangle': RectangleIcon,
-  linker: LinkerIcon,
-  undo: UndoIcon,
-  redo: RedoIcon,
-  group: GroupIcon,
-  ungroup: UngroupIcon,
-  delete: DeleteIcon,
-  'zoom-out': ZoomOutIcon,
-  fit: FitIcon,
-  'zoom-in': ZoomInIcon,
-  connect: LinkerIcon,
+  linker: Linker,
+  undo: Undo,
+  redo: Redo,
+  group: Group,
+  ungroup: Ungroup,
+  delete: Delete,
+  'zoom-out': ZoomOut,
+  fit: Fit,
+  'zoom-in': ZoomIn,
+  connect: Linker,
   'create-single': CreateSingleIcon,
-  'create-batch': CreateBatchIcon,
+  'create-batch': Batch,
 } as const
 
 export type IconKey = KeyOf<typeof defaultIconRegistry>

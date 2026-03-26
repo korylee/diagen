@@ -8,10 +8,12 @@ import type { JSX } from 'solid-js'
 import { IconBase } from '../base'
 import type { IconProps } from '../types'
 
-export function RectangleIcon(props: IconProps): JSX.Element {
+export function Ungroup(props: IconProps): JSX.Element {
   return (
     <IconBase {...props} viewBox="0 0 16 16">
-      <rect width="11" height="9" x="2.5" y="3.5" rx="1.5"/>
+      <rect width="4.5" height="4.5" x="2.5" y="3.5" rx=".75"/>
+      <rect width="4.5" height="4.5" x="9" y="8" rx=".75"/>
+      <path d="m6 10 4-4"/>
     </IconBase>
   )
 }
