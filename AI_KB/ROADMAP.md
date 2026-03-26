@@ -1,403 +1,320 @@
-# Diagen 近期开发计划（1-2 周，基于 `.processon` 与 draw.io 对照）
+# Diagen 近期开发计划（以补齐编辑器核心能力为最高优先级）
 
-日期：2026-03-24  
-计划周期：10 个工作日（可在 1-2 周内按人力压缩或拉伸）  
-计划目标：在不破坏现有分层（`core/renderer/primitives/ui`）的前提下，优先补齐编辑器生产力缺口，并开始建设应用壳层 UI。
-
----
-
-## 当前进度摘要（2026-03-24）
-
-已完成：
-1. `tool manager` 已接入 `core`，并具备 `idle / create-shape / create-linker` 运行时语义。
-2. shape / linker 正式创建链路已进入 renderer 主链路：
-   - `RendererContainer.tsx` 已支持 `create-shape` 点击落点创建
-   - `RendererContainer.tsx` 已支持 `create-linker` 从空白点开始创建
-   - `CanvasRenderer.tsx` 已支持 `create-linker` 下点按 shape 直接进入快速建线
-3. `packages/ui` 已完成第一阶段壳层能力，`Sidebar` 与 `Toolbar` 已可用于 playground 最小集成。
-4. `packages/designer-ui` 已建立 bridge 层，包含 `createToolbarBridge`、`createShapeLibraryBridge`、`createSidebarActionBridge` 与 `Sidebar / Toolbar`。
-5. `packages/icons` 已形成“平铺 assets + svgo 规范化 + generated icon component”流水线。
-6. “从锚点拖出创建新线”已完成 `Phase 1`：
-   - `packages/core/src/utils/anchors/index.ts` 已新增 `resolvePreferredCreateAnchor(...)`
-   - `packages/core/src/utils/anchors/__tests__/index.test.ts` 已补齐 4 个核心用例并通过测试
-
-仍待完成：
-1. Clipboard manager 与回归测试
-2. `createLinkerDrag.startCreateFromShape(...)` 的 transaction 闭环
-3. `InteractionMachine.startQuickCreateLinker(...)`
-4. 右上角快捷建线 overlay UI
-
-说明：
-- `AI_KB` 下不再单独维护执行审查、基础差距、锚点建线专项计划；相关结论统一收敛到本文
-- 当前 P0 总状态：
-  - `P0-创建工具链路`：已完成
-  - `P0-UI 壳层起步`：已完成
-  - `P0-clipboard manager`：未完成，是当前唯一剩余 P0 阻塞项
+日期：2026-03-26  
+计划类型：滚动计划（优先覆盖未来 4-6 周）  
+计划目标：在不破坏现有分层（`core / renderer / primitives / components / ui`）的前提下，优先把编辑器核心能力补齐到“可连续使用、可回归验证、可继续扩展”的状态。`UI` 壳层与通用组件继续推进，但不再占用最高优先级。
 
 ---
 
-## 0. 分析基线（本计划依据）
+## 0. 当前判断
 
-1. `.processon` 源码锚点：
-- 吸附线：`designer.core.js:snapLine(5769)`、`snapResizeLine(5978)`
-- 画布扩容：`designer.core.js:changeCanvas(6633)`
-- 剪贴板：`designer.core.js:clipboard(6663+)`
-- 控件反馈：`designer.core.js:drawControls(8861)`、`showLinkerControls(10575)`、`showAnchors(10689)`
-- 历史系统：`designer.core.js:undoStack/redoStack(13144+)` + `designer.events.js:undoStackChanged/clipboardChanged(212+)`
+### 0.1 当前结论
+1. 项目当前最重要的问题，不是“缺少更多壳层组件”，而是“编辑器主流程还没有完全成为一等能力”。
+2. 后续开发的最高优先级统一调整为：`编辑器核心能力 > 稳定性与回归 > 壳层 UI/通用组件 > 产品化扩展`。
+3. 所有新工作默认先服务于以下闭环：
+   - 选择
+   - 拖拽
+   - 缩放与导航
+   - 建块
+   - 建线
+   - 编辑已有线
+   - 撤销重做
+   - 剪贴板
 
-2. draw.io / mxGraph 参考轴：
-- `View/Model` 分离
-- `Handler` 原语化交互体系
-- `Overlay` 反馈层
-- `Undo` 事务边界
-- 路由与可读性（含 line jumps）
+### 0.2 现状摘要（2026-03-26）
+已具备：
+1. `core` 已具备 `tool manager`、`history manager`、`selection manager`、`view manager` 等基础管理器。
+2. `renderer` 已具备三层渲染契约：
+   - `world-layer`
+   - `scene-layer`
+   - `overlay-layer`
+3. shape / linker 正式创建链路已接入主交互链。
+4. 路由、line jumps、anchors、guide 等基础能力已有一部分实现与测试。
+5. playground 已能承载 `core + renderer + ui` 联调。
 
-3. Diagen 当前对照入口：
-- 坐标归一化：`packages/renderer/src/primitives/createCoordinateService.ts`
-- 交互状态机：`packages/renderer/src/primitives/createInteractionMachine.ts`
-- 历史事务：`packages/core/src/designer/managers/history.ts`
-- 视图管理：`packages/core/src/designer/managers/view.ts`
-- 工具态：`packages/core/src/designer/managers/tool.ts`
-- UI 壳层承载点：`packages/ui/`
-
----
-
-## 1. 目标与成功标准
-
-### 1.1 目标（P0/P1）
-1. P0：完成 shape/linker 正式创建链路（工具态进入画布创建）。
-2. P0：落地 `clipboard manager`（copy/cut/paste/duplicate）并接入历史事务。
-3. P0：开始建设 `packages/ui` 壳层组件（Sidebar / Topbar / TopMenu / ContextMenu）。
-4. P1：为核心交互与 UI 壳层补齐回归测试与 playground 验证。
-
-当前状态（2026-03-24）：
-1. P0-1 已完成。
-2. P0-2 未完成。
-3. P0-3 已完成第一阶段目标，后续 Topbar / TopMenu / ContextMenu 继续按 P1/P2 推进。
-
-### 1.2 成功标准（验收）
-1. 拖拽/缩放时，吸附线与吸附行为稳定可见，误吸附可控（阈值可配置）。
-2. 复制/剪切/粘贴支持多选、group 保真、ID 重映射，撤销重做行为正确。
-3. 进入 shape/linker 工具后，可直接在画布创建块和线，不再依赖 playground 按钮。
-4. `packages/ui` 输出可复用的 Sidebar / Topbar / TopMenu / ContextMenu 组件，并通过 playground 做最小集成。
+主要缺口：
+1. 快捷建线链路尚未形成完整事务闭环。
+2. clipboard 仍未完成，是编辑器生产力的关键缺口。
+3. 交互回归测试仍偏薄，`renderer` 层缺少足够保护。
+4. 视图导航、快捷键、命令入口、连续编辑流仍需统一打磨。
+5. 部分知识库条目和阶段描述已经滞后，需要按当前优先级解释项目节奏。
 
 ---
 
-## 2. 范围定义
+## 1. 本阶段总目标与验收标准
 
-### 2.1 本周期内（In Scope）
-1. Guide 计算引擎（core）+ Guide overlay（renderer）。
-2. Clipboard 语义与命令入口（core 优先，UI 仅薄层绑定）。
-3. Shape/linker 正式创建工具链路。
-4. `packages/ui` 壳层组件基础实现与 playground 集成。
-5. 单元测试与最小集成回归（交互链路 + UI 壳层）。
+### 1.1 总目标
+1. 将 Diagen 推进到“基础编辑器核心流程完整可用”的阶段。
+2. 核心体验必须不依赖 playground 中的临时按钮或 demo 逻辑才能完成主要编辑操作。
+3. 核心交互必须有清晰事务边界，能够稳定进入 `undo / redo`。
+4. `renderer` 与 `core` 的职责边界保持清晰，不因赶工把应用逻辑写回底层。
 
-### 2.2 本周期外（Out of Scope）
-1. 评论系统完整产品化（仅保留接口位）。
-2. 全量导出体系（PNG/PDF/SVG 完整参数面板）。
-3. 实时协作协议与远端冲突合并。
-4. 完整设计系统与主题定制平台。
-
-### 2.3 当前主要差距与执行前提
-1. 当前最大差距不是“不能编辑”，而是“创建还不是一等交互能力”。
-2. P0 主缺口仍是：
-   - clipboard manager
-   - 从锚点拖出新 linker 的独立快捷入口
-3. 已具备的开工前提：
-   - `tool manager`、`history.transaction`、`InteractionOverlay`、`createInteractionMachine`、坐标归一化链路均已存在
-   - `resolvePreferredCreateAnchor(...)` 已落地，可作为快捷建线唯一 source anchor 决策入口
-4. 当前主要工程风险：
-   - 交互回归测试仍偏薄
-   - 创建链路若不统一走 transaction，容易产生临时 linker 泄漏或 undo 粒度错误
+### 1.2 阶段验收标准
+满足以下条件时，可认为本阶段主目标达成：
+1. 用户可以稳定完成“创建图元 -> 连接 -> 调整 -> 复制粘贴 -> 撤销重做”的连续流程。
+2. 快捷建线、已有线拖拽编辑、工具态创建三条链路不互相打架。
+3. 关键交互在缩放、滚动、单选、多选场景下行为一致。
+4. `renderer` 关键路径具备最小回归测试集。
+5. playground 可以作为正式联调入口，而不是仅用于展示静态效果。
 
 ---
 
-## 3. 详细执行计划（D1-D10）
+## 2. 优先级原则
+
+### 2.1 优先级顺序
+1. P0：编辑器核心能力
+2. P0：交互稳定性、事务一致性、回归测试
+3. P1：设计器壳层接线与命令入口
+4. P2：通用组件扩展与样式体系
+5. P3：评论、导出、协作等产品化能力
+
+### 2.2 执行约束
+1. 若 P0 主链路仍未完成，不并行开启新的 P2/P3 能力开发。
+2. `components` 新增组件必须优先证明对编辑器主流程有直接价值。
+3. `ui` 只负责桥接与壳层装配，不承载图形几何与历史事务逻辑。
+4. `renderer` 只处理交互与可视化，不回卷到应用菜单编排。
+
+---
+
+## 3. 核心主线拆解
+
+### 3.1 主线 A：创建与连线
+目标：让“建块 + 建线 + 编辑线”成为稳定的一等交互能力。
+
+必做项：
+1. 完成 `createLinkerDrag.startCreateFromShape(...)` 的事务闭环。
+2. 完成 `InteractionMachine.startQuickCreateLinker(...)` 收口。
+3. 完成 `LinkCreateOverlay` 或等价快捷入口的稳定接线。
+4. 统一新建线、编辑已有线、工具态建线的结束/取消规则。
+5. 补齐命中 shape、命中空白、阈值内取消、阈值外提交等回归测试。
+
+完成标志：
+1. 快捷建线不产生孤儿 linker。
+2. 一次建线只生成一个 undo 单元。
+3. 取消操作不会留下脏状态。
+4. 缩放后建线起点与终点仍稳定。
+
+### 3.2 主线 B：选择、拖拽、缩放与导航
+目标：把高频编辑基础动作做稳，而不是只追求新功能。
+
+必做项：
+1. 复核单选、多选、框选与选择态切换行为。
+2. 打磨 shape 拖拽、group 拖拽、resize、rotate 的一致性。
+3. 补齐缩放、滚动、fit、居中选中、视口重置等视图命令。
+4. 清理 `RendererContainer` 与 `InteractionOverlay` 的职责边界。
+5. 为坐标归一化、滚动容器、overlay 定位补最小回归验证。
+
+完成标志：
+1. 拖拽、框选、旋转、缩放在 10-15 分钟连续操作下无明显异常。
+2. 视图命令不会破坏当前交互会话。
+3. overlay 与 scene 坐标在不同 zoom 下保持一致。
+
+### 3.3 主线 C：撤销重做与剪贴板
+目标：补齐真正影响生产力的编辑器命令系统。
+
+必做项：
+1. 完成 clipboard manager 的模型、序列化和 ID 重映射。
+2. 接通 `copy / cut / paste / duplicate`。
+3. 将 clipboard 操作完整纳入 `history.transaction`。
+4. 补齐 group / linker 引用关系保持与降级策略。
+5. 在 playground 或壳层接入快捷键与命令入口。
+
+完成标志：
+1. 多选复制可正确粘贴。
+2. group 结构与 linker 引用关系可用。
+3. `undo / redo` 粒度符合用户预期。
+
+### 3.4 主线 D：命令入口与最小壳层闭环
+目标：让核心能力有稳定入口，但不让壳层工作反客为主。
+
+必做项：
+1. 明确 `Toolbar / Sidebar / 快捷键 / 右键菜单` 的命令边界。
+2. 将创建、删除、复制、分组、缩放等高频命令映射到统一入口。
+3. 继续使用 bridge 思路，不把 `Designer` 语义直接塞进基础组件。
+4. playground 保持最小但完整的编辑壳层。
+
+完成标志：
+1. 主流程命令不再依赖临时按钮。
+2. `ui` 可以稳定承载编辑命令映射，但不拥有底层状态。
+
+---
+
+## 4. 分阶段执行计划
+
+## Phase 0：基线稳定（本周立即执行）
+目标：先把“可持续迭代”建立起来，再继续堆功能。
+
+任务：
+1. 清理全仓已知类型噪音，至少保证核心开发路径不被无关错误干扰。
+2. 复核 `RendererContainer`、`InteractionOverlay`、`LinkCreateOverlay` 当前脏改动与计划方向的一致性。
+3. 为 `renderer` 关键交互补第一批测试骨架。
+4. 确认 playground 为当前唯一集成验证入口。
+
+产出：
+1. 稳定的开发基线。
+2. 可持续补功能的测试入口。
+
+## Phase 1：创建与连线闭环
+目标：先把最容易影响“能不能用”的部分做通。
+
+任务：
+1. 完成快捷建线 `Phase 2 -> Phase 4`：
+   - `createLinkerDrag.startCreateFromShape(...)`
+   - `InteractionMachine.startQuickCreateLinker(...)`
+   - overlay 触发入口
+2. 统一 linker 新建、编辑、取消、提交的事务边界。
+3. 补齐对应测试。
+
+产出：
+1. 可正式使用的建线链路。
+2. 与现有 linker 编辑链兼容的交互模型。
+
+## Phase 2：选择/拖拽/导航稳态化
+目标：把基础编辑动作打磨到连续可用。
+
+任务：
+1. 选择、框选、拖拽、resize、rotate 回归清理。
+2. guide 与吸附反馈再校准。
+3. 补齐 zoom / fit / focus selection / scroll 协同命令。
+4. 修复 overlay 定位与缩放坐标偏差。
+
+产出：
+1. 稳定的高频编辑体验。
+2. 可回归验证的导航与操作闭环。
+
+## Phase 3：剪贴板与历史系统
+目标：补齐编辑器生产力能力。
+
+任务：
+1. 实现 clipboard manager。
+2. 接入 copy / cut / paste / duplicate。
+3. 保证与 group / linker / history 的一致性。
+4. 建立对应单元测试和 playground 验证场景。
+
+产出：
+1. 可用的剪贴板系统。
+2. 成熟的事务边界约束。
+
+## Phase 4：命令壳层与最小产品化
+目标：把核心能力通过稳定入口暴露出来。
+
+任务：
+1. 给高频命令建立快捷键与壳层入口。
+2. 整理 `Toolbar / Sidebar / ContextMenu` 的接线优先级。
+3. 清理仅为 demo 服务的临时逻辑。
+4. 整理文档、示例和已知限制。
+
+产出：
+1. 最小但完整的编辑器壳层。
+2. 可继续扩展的命令体系。
+
+---
+
+## 5. 未来 4 周建议节奏
 
 ### Week 1
-
-### D1：技术方案冻结与任务拆解
-1. 完成创建工具态接口草案，明确 `tool manager` 放入 `core`。
-2. 明确事务边界：工具态是运行时状态，不进入 Diagram；一次用户创建动作对应一个 history entry。
-3. 输出：`AI_KB` 设计补充条目 + 开发任务清单。
-
-当前状态（2026-03-19）：已完成。  
-补充：`core` 已新增 `tool manager`，运行时支持 `idle / create-shape / create-linker`。
-
-### D2：创建工具基础设施
-1. 将工具态纳入 `EditorState`，作为正式运行时状态。
-2. 在 `RendererContainer` 接入 `Esc` 退出与基础 cursor 反馈。
-3. 输出：可被后续 D3-D5 复用的 `tool` API 与回归测试。
-
-当前状态（2026-03-19）：已完成。  
-补充：已新增 `toolManager.test.ts`；当前仅完成基础设施，尚未接入画布点击创建。
-
-### D3：shape 点击落点创建
-1. 在 `renderer` 将 `create-shape` 工具态转为画布点击创建命令。
-2. 创建后自动选中，支持 `continuous` 连续创建。
-3. 输出：最小可用的画布创建闭环与回归测试。
-
-验收：点击画布即可创建 shape，`Esc` 可退出工具态。
-
-当前状态（2026-03-24）：已完成。  
-补充：
-- `packages/renderer/src/components/RendererContainer.tsx` 已接线 `startShapeCreate(...)`
-- `create-shape` 下点击空白画布即可创建 shape
-- `continuous = false` 时创建后会自动退出工具态
-
-### D4：从锚点拖出创建新 linker
-1. 在选中 shape 的 overlay 暴露出线手柄。
-2. 按下时创建临时 linker，并切入现有 `linkerDrag` 链路。
-3. 输出：连接成功提交，取消时回滚的事务闭环。
-
-验收：从锚点拖出可直接完成新线创建，不再依赖 demo 按钮。
-
-当前状态（2026-03-23）：
-- 已完成前置 `Phase 1`：`core` 锚点决策 helper
-- 已完成工具态下的两类正式建线入口：
-  - `RendererContainer.tsx`：从空白点开始创建 linker
-  - `CanvasRenderer.tsx`：`create-linker` 模式下点按 shape 直接进入快速建线
-- 未完成右上角快捷建线 overlay 与专用 transaction/machine API 收口
-- 该项已拆分为独立专项计划，按 `Phase 2 -> Phase 3 -> Phase 4` 推进
-
-### D5：Week1 集成与回归
-1. 清理工具态 API 命名与 Renderer 接线。
-2. 执行核心回归测试（工具切换、创建、撤销重做）。
-3. 输出：Week1 集成报告（问题清单 + 修复优先级）。
-
-验收：P0 功能基础闭环可用，已知问题可追踪。
+1. 处理基线问题与 `renderer` 测试入口。
+2. 完成快捷建线 transaction 闭环。
+3. 让 `LinkCreateOverlay` 或等价快捷入口接上正式链路。
 
 ### Week 2
+1. 清理建线回归问题。
+2. 打磨选择、拖拽、缩放、overlay 定位。
+3. 补齐第一轮交互回归测试。
 
-### D6：Clipboard Manager 设计与实现（core）
-1. 新增 clipboard 数据结构与序列化协议。
-2. 实现 `copy/cut/paste/duplicate`，支持 ID 重映射。
-3. 输出：group/linker 引用关系保持策略（含降级规则）。
+### Week 3
+1. 实现 clipboard manager。
+2. 接入 copy / cut / paste / duplicate。
+3. 覆盖 group / linker / history 场景。
 
-验收：多选复制后粘贴结果结构完整、引用正确、无 ID 冲突。
-
-### D7：Clipboard 与历史/交互接入
-1. 将 clipboard 动作纳入 transaction scope。
-2. 绑定快捷键/命令入口（renderer 或 playground 层）。
-3. 输出：撤销重做覆盖 copy/cut/paste/duplicate。
-
-验收：每次粘贴为单独可撤销单元；cut 可完整恢复。
-
-### D8：packages/ui 基础壳层搭建
-1. 在 `packages/ui` 建立导出结构、基础样式与组件约定。
-2. 明确组件边界：只负责菜单/栏位/弹层，不承载图语义和 history。
-3. 输出：`Sidebar / Topbar / TopMenu / ContextMenu` 的组件骨架与基础 props。
-
-验收：`packages/ui` 不再是占位包，四类组件可被 playground 引用。
-
-当前状态（2026-03-19）：
-- 已完成第一阶段：`packages/ui` 已建立 `tsdown` 构建、标准导出与 `Sidebar` 第一版。
-- playground 已完成 `Sidebar + Toolbar + designer-ui bridge` 最小集成，当前 Topbar / TopMenu / ContextMenu 仍待实现。
-- 已新增 `packages/designer-ui` bridge 包，并落地 `createToolbarBridge`、`createShapeLibraryBridge`、`createSidebarActionBridge`。
-- playground 顶部工具栏与左侧 Sidebar 的 `Designer` 接线已迁移到 bridge 层。
-
-### D9：UI 壳层组件最小闭环
-1. `Sidebar`：图元分类/工具入口容器。
-2. `Topbar / TopMenu`：文件、编辑、视图类菜单承载。
-3. `ContextMenu`：右键命令菜单承载，可由应用层注入菜单项。
-
-验收：playground 可用 `packages/ui` 组件组合出基本编辑器壳层。
-
-### D10：封板与知识库同步
-1. 合并本周期文档：架构、集成点、对照结论。
-2. 形成版本说明（新增能力、限制、已知问题），明确 `ui` 与 `renderer` 的边界。
-3. 输出：下一周期滚动 backlog（按优先级排序）。
-
-验收：功能、文档、测试三者一致，可进入下一迭代。
+### Week 4
+1. 统一命令入口和快捷键。
+2. 用 playground 验证完整编辑主流程。
+3. 归档文档，形成下一轮 backlog。
 
 ---
 
-## 3.1 D4 专项拆解：从锚点拖出创建新线
+## 6. 关键任务清单（按优先级）
 
-目标：
-1. 将“从 shape 锚点拖出创建新线”完整接入 `core / renderer / history`。
-2. 保持代码精简、健壮、可持续，避免临时逻辑堆进 overlay 或重复实现已有拖拽系统。
-
-当前进度（2026-03-23）：
-1. `Phase 1` 已完成：
-   - `packages/core/src/utils/anchors/index.ts` 已新增 `resolvePreferredCreateAnchor(...)`
-   - 已新增 `PreferredCreateAnchor` / `PreferredCreateFixedAnchorInfo`
-   - `packages/core/src/utils/anchors/__tests__/index.test.ts` 已补齐 4 个核心用例并通过
-2. 待完成：
-   - `Phase 2`：`createLinkerDrag.startCreateFromShape(...)`
-   - `Phase 3`：`InteractionMachine.startQuickCreateLinker(...)`
-   - `Phase 4`：右上角快捷建线 overlay UI
-
-强约束：
-1. 不复制 `createLinkerDrag` 的拖拽、吸附、endpoint 解析逻辑。
-2. 不在 `InteractionOverlay` 内直接维护临时 linker 生命周期。
-3. 所有“新建 + 拖拽 + 完成/取消”必须属于同一个 history transaction。
-4. 锚点选择规则统一走 `resolvePreferredCreateAnchor(...)`，不得在 renderer 再写一套判断。
-5. renderer 只做触发、状态切换、可视化；不承载复杂几何决策。
-
-禁止事项：
-1. 不在 UI 组件中直接 `Schema.createLinker(...) + edit.add(...) + window mousemove`。
-2. 不为“快捷建线”新写一套独立 drag session。
-3. 不将菜单位置当作连线起点。
-4. 不通过全局 `tool.create-linker` 硬拐到本次需求。
-
-### Phase 1：Core 锚点决策
-
-状态：
-1. 已完成。
-2. 完成日期：2026-03-23。
-
-实际行为：
-1. 优先 `direction === 'right'`
-2. 回退 `direction === 'top'`
-3. 再回退到“最接近右上参考点”的固定锚点
-4. 最后回退 perimeter
-
-已验收：
-1. 标准四锚点矩形优先右侧锚点
-2. 缺少右侧锚点时回退顶部锚点
-3. 自定义锚点无 `direction` 时稳定选中固定锚点
-4. 无固定锚点时返回 perimeter binding
-
-### Phase 2：Renderer 建线主链路
-
-目标：
-1. 给现有 `linkerDrag` 增加“创建新线再进入拖拽”的正式 API。
-
-修改范围：
+### P0：立即执行
 1. `packages/renderer/src/primitives/createLinkerDrag.ts`
+   - 完成 `startCreateFromShape(...)`
+2. `packages/renderer/src/primitives/createInteractionMachine.ts`
+   - 完成 `startQuickCreateLinker(...)`
+3. `packages/renderer/src/components/LinkCreateOverlay.tsx`
+   - 接入正式快捷建线入口，而不是临时行为
+4. `packages/renderer/src/components/RendererContainer.tsx`
+   - 继续统一视图/输入/会话边界
+5. `packages/renderer/src/components/InteractionOverlay.tsx`
+   - 清理 overlay 组合边界，避免交互逻辑分散
 
-建议新增：
-1. `startCreateFromShape(e, { sourceShapeId, linkerId })`
+### P0：紧随其后
+1. clipboard manager
+2. 交互回归测试
+3. 视图命令与快捷键
 
-建议内部重构：
-1. 抽出统一的 transaction/session 初始化函数
-2. 抽出统一的 `setupDragState(...)`
-3. 抽出统一的 `finalizeCreateResult(...)`
+### P1
+1. `Toolbar / Sidebar / ContextMenu` 的命令映射
+2. 通用组件补充，但必须服务主流程
 
-行为要求：
-1. 创建临时 linker 时，`from` 已绑定 source shape 的 preferred anchor
-2. `to` 初始与 `from` 相同，立即以 `mode = 'to'` 进入拖拽
-3. 若未超过阈值，`transaction.abort()` 必须删除临时线
-4. 若拖拽成功但未命中目标 shape，可保留自由线
-5. 若成功绑定目标 shape，提交后默认选中新 linker
-
-验收标准：
-1. 一次快捷建线只占用一个 undo 单元
-2. undo 后整条新线消失，而不是只回滚 endpoint
-3. cancel 后没有孤儿 linker 留在图里
-4. 现有“编辑已有 linker”链路不回归
-
-### Phase 3：Interaction Machine 接口收口
-
-目标：
-1. 给外部组件一个稳定的“一次性快捷建线”入口，不直接调用 `linkerDrag` 内部细节。
-
-修改范围：
-1. `packages/renderer/src/primitives/createInteractionMachine.ts`
-
-建议新增：
-1. `startQuickCreateLinker(e, { sourceShapeId, linkerId })`
-
-要求：
-1. 只负责模式切换和能力转发
-2. 不直接参与 linker 创建细节
-3. 与 `startLinkerDrag(...)` 保持同级
-
-### Phase 4：Overlay 与交互呈现
-
-目标：
-1. 给单选 shape 提供右上角快捷建线入口。
-
-修改范围：
-1. `packages/renderer/src/components/InteractionOverlay.tsx`
-2. 可选新增 `packages/renderer/src/components/ShapeLinkerQuickCreateOverlay.tsx`
-
-UI 要求：
-1. 仅当单选一个可连接 shape 且 machine idle 时显示
-2. 挂在选中框右上角外侧
-3. 提供 3 个 action：折线、直线、曲线
-4. `onMouseDown` 直接调用 `pointer.machine.startQuickCreateLinker(...)`
-
-测试要求：
-1. Core：`resolvePreferredCreateAnchor` 已完成定向测试
-2. Renderer 后续至少覆盖：
-   - `startCreateFromShape` 成功创建临时 linker
-   - 阈值内结束回滚
-   - 阈值外结束提交
-   - 命中 shape 时 endpoint 绑定正确
-   - 未命中 shape 时自由线保留
-   - undo/redo 正确删除与恢复整条线
-
-当前下一步：
-1. 直接进入 `Phase 2`
-2. 先完成 transaction 闭环，再接 machine，最后挂 overlay UI
+### P2
+1. 评论
+2. 导出
+3. 协作预研
 
 ---
 
-## 4. 交付物清单（本周期）
+## 7. 风险与缓解
 
-1. Guide：计算模块 + overlay 渲染 + 交互接线 + 测试。
-2. Clipboard：manager + 命令入口 + 历史事务接入 + 测试。
-3. 创建工具链路：shape/linker 工具态接入画布创建。
-4. UI 壳层：`packages/ui` 下 Sidebar / Topbar / TopMenu / ContextMenu。
-5. 文档：`AI_KB` 对应章节更新（架构、集成点、路线图）。
+1. 风险：为了赶进度，把应用命令直接写进 `renderer`。  
+缓解：所有图语义写操作优先落在 `core` manager / command 边界。
 
-当前补充：
-- 第 2 项是当前唯一剩余 P0 主项
-- 第 3 项中的 shape/linker 正式创建链路已完成；独立的右上角快捷建线 overlay 仍未闭环
-- 第 4 项中 `Sidebar`、`Toolbar`、`designer-ui bridge` 已落地，`Topbar / TopMenu / ContextMenu` 仍待补齐
+2. 风险：创建与编辑已有 linker 形成两套并行实现。  
+缓解：所有 linker 拖拽统一复用 `createLinkerDrag` 主链路。
 
----
+3. 风险：回归测试跟不上，导致每次修交互都会破别处。  
+缓解：每补一个核心链路，就同步补最小可验证测试，不欠账到最后。
 
-## 5. 风险、依赖与缓解
-
-1. 风险：UI 壳层反向侵入 `renderer/core`，把应用逻辑写回基础层。  
-缓解：`packages/ui` 只做组件容器与菜单呈现，不直接依赖图语义写操作。
-
-2. 风险：Clipboard 与 group/linker 关系重建出现脏引用。  
-缓解：先做纯模型层单测，再接 UI 命令入口。
-
-3. 风险：创建工具链路与现有 drag/select 状态机冲突。  
-缓解：所有创建入口统一经 `tool manager` 分发，避免在 `RendererContainer` 内新增隐式分支。
-
-4. 依赖：统一 history 事件类型与事务提交时机。  
-缓解：D1-D5 先冻结创建工具事务边界，D6-D10 做集中回归。
+4. 风险：UI 壳层继续挤占核心能力开发时间。  
+缓解：所有 `components / ui` 需求先问一句“是否直接改善编辑主流程”，否则降级优先级。
 
 ---
 
-## 6. 测试策略（最小必做）
+## 8. 测试策略
 
-1. 单元测试：
-- Tool：工具态切换、清空、连续模式。
-- Clipboard：ID 重映射、group 保真、linker 端点降级。
-- UI：菜单开关、菜单项事件派发、基础可访问性。
-- Anchors：`resolvePreferredCreateAnchor` 的方向优先级、稳定回退与 perimeter 回退。
+### 8.1 必做单元测试
+1. anchors：起点决策与回退规则
+2. tool：工具态切换与退出
+3. history：transaction 提交/取消
+4. clipboard：ID 重映射、group 保真、linker 降级
+5. renderer primitives：新建线、取消、提交、命中目标
 
-2. 集成回归：
-- 创建/拖拽/连线/粘贴/撤销重做串行场景。
-- 缩放比例变化下坐标一致性（依赖 `createCoordinateService`）。
-- playground 中 `packages/ui` 壳层与 `renderer` 组合场景。
+### 8.2 必做集成回归
+1. 创建 shape -> 创建 linker -> undo -> redo
+2. 单选/多选 -> 拖拽 -> 缩放 -> 再次编辑
+3. copy -> paste -> move -> undo -> redo
+4. 不同 zoom 下 overlay 与 pointer 坐标一致性
 
-3. 手工验证（playground）：
-- 中高密度图场景操作 10-15 分钟，观察稳定性与性能。
-
----
-
-## 7. 两周后计划（简版，滚动动态调整）
-
-1. P2：评论系统最小闭环（锚点、面板、持久化接口），按产品反馈拆分。
-2. P2：导出能力分阶段补齐（先 SVG/PNG，再 PDF 与高级选项）。
-3. P3：协作能力预研（操作日志协议、冲突策略、远端回放）。
-4. 每周固定一次滚动评审：只保留下一周的细化计划，后续保持轻量 backlog。
-
-说明：
-- 评论仍属于应用层，不进入基础架构与 `packages/ui` 基础组件计划。
+### 8.3 手工验证
+1. 在 playground 连续编辑 10-15 分钟
+2. 覆盖中高密度图场景
+3. 记录已知问题并归档到下一轮 backlog
 
 ---
 
-## 8. 计划维护规则
+## 9. 非当前优先级事项
 
-1. 本文是近期执行基线，按周更新，不做长期瀑布式承诺。
-2. 若 P0 未完成，不并行开启新 P2 功能开发。
-3. 每次调整必须同步更新 `AI_KB/README.md` 的“当前版本要点”与本文件日期。
+以下工作可以继续记录，但默认不抢占当前主线：
+1. 更多通用导航组件
+2. 评论系统
+3. 导出高级选项
+4. 协作协议
+5. 完整主题系统
+
+---
+
+## 10. 维护规则
+
+1. 本文是近期执行基线，按周滚动更新。
+2. 若编辑器核心链路未完成，不提升外围 UI 事项优先级。
+3. 每次计划调整，必须同步更新 `AI_KB/README.md` 的“当前版本要点”和本文日期。

@@ -16,7 +16,7 @@
 9. `AI_KB/ROADMAP.md`
 10. `AI_KB/DEV_GUIDE.md`
 
-当前版本要点（2026-03-25）：
+当前版本要点（2026-03-26）：
 - 事件坐标归一化入口已迁移到 `createCoordinateService`：`packages/renderer/src/primitives/createCoordinateService.ts`。
 - 渲染容器采用三层契约：`world-layer` / `scene-layer` / `overlay-layer`。
 - 工具态基础设施已落地：`core` 新增 `tool manager`，运行时支持 `idle / create-shape / create-linker`。
@@ -24,21 +24,18 @@
 - 连线路由主链路已接入 `view` 配置：默认 `broken/orthogonal` 走 obstacle + hybrid，`straight/curved` 保持 basic。
 - `lineJumps` 已接入主渲染链：`diagram.page.lineJumps` 可驱动 `LinkerCanvas` 跳线绘制。
 - 连线端点候选选择已调整为“固定锚点优先、perimeter 回退”，提升创建/重连时的连接稳定性。
-- `packages/ui` 已重构为纯基础构件层，当前主入口为 `panel` 与 `actionBar`。
-- `packages/ui` 已移除 `Sidebar / Toolbar` 成品语义中心，设计器壳层布局改由 `designer-ui` 组合基础构件完成。
+- `packages/components` 当前已沉淀 `panel`、`actionBar`、`menu` 三类基础构件。
+- `packages/ui` 负责将 `Designer` 状态/命令桥接到侧边栏与工具栏等壳层能力，宿主层尽量只保留布局与少量插槽。
 - 已新增 `packages/icons` 纯图标资产包，当前采用 `assets + svgo + src/generated` 生成流程。
-- 已新增 `packages/designer-ui` 作为 bridge 层，当前包含 `createToolbarBridge` / `Toolbar`、`createShapeLibraryBridge` / `createSidebarActionBridge` / `Sidebar`，负责将 `Designer` 状态/命令映射并渲染到 Toolbar / Sidebar。
-- Sidebar preview 已下沉到 `designer-ui/sidebar` 注册侧，可按 item 语义自由组装。
-- `packages/designer-ui/sidebar/search.ts` 已负责搜索过滤、搜索结果 section 与分类生成，避免把设计器语义继续抬进 `ui`。
-- `packages/designer-ui/Sidebar` 已改为直接组合 `@diagen/components/panel`，专用 library shell 布局样式位于 `designer-ui/sidebar/sidebar.css`。
-- `packages/designer-ui/Toolbar` 已改为直接组合 `@diagen/components/actionBar`。
-- `packages/designer-ui/src/designerIconRegistry.tsx` 作为语义映射层，负责将 `undo/group/shape-rectangle` 等设计器语义键映射到 `@diagen/icons` 组件。
-- playground 已将顶部工具栏与左侧 Sidebar 的 `Designer` 接线下沉到 `designer-ui`，宿主层仅保留数据加载、布局和少量状态插槽。
+- `packages/ui/sidebar` 已负责搜索过滤、搜索结果 section 与分类生成，避免把设计器语义继续抬进基础构件层。
+- `packages/ui/Sidebar` 已直接组合 `@diagen/components/panel`，`packages/ui/Toolbar` 已直接组合 `@diagen/components/actionBar`。
+- playground 已将顶部工具栏与左侧 Sidebar 的 `Designer` 接线下沉到 `packages/ui`，宿主层仅保留数据加载、布局和少量状态插槽。
 - `.processon` 深度对照已补充吸附线、剪贴板、历史与扩容机制的源码级分析。
 - 近期执行信息已统一收敛到 `ROADMAP.md`，不再拆分多份计划/审查文档。
 - 已新增 shape 右上角快捷建线设计，明确 UI、锚点决策、事务边界与复用策略。
 - “从锚点拖出创建新线”专项计划已并入 `ROADMAP.md` 的 D4 专项章节。
-- 当前唯一剩余 P0 主阻塞项为 clipboard manager。
+- 后续最高优先级已调整为“补齐编辑器核心能力”，主线依次为：创建与连线、选择与导航、撤销重做与剪贴板、命令入口与最小壳层闭环。
+- 当前最关键的 P0 缺口为：快捷建线事务闭环、clipboard manager、renderer 交互回归测试。
 
 更新规则：
 - 新增/调整包结构：更新 `REPO_MAP.md`、`PROJECT_OVERVIEW.md`
@@ -50,4 +47,4 @@
 - 计划与节奏变化：更新 `ROADMAP.md`
 - 命令或调试流程变化：更新 `DEV_GUIDE.md`
 
-最后更新日期：2026-03-25
+最后更新日期：2026-03-26

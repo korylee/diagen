@@ -1,10 +1,12 @@
-import { batch, createEffect, createMemo, createSignal, JSX, onMount } from 'solid-js'
+import { createEffect, createMemo, createSignal, JSX, onMount } from 'solid-js'
 import { Schema } from '@diagen/core'
 import { createEventListener, createKeyboard, createScroll } from '@diagen/primitives'
+import type { Point } from '@diagen/shared'
 import { createPointerInteraction } from '../primitives'
+import { hitTestScene } from '../utils'
 import { DesignerGrids } from './DesignerGrids'
 import { useDesigner } from './DesignerProvider'
-import { SelectionLayer, SelectionOverlay } from './InteractionOverlay'
+import { InteractionOverlay } from './InteractionOverlay'
 import { InteractionProvider } from './InteractionProvider'
 import { createCoordinateService } from '../primitives/createCoordinateService'
 
@@ -22,9 +24,9 @@ export function RendererContainer(props: {
   /** resize 吸附容差（画布坐标） */
   resizeGuideTolerance?: number
 }) {
-  const { selection, edit, view, state, history, tool } = useDesigner()
+  const designer = useDesigner()
+  const { selection, edit, view, state, history, tool } = designer
 
-  const [containerRef, setContainerRef] = createSignal<HTMLDivElement | null>(null)
   const [viewportRef, setViewportRef] = createSignal<HTMLDivElement | null>(null)
   const [sceneLayerRef, setSceneLayerRef] = createSignal<HTMLDivElement | null>(null)
   const coordinate = createCoordinateService({
@@ -44,6 +46,8 @@ export function RendererContainer(props: {
   })
   const keyboard = createKeyboard()
   const scroll = createScroll(viewportRef)
+  type SceneHit = ReturnType<typeof hitTestScene>
+  type LinkerSceneHit = Extract<NonNullable<SceneHit>, { type: 'linker' }>
 
   keyboard.bind('delete', () => edit.remove(selection.selectedIds()))
   keyboard.bind('ctrl+a', () => selection.selectAll())
@@ -130,31 +134,132 @@ export function RendererContainer(props: {
     // 平移检测
     if (pointer.machine.startPan(e)) {
       e.preventDefault()
-      return
     }
-    if (!pointer.machine.isIdle()) return
+  }
 
-    if (e.button === 0) {
-      if (state.tool.type === 'create-shape') {
-        if (startShapeCreate(e)) {
-          e.preventDefault()
-          return
-        }
-      }
+  const applySelection = (id: string, event: MouseEvent): void => {
+    if (event.ctrlKey || event.metaKey) {
+      selection.isSelected(id) ? selection.deselect(id) : selection.select(id)
+    } else {
+      selection.replace([id])
+    }
+  }
 
-      if (state.tool.type === 'create-linker') {
-        if (startLinkerCreate(e)) {
-          e.preventDefault()
-          return
-        }
-      }
+  const handleCreateShapeDown = (e: MouseEvent, shapeId: string, continuous: boolean, point: Point): boolean => {
+    const definition = Schema.getShape(shapeId)
+    if (!definition) return false
+
+    const width = definition.props.w
+    const height = definition.props.h
+    const shape = Schema.createShape(shapeId, {
+      x: Math.round(point.x - width / 2),
+      y: Math.round(point.y - height / 2),
+      w: width,
+      h: height,
+      angle: 0,
+    })
+    if (!shape) return false
+
+    e.stopPropagation()
+    e.preventDefault()
+
+    edit.add([shape])
+    selection.replace([shape.id])
+    view.scheduleAutoGrow(view.getShapeBounds(shape))
+    view.flushAutoGrow()
+
+    if (!continuous) {
+      tool.setIdle()
     }
 
-    // 左键 - 框选
-    if (e.button === 0) {
-      selection.clear()
-      pointer.machine.startBoxSelect(e)
+    return true
+  }
+
+  const handleCreateLinkerDown = (
+    e: MouseEvent,
+    point: Point,
+    linkerId: string,
+    continuous: boolean,
+    sceneHit: SceneHit,
+  ): boolean => {
+    e.stopPropagation()
+    e.preventDefault()
+
+    const started =
+      sceneHit?.type === 'shape'
+        ? pointer.machine.startQuickCreateLinker(e, {
+            sourceShapeId: sceneHit.element.id,
+            linkerId,
+          })
+        : pointer.machine.startCreateLinkerFromPoint(e, {
+            linkerId,
+            point,
+          })
+
+    if (started && !continuous) {
+      tool.setIdle()
     }
+
+    return started
+  }
+
+  const handleLinkerPrimaryDown = (e: MouseEvent, point: Point, sceneHit: LinkerSceneHit): boolean => {
+    e.stopPropagation()
+    e.preventDefault()
+    applySelection(sceneHit.element.id, e)
+    return pointer.machine.startLinkerDrag(e, sceneHit.element.id, point, sceneHit.hit, sceneHit.route)
+  }
+
+  const handleShapePrimaryDown = (e: MouseEvent, point: Point, shapeId: string): boolean => {
+    e.stopPropagation()
+    e.preventDefault()
+
+    const resizeHit = pointer.resize.hitTest(point)
+    if (resizeHit) {
+      return pointer.machine.startResize(resizeHit.id, resizeHit.dir, e)
+    }
+
+    applySelection(shapeId, e)
+    return pointer.machine.startShapeDrag(e)
+  }
+
+  const handleBlankPrimaryDown = (e: MouseEvent): boolean => {
+    e.stopPropagation()
+    e.preventDefault()
+    selection.clear()
+    pointer.machine.startBoxSelect(e)
+    return true
+  }
+
+  const handleSceneMouseDown = (e: MouseEvent): boolean => {
+    if (e.button !== 0) return false
+    if (!pointer.machine.isIdle()) return false
+
+    const currentTool = tool.tool()
+    const point = coordinate.eventToCanvas(e)
+
+    if (currentTool.type === 'create-shape') {
+      return handleCreateShapeDown(e, currentTool.shapeId, currentTool.continuous, point)
+    }
+
+    const sceneHit = hitTestScene(designer.element.elements(), point, {
+      zoom: view.viewport().zoom,
+      getLinkerLayout: linker => view.getLinkerLayout(linker),
+    })
+
+    if (currentTool.type === 'create-linker') {
+      return handleCreateLinkerDown(e, point, currentTool.linkerId, currentTool.continuous, sceneHit)
+    }
+
+    if (sceneHit?.type === 'linker') {
+      return handleLinkerPrimaryDown(e, point, sceneHit)
+    }
+
+    if (sceneHit?.type === 'shape') {
+      return handleShapePrimaryDown(e, point, sceneHit.element.id)
+    }
+
+    return handleBlankPrimaryDown(e)
   }
 
   const calcEdgeStep = (distanceToEdge: number): number => {
@@ -220,7 +325,6 @@ export function RendererContainer(props: {
     }
   }
 
-  createEventListener(containerRef, 'wheel', onWheel, { passive: false })
   createEventListener(
     () => window,
     'mousemove',
@@ -249,52 +353,6 @@ export function RendererContainer(props: {
     el.scrollTop = val
   })
 
-  const startShapeCreate = (e: MouseEvent): boolean => {
-    const currentTool = state.tool
-    if (currentTool.type !== 'create-shape') return false
-
-    const definition = Schema.getShape(currentTool.shapeId)
-    if (!definition) return false
-
-    const point = coordinate.eventToCanvas(e)
-    const width = definition.props.w
-    const height = definition.props.h
-    const shape = Schema.createShape(currentTool.shapeId, {
-      x: Math.round(point.x - width / 2),
-      y: Math.round(point.y - height / 2),
-      w: width,
-      h: height,
-      angle: 0,
-    })
-    if (!shape) return false
-
-    batch(() => {
-      edit.add([shape])
-      selection.replace([shape.id])
-      view.scheduleAutoGrow(view.getShapeBounds(shape))
-      view.flushAutoGrow()
-      if (!currentTool.continuous) {
-        tool.setIdle()
-      }
-    })
-
-    return true
-  }
-
-  const startLinkerCreate = (e: MouseEvent): boolean => {
-    const currentTool = state.tool
-    if (currentTool.type !== 'create-linker') return false
-
-    const started = pointer.machine.startCreateLinkerFromPoint(e, {
-      linkerId: currentTool.linkerId,
-      point: coordinate.eventToCanvas(e),
-    })
-    if (started && !currentTool.continuous) {
-      tool.setIdle()
-    }
-    return started
-  }
-
   return (
     <InteractionProvider interaction={interaction}>
       <div
@@ -303,23 +361,31 @@ export function RendererContainer(props: {
         style="overflow: scroll;position: relative;z-index: 0;background: #eaecee;height: 900px;"
       >
         {/*滚动容器*/}
-        <div ref={setContainerRef} style={containerStyle()} onMouseDown={onMouseDown} class="designer-container">
+        <div
+          style={containerStyle()}
+          class="designer-container"
+          onMouseDown={onMouseDown}
+          on:wheel={{ passive: false, handleEvent: onWheel }}
+        >
           {/*世界层（canvas 坐标，交给 transform 处理）*/}
           <div style={layerStyle()} class="designer-layer">
             <DesignerGrids />
           </div>
 
           {/*渲染层（屏幕坐标，不做 transform）*/}
-          <div ref={setSceneLayerRef} style={sceneLayerStyle()}>
+          <div
+            ref={setSceneLayerRef}
+            style={sceneLayerStyle()}
+            on:mousedown={e => {
+              handleSceneMouseDown(e)
+            }}
+          >
             {props.children}
           </div>
 
           {/*交互覆盖层（屏幕坐标，不做 transform）*/}
           <div style={overlayLayerStyle()}>
-            <SelectionOverlay />
-
-            {/* 框选层 - 用于显示框选区域 */}
-            <SelectionLayer />
+            <InteractionOverlay />
           </div>
         </div>
       </div>

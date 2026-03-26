@@ -2,13 +2,12 @@ import type { ShapeElement } from '@diagen/core'
 import { isBoundsVisible } from '@diagen/core'
 import { createDevicePixelRatio } from '@diagen/primitives'
 import { getRotatedBoxBounds } from '@diagen/shared'
-import { createEffect, createMemo, onMount } from 'solid-js'
+import { createEffect, createMemo } from 'solid-js'
 import { useDesigner } from '../../components'
 import { renderShape } from '../../utils'
 
 export interface ShapeCanvasProps {
   shape: ShapeElement
-  onMouseDown?: (event: MouseEvent) => boolean | void
 }
 
 export function ShapeCanvas(props: ShapeCanvasProps) {
@@ -89,12 +88,6 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
     syncCanvas()
   })
 
-  const handleMouseDown = (e: MouseEvent) => {
-    const handled = props.onMouseDown?.(e)
-    if (handled === false) return
-    e.stopPropagation()
-  }
-
   return (
     <div
       ref={containerRef}
@@ -114,7 +107,6 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
           width: `${getScreenBounds().w}px`,
           height: `${getScreenBounds().h}px`,
         }}
-        onMouseDown={handleMouseDown}
       />
     </div>
   )

@@ -1,4 +1,4 @@
-import { generateId, PartialBy } from '@diagen/shared'
+import { generateId, Optional } from '@diagen/shared'
 import { createMemo } from 'solid-js'
 import { createStore, produce } from 'solid-js/store'
 import type { DesignerContext } from './types'
@@ -18,7 +18,7 @@ export interface Command {
 }
 
 export function createCommand<T>(
-  opts: PartialBy<Omit<Command, 'id' | 'timestamp'>, 'redo'> & { payload?: T },
+  opts: Optional<Omit<Command, 'id' | 'timestamp'>, 'redo'> & { payload?: T },
 ): T extends null | undefined ? Command : Command & { payload: T } {
   const command: any = {
     redo: () => {

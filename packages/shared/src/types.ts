@@ -48,4 +48,6 @@ export type Mutable<T> = {
   -readonly [K in keyof T]: T[K]
 }
 
-export type PartialBy<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>
+export type Optional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>
+
+export type Assign<T, U> = Omit<T, keyof U> & U

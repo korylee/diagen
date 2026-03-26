@@ -7,11 +7,10 @@ import { renderLinker } from '../../utils'
 
 export interface LinkerCanvasProps {
   linker: LinkerElement
-  onMouseDown?: (event: MouseEvent) => boolean
 }
 
 export function LinkerCanvas(props: LinkerCanvasProps) {
-  const { view, selection } = useDesigner()
+  const { view } = useDesigner()
   const pixelRatio = createDevicePixelRatio()
   const layout = createMemo(() => view.getLinkerLayout(props.linker))
   const bounds = createMemo(() => layout().bounds)
@@ -25,7 +24,7 @@ export function LinkerCanvas(props: LinkerCanvasProps) {
   const screenBounds = createMemo(() => {
     const vp = view.viewport()
     const b = bounds()
-    
+
     return {
       x: b.x * vp.zoom + vp.x - padding,
       y: b.y * vp.zoom + vp.y - padding,
@@ -99,10 +98,6 @@ export function LinkerCanvas(props: LinkerCanvasProps) {
     syncCanvas()
   })
 
-  const handleMouseDown = (e: MouseEvent) => {
-    props.onMouseDown?.(e)
-  }
-
   return (
     <div
       ref={containerRef}
@@ -112,8 +107,7 @@ export function LinkerCanvas(props: LinkerCanvasProps) {
         top: `${screenBounds().y}px`,
         width: `${screenBounds().w}px`,
         height: `${screenBounds().h}px`,
-        cursor: selection.isSelected(props.linker.id) ? 'move' : 'pointer',
-        'pointer-events': 'auto',
+        'pointer-events': 'none',
       }}
     >
       <canvas
@@ -121,8 +115,8 @@ export function LinkerCanvas(props: LinkerCanvasProps) {
         style={{
           width: `${screenBounds().w}px`,
           height: `${screenBounds().h}px`,
+          'pointer-events': 'none',
         }}
-        onMouseDown={handleMouseDown}
       />
     </div>
   )

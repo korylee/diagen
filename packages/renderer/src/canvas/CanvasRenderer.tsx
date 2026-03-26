@@ -1,94 +1,28 @@
-import { isLinker } from '@diagen/core'
+import { isLinker, isShape } from '@diagen/core'
 import { For } from 'solid-js'
-import { useDesigner, useInteraction } from '../components'
+import { useDesigner } from '../components'
 import { LinkerCanvas, ShapeCanvas } from './element'
 
 export interface CanvasRendererProps {}
 
-export function CanvasRenderer(props: CanvasRendererProps) {
+export function CanvasRenderer() {
   const designer = useDesigner()
-  const { element, selection, tool } = designer
-  const { pointer, coordinate } = useInteraction()
-
-  const applySelection = (id: string, event: MouseEvent) => {
-    if (event.ctrlKey || event.metaKey) {
-      selection.isSelected(id) ? selection.deselect(id) : selection.select(id)
-    } else {
-      selection.replace([id])
-    }
-  }
-
-  const onShapeMouseDown = (e: MouseEvent, id: string): boolean => {
-    const currentTool = tool.tool()
-    if (currentTool.type === 'create-shape') {
-      return false
-    }
-    if (currentTool.type === 'create-linker') {
-      e.stopPropagation()
-      e.preventDefault()
-      const started = pointer.machine.startQuickCreateLinker(e, {
-        sourceShapeId: id,
-        linkerId: currentTool.linkerId,
-      })
-      if (started && !currentTool.continuous) {
-        tool.setIdle()
-      }
-      return started
-    }
-
-    e.stopPropagation()
-    e.preventDefault()
-
-    // 调整大小检测
-    const point = coordinate.eventToCanvas(e)
-    const hit = pointer.resize.hitTest(point)
-    if (hit) {
-      pointer.machine.startResize(hit.id, hit.dir, e)
-      return true
-    }
-
-    applySelection(id, e)
-
-    // 开始拖动
-    return pointer.machine.startShapeDrag(e)
-  }
-
-  const onLinkerMouseDown = (e: MouseEvent, id: string): boolean => {
-    if (tool.tool().type === 'create-shape' || tool.tool().type === 'create-linker') {
-      return false
-    }
-
-    const target = element.getById(id)
-    if (!target || !isLinker(target)) return false
-
-    const point = coordinate.eventToCanvas(e)
-    const hitResult = pointer.linkerDrag.hitTestWithRoute(id, point)
-    const linkerHit =
-      hitResult?.hit ??
-      (selection.isSelected(id) && !e.ctrlKey && !e.metaKey
-        ? ({
-            type: 'line',
-          } as const)
-        : null)
-
-    if (!linkerHit) {
-      return false
-    }
-
-    e.stopPropagation()
-    e.preventDefault()
-    applySelection(id, e)
-    return pointer.machine.startLinkerDrag(e, id, point, linkerHit, hitResult?.route)
-  }
+  const { element } = designer
 
   return (
     <>
-      <For each={element.shapes()}>
-        {element => <ShapeCanvas shape={element} onMouseDown={e => onShapeMouseDown(e, element.id)} />}
-      </For>
+      <For each={element.elements()}>
+        {item => {
+          if (isShape(item)) {
+            return <ShapeCanvas shape={item} />
+          }
 
-      <For each={element.linkers()}>
-        {element => <LinkerCanvas linker={element} onMouseDown={e => onLinkerMouseDown(e, element.id)} />}
+          if (isLinker(item)) {
+            return <LinkerCanvas linker={item} />
+          }
+
+          return null
+        }}
       </For>
     </>
   )

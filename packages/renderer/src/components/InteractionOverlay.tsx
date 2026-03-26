@@ -387,7 +387,8 @@ function ShapeSelectionOverlay(props: ShapeSelectionLayerProps) {
   })
 
   const canRotate = createMemo(() => {
-    if (!props.showRotateHandle) return false
+    const showRotateHandle = props.showRotateHandle ?? true
+    if (!showRotateHandle) return false
     const shapes = selectedShapes()
     if (!shapes || shapes.length !== 1) return false
     const target = shapes[0]
@@ -485,26 +486,11 @@ function ShapeSelectionOverlay(props: ShapeSelectionLayerProps) {
   )
 }
 
-export interface SelectionLayerProps extends ShapeSelectionLayerProps {}
-
-export function SelectionOverlay(props: SelectionLayerProps) {
-  return (
-    <>
-      <GuideOverlay />
-      <LinkTargetOverlay />
-      <LinkCreateOverlay />
-
-      <ShapeSelectionOverlay showRotateHandle={props.showRotateHandle} />
-      <LinkerSelectionOverlay />
-    </>
-  )
-}
-
 // ============================================================================
 // 锚点预览 - 连线时显示元素的锚点
 // ============================================================================
 
-export function AnchorPreview(props: { elementId: string; highlightAnchor?: number | string }) {
+function AnchorPreview(props: { elementId: string; highlightAnchor?: number | string }) {
   const { element } = useDesigner()
   const { coordinate } = useInteraction()
   const shape = createMemo(() => {
@@ -554,6 +540,26 @@ export function AnchorPreview(props: { elementId: string; highlightAnchor?: numb
         )
       }}
     </For>
+  )
+}
+
+export interface InteractionOverlayProps extends ShapeSelectionLayerProps {}
+
+export function InteractionOverlay(props: InteractionOverlayProps) {
+  return (
+    <>
+      {/* 框选层 - 用于显示框选区域 */}
+      <SelectionLayer />
+
+      {/* 指导线层 - 用于显示指导线 */}
+      <GuideOverlay />
+
+      <LinkTargetOverlay />
+      <LinkCreateOverlay />
+
+      <ShapeSelectionOverlay {...props} />
+      <LinkerSelectionOverlay />
+    </>
   )
 }
 
