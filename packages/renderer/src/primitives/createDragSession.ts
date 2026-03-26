@@ -1,89 +1,204 @@
-import type { Point } from '@diagen/shared'
-import { batch, createMemo, createSignal } from 'solid-js'
+import { createSignal } from 'solid-js'
+import { createPointerDragTracker, type CreatePointerDragTrackerOptions, type PointerDragMoveState } from './createPointerDragTracker'
 
-export interface CreateDragSessionOptions {
-  threshold?: number
+interface PointerEventLike {
+  clientX: number
+  clientY: number
 }
 
-export interface DragMoveState {
-  dx: number
-  dy: number
-  shouldUpdate: boolean
+interface TransactionScopeLike {
+  begin: () => boolean
+  commit: () => boolean
+  abort: () => boolean
 }
 
-export function createDragSession(options: CreateDragSessionOptions = {}) {
-  const { threshold = 3 } = options
+export type DragTransactionMode = 'on-begin' | 'on-drag-start'
 
-  const [isDragging, setIsDragging] = createSignal<boolean>(false)
-  const [isPending, setIsPending] = createSignal<boolean>(false)
-  const [startMouse, setStartMouse] = createSignal<Point | null>(null)
-  const [lastMouse, setLastMouse] = createSignal<Point | null>(null)
+export interface DragSessionUpdateContext<TState> {
+  state: TState
+  event: MouseEvent
+  moveState: PointerDragMoveState
+}
 
-  const delta = createMemo<Point>(() => {
-    const start = startMouse()
-    const last = lastMouse()
-    if (!start || !last) return { x: 0, y: 0 }
-    return { x: last.x - start.x, y: last.y - start.y }
-  })
+export interface DragSessionFinalizeContext<TState> {
+  state: TState | null
+  shouldCommit: boolean
+  reason: 'end' | 'cancel'
+}
 
-  function begin(point: Point): void {
-    batch(() => {
-      setStartMouse(point)
-      setLastMouse(point)
-      setIsPending(true)
-      setIsDragging(threshold === 0)
+export interface CreateDragSessionOptions<TStartInput, TState> extends CreatePointerDragTrackerOptions {
+  getEvent: (input: TStartInput) => PointerEventLike
+  setup: (input: TStartInput) => TState | null
+  update: (context: DragSessionUpdateContext<TState>) => void
+  finalize?: (context: DragSessionFinalizeContext<TState>) => void
+  reset?: () => void
+  transaction?: TransactionScopeLike
+  transactionMode?: DragTransactionMode
+  onCommit?: (state: TState | null) => void
+  onAbort?: (state: TState | null) => void
+}
+
+export function createDragSession<TStartInput, TState>(options: CreateDragSessionOptions<TStartInput, TState>) {
+  const {
+    threshold = 3,
+    getEvent,
+    setup,
+    update,
+    finalize,
+    reset,
+    transaction,
+    transactionMode = 'on-drag-start',
+    onCommit,
+    onAbort,
+  } = options
+
+  const tracker = createPointerDragTracker({ threshold })
+  const [state, setState] = createSignal<TState | null>(null)
+  let transactionStarted = false
+
+  function begin(input: TStartInput): boolean {
+    if (transaction && transactionMode === 'on-begin') {
+      if (!startTransaction()) {
+        resetSession()
+        return false
+      }
+    }
+
+    try {
+      const nextState = setup(input)
+      if (!nextState) {
+        abortStartedTransaction()
+        resetSession()
+        return false
+      }
+
+      setState(() => nextState)
+      const event = getEvent(input)
+      tracker.begin({ x: event.clientX, y: event.clientY })
+      return true
+    } catch (error) {
+      abortStartedTransaction()
+      resetSession()
+      throw error
+    }
+  }
+
+  function move(event: MouseEvent): void {
+    const moveState = tracker.update({ x: event.clientX, y: event.clientY })
+    const currentState = state()
+    if (!moveState || !moveState.shouldUpdate || !currentState) return
+
+    if (transaction && !transactionStarted && transactionMode === 'on-drag-start') {
+      if (!startTransaction()) {
+        cancel()
+        return
+      }
+    }
+
+    update({
+      state: currentState,
+      event,
+      moveState,
     })
   }
 
-  function update(point: Point): DragMoveState | null {
-    if (!isPending()) return null
-    const start = startMouse()
-    if (!start) return null
+  function end(): void {
+    if (!tracker.isPending()) return
+    const currentState = state()
+    const shouldCommit = tracker.finish()
 
-    const dx = point.x - start.x
-    const dy = point.y - start.y
+    finalize?.({
+      state: currentState,
+      shouldCommit,
+      reason: 'end',
+    })
 
-    if (!isDragging()) {
-      if (Math.abs(dx) < threshold && Math.abs(dy) < threshold) {
-        setLastMouse(point)
-        return { dx, dy, shouldUpdate: false }
-      }
-      setIsDragging(true)
-    }
-
-    setLastMouse(point)
-    return { dx, dy, shouldUpdate: true }
-  }
-
-  function finish(): boolean {
-    const dragged = isDragging()
-    reset()
-    return dragged
+    finalizeTransaction(shouldCommit, currentState)
+    resetSession()
   }
 
   function cancel(): void {
-    reset()
+    if (!tracker.isPending()) return
+    const currentState = state()
+    tracker.cancel()
+
+    finalize?.({
+      state: currentState,
+      shouldCommit: false,
+      reason: 'cancel',
+    })
+
+    finalizeTransaction(false, currentState)
+    resetSession()
   }
 
-  function reset(): void {
-    batch(() => {
-      setIsDragging(false)
-      setIsPending(false)
-      setStartMouse(null)
-      setLastMouse(null)
-    })
+  function finalizeTransaction(shouldCommit: boolean, currentState: TState | null): void {
+    if (!transactionStarted) {
+      notifyTransactionResult(shouldCommit, currentState)
+      return
+    }
+
+    if (!transaction) {
+      notifyTransactionResult(shouldCommit, currentState)
+      transactionStarted = false
+      return
+    }
+
+    if (shouldCommit) {
+      if (transaction.commit()) {
+        onCommit?.(currentState)
+      } else {
+        onAbort?.(currentState)
+      }
+    } else {
+      if (transaction.abort()) {
+        onAbort?.(currentState)
+      }
+    }
+    transactionStarted = false
+  }
+
+  function startTransaction(): boolean {
+    if (!transaction) return true
+    if (transactionStarted) return false
+
+    const started = transaction.begin()
+    transactionStarted = started
+    return started
+  }
+
+  function abortStartedTransaction(): void {
+    if (!transactionStarted || !transaction) return
+    transaction.abort()
+    transactionStarted = false
+  }
+
+  function notifyTransactionResult(shouldCommit: boolean, currentState: TState | null): void {
+    if (shouldCommit) {
+      onCommit?.(currentState)
+      return
+    }
+
+    onAbort?.(currentState)
+  }
+
+  function resetSession(): void {
+    setState(() => null)
+    transactionStarted = false
+    reset?.()
   }
 
   return {
-    isDragging,
-    isPending,
-    delta,
+    state,
+    isPending: tracker.isPending,
+    isDragging: tracker.isDragging,
+    isActive: tracker.isPending,
+    delta: tracker.delta,
     begin,
-    update,
-    finish,
+    move,
+    end,
     cancel,
-    reset,
   }
 }
 
-export type CreateDragSession = ReturnType<typeof createDragSession>
+export type CreateDragSession<TStartInput, TState> = ReturnType<typeof createDragSession<TStartInput, TState>>

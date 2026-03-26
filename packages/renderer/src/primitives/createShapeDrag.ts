@@ -1,105 +1,138 @@
 import { batch, createSignal, onCleanup } from 'solid-js'
-import { calculateMoveGuideSnap, isShape, type GuideLine } from '@diagen/core'
+import { calculateMoveGuideSnap, isShape, type GuideLine, type ShapeElement } from '@diagen/core'
 import { getRotatedBoxBounds, unionBounds } from '@diagen/shared'
 import type { Bounds, Point } from '@diagen/shared'
 import { useDesigner } from '../components'
 import { type EventToCanvas } from './createCoordinateService'
-import type { CreateDragSessionOptions } from './createDragSession'
+import { createDragSession } from './createDragSession'
+import type { CreatePointerDragTrackerOptions } from './createPointerDragTracker'
 import { createPointerDeltaState } from './pointerDeltaState'
-import { createTransactionalSession } from './createTransactionalSession'
 
-// ============================================================================
-// 图形拖动 Hook - 与 Designer 集成
-// ============================================================================
-
-export interface UseShapeDragOptions extends CreateDragSessionOptions {
+export interface UseShapeDragOptions extends CreatePointerDragTrackerOptions {
   eventToCanvas?: EventToCanvas
   guideTolerance?: number
 }
 
+interface DragTarget {
+  id: string
+  startProps: ShapeElement['props']
+}
+
+interface DragStartContext {
+  targets: DragTarget[]
+  selectionBounds: Bounds | null
+  guideCandidates: Bounds[]
+}
+
 export function createShapeDrag(options: UseShapeDragOptions = {}) {
   const { threshold = 3, eventToCanvas, guideTolerance } = options
-  const designer = useDesigner()
-  const transaction = designer.history.transaction.createScope('拖拽图形')
+  const { history, view, element, edit, selection } = useDesigner()
+  const transaction = history.transaction.createScope('拖拽图形')
   const pointerDelta = createPointerDeltaState({ eventToCanvas })
-  const session = createTransactionalSession({
+  const [guides, setGuides] = createSignal<GuideLine[]>([])
+  const session = createDragSession<{ event: MouseEvent; ids?: string[] }, DragStartContext>({
     threshold,
     transaction,
+    getEvent: input => input.event,
+    setup: input => {
+      const targetIds = input.ids ?? selection.selectedIds()
+      if (targetIds.length === 0) return null
+
+      const context = buildDragStartContext(targetIds)
+      if (!context) return null
+
+      setGuides([])
+      pointerDelta.begin(input.event)
+      return context
+    },
+    update: ({ state, event, moveState }) => {
+      const delta = pointerDelta.resolveDelta({
+        moveState,
+        zoom: view.zoom(),
+        event,
+      })
+      const snapped = state.selectionBounds
+        ? calculateMoveGuideSnap({
+            movingBounds: state.selectionBounds,
+            delta,
+            candidates: state.guideCandidates,
+            tolerance: guideTolerance,
+          })
+        : null
+      const appliedDelta = snapped?.delta ?? delta
+      setGuides(snapped?.guides ?? [])
+
+      const movedBounds = applyDraggedShapeUpdates(state.targets, appliedDelta)
+      view.scheduleAutoGrow(movedBounds ?? undefined)
+    },
+    reset: () => {
+      setGuides([])
+      pointerDelta.reset()
+    },
     onCommit: () => {
-      designer.view.flushAutoGrow()
+      view.flushAutoGrow()
     },
   })
 
-  const [startPositions, setStartPositions] = createSignal<Record<string, Point>>({})
-  const [startSelectionBounds, setStartSelectionBounds] = createSignal<Bounds | null>(null)
-  const [guideCandidates, setGuideCandidates] = createSignal<Bounds[]>([])
-  const [guides, setGuides] = createSignal<GuideLine[]>([])
-
-  const start = (e: MouseEvent, ids?: string[]) => {
-    const targetIds = ids ?? designer.selection.selectedIds()
-    if (targetIds.length === 0) return
-
-    const positions: Record<string, Point> = {}
-    let selectionBounds: Bounds | null = null
-    for (const id of targetIds) {
-      const el = designer.element.getById(id)
-      if (el && isShape(el)) {
-        positions[id] = { x: el.props.x, y: el.props.y }
-        const bounds = designer.view.getShapeBounds(el)
-        selectionBounds = selectionBounds ? unionBounds(selectionBounds, bounds) : bounds
-      }
-    }
-
-    if (Object.keys(positions).length === 0) return
-
-    const activeIds = new Set(Object.keys(positions))
-    const candidates = designer.element
-      .shapes()
-      .filter(shape => !activeIds.has(shape.id))
-      .map(shape => designer.view.getShapeBounds(shape))
-
-    setStartPositions(positions)
-    setStartSelectionBounds(selectionBounds)
-    setGuideCandidates(candidates)
-    setGuides([])
-    pointerDelta.setStartFromEvent(e)
-    session.begin({ x: e.clientX, y: e.clientY })
-  }
+  const start = (e: MouseEvent, ids?: string[]): boolean => session.begin({ event: e, ids })
 
   const move = (e: MouseEvent) => {
-    const moveState = session.update({ x: e.clientX, y: e.clientY })
-    if (!moveState || !moveState.shouldUpdate) return
+    session.move(e)
+  }
 
-    const zoom = designer.state.viewport.zoom
-    const positions = startPositions()
-    const delta = pointerDelta.resolveDelta({
-      moveState,
-      zoom,
-      event: e,
-    })
-    const selectionBounds = startSelectionBounds()
-    const snapped = selectionBounds
-      ? calculateMoveGuideSnap({
-          movingBounds: selectionBounds,
-          delta,
-          candidates: guideCandidates(),
-          tolerance: guideTolerance,
-        })
-      : null
-    const appliedDelta = snapped?.delta ?? delta
-    setGuides(snapped?.guides ?? [])
+  const end = () => {
+    session.end()
+  }
+
+  const cancel = () => {
+    session.cancel()
+  }
+
+  function buildDragStartContext(ids: string[]): DragStartContext | null {
+    const targets: DragTarget[] = []
+    let selectionBounds: Bounds | null = null
+
+    for (const id of ids) {
+      const el = element.getElementById(id)
+      if (!el || !isShape(el)) continue
+
+      const startProps = { ...el.props }
+      targets.push({
+        id,
+        startProps,
+      })
+      const bounds = view.getShapeBounds(el)
+      selectionBounds = selectionBounds ? unionBounds(selectionBounds, bounds) : bounds
+    }
+
+    if (targets.length === 0) return null
+
+    return {
+      targets,
+      selectionBounds,
+      guideCandidates: buildGuideCandidates(targets),
+    }
+  }
+
+  function buildGuideCandidates(targets: DragTarget[]): Bounds[] {
+    const activeIds = new Set(targets.map(target => target.id))
+    return element
+      .shapes()
+      .filter(shape => !activeIds.has(shape.id))
+      .map(shape => view.getShapeBounds(shape))
+  }
+
+  function applyDraggedShapeUpdates(targets: DragTarget[], delta: Point): Bounds | null {
     let movedBounds: Bounds | null = null
 
     batch(() => {
-      for (const [id, startPos] of Object.entries(positions)) {
-        const el = designer.element.getById(id)
-        if (!el || !isShape(el)) continue
+      for (const target of targets) {
+        const nextX = target.startProps.x + delta.x
+        const nextY = target.startProps.y + delta.y
 
-        const nextX = startPos.x + appliedDelta.x
-        const nextY = startPos.y + appliedDelta.y
-        designer.edit.update(id, {
+        edit.update(target.id, {
           props: {
-            ...el.props,
+            ...target.startProps,
             x: nextX,
             y: nextY,
           },
@@ -108,37 +141,15 @@ export function createShapeDrag(options: UseShapeDragOptions = {}) {
         const shapeBounds: Bounds = getRotatedBoxBounds({
           x: nextX,
           y: nextY,
-          w: el.props.w,
-          h: el.props.h,
-          angle: el.props.angle,
+          w: target.startProps.w,
+          h: target.startProps.h,
+          angle: target.startProps.angle,
         })
         movedBounds = movedBounds ? unionBounds(movedBounds, shapeBounds) : shapeBounds
       }
     })
 
-    designer.view.scheduleAutoGrow(movedBounds ?? undefined)
-  }
-
-  const end = () => {
-    if (session.isPending()) {
-      session.finish()
-    }
-    setStartPositions({})
-    setStartSelectionBounds(null)
-    setGuideCandidates([])
-    setGuides([])
-    pointerDelta.clear()
-  }
-
-  const cancel = () => {
-    if (session.isPending()) {
-      session.cancel()
-    }
-    setStartPositions({})
-    setStartSelectionBounds(null)
-    setGuideCandidates([])
-    setGuides([])
-    pointerDelta.clear()
+    return movedBounds
   }
 
   onCleanup(() => {

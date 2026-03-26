@@ -1,13 +1,20 @@
-import { batch, createSignal, onCleanup } from 'solid-js'
+import { onCleanup } from 'solid-js'
 import { isRotatable, isShape } from '@diagen/core'
 import type { Point } from '@diagen/shared'
 import { getRotatedBoxBounds } from '@diagen/shared'
 import { useDesigner } from '../components'
 import type { EventToCanvas } from './createCoordinateService'
-import type { CreateDragSessionOptions } from './createDragSession'
-import { createTransactionalSession } from './createTransactionalSession'
+import { createDragSession } from './createDragSession'
+import type { CreatePointerDragTrackerOptions } from './createPointerDragTracker'
 
-export interface CreateRotateOptions extends CreateDragSessionOptions {
+export interface RotateDragState {
+  targetId: string
+  startAngle: number
+  startPointerAngle: number
+  center: Point
+}
+
+export interface CreateRotateOptions extends CreatePointerDragTrackerOptions {
   eventToCanvas?: EventToCanvas
   snapStep?: number
 }
@@ -28,120 +35,84 @@ function normalizeDeltaAngle(delta: number): number {
 
 export function createRotate(options: CreateRotateOptions = {}) {
   const { threshold = 2, snapStep = 15, eventToCanvas } = options
-  const designer = useDesigner()
-  const { element, edit, view, history } = designer
+  const { element, edit, view, history } = useDesigner()
   const transaction = history.transaction.createScope('旋转图形')
-  const session = createTransactionalSession({
+  let session!: ReturnType<typeof createDragSession<{ id: string; event: MouseEvent }, RotateDragState>>
+  session = createDragSession({
     threshold,
     transaction,
+    getEvent: input => input.event,
+    setup: input => {
+      const shape = element.getElementById(input.id)
+      if (!shape || !isShape(shape) || !isRotatable(shape)) return null
+      if (!eventToCanvas) return null
+
+      const center = {
+        x: shape.props.x + shape.props.w / 2,
+        y: shape.props.y + shape.props.h / 2,
+      }
+      const pointer = eventToCanvas(input.event)
+
+      return {
+        targetId: input.id,
+        startAngle: shape.props.angle ?? 0,
+        center,
+        startPointerAngle: getAngleByPoint(pointer, center),
+      }
+    },
+    update: ({ state, event }) => {
+      if (!eventToCanvas) return
+
+      const shape = element.getElementById(state.targetId)
+      if (!shape || !isShape(shape)) {
+        session.cancel()
+        return
+      }
+
+      const pointer = eventToCanvas(event)
+      const currentPointerAngle = getAngleByPoint(pointer, state.center)
+      const delta = normalizeDeltaAngle(currentPointerAngle - state.startPointerAngle)
+
+      let nextAngle = normalizeAngle(state.startAngle + delta)
+      if (event.shiftKey && snapStep > 0) {
+        nextAngle = Math.round(nextAngle / snapStep) * snapStep
+        nextAngle = normalizeAngle(nextAngle)
+      }
+
+      if (shape.props.angle === nextAngle) return
+
+      edit.update(state.targetId, 'props', {
+        ...shape.props,
+        angle: nextAngle,
+      })
+
+      view.scheduleAutoGrow(
+        getRotatedBoxBounds({
+          x: shape.props.x,
+          y: shape.props.y,
+          w: shape.props.w,
+          h: shape.props.h,
+          angle: nextAngle,
+        }),
+      )
+    },
     onCommit: () => {
       view.flushAutoGrow()
     },
   })
 
-  const [targetId, setTargetId] = createSignal<string | null>(null)
-  const [startAngle, setStartAngle] = createSignal<number>(0)
-  const [startPointerAngle, setStartPointerAngle] = createSignal<number>(0)
-  const [center, setCenter] = createSignal<Point | null>(null)
-
-  function isRotating(): boolean {
-    return session.isDragging()
-  }
-
-  function start(id: string, e: MouseEvent): boolean {
-    const shape = element.getElementById(id)
-    if (!shape || !isShape(shape) || !isRotatable(shape)) return false
-    if (!eventToCanvas) return false
-
-    const centerPoint = {
-      x: shape.props.x + shape.props.w / 2,
-      y: shape.props.y + shape.props.h / 2,
-    }
-    const pointer = eventToCanvas(e)
-
-    batch(() => {
-      setTargetId(id)
-      setStartAngle(shape.props.angle ?? 0)
-      setCenter(centerPoint)
-      setStartPointerAngle(getAngleByPoint(pointer, centerPoint))
-    })
-    session.begin({ x: e.clientX, y: e.clientY })
-    return true
-  }
-
-  function move(e: MouseEvent): void {
-    const moveState = session.update({ x: e.clientX, y: e.clientY })
-    if (!moveState || !moveState.shouldUpdate || !eventToCanvas) return
-
-    const id = targetId()
-    const centerPoint = center()
-    if (!id || !centerPoint) return
-
-    const shape = element.getElementById(id)
-    if (!shape || !isShape(shape)) {
-      cancel()
-      return
-    }
-
-    const pointer = eventToCanvas(e)
-    const currentPointerAngle = getAngleByPoint(pointer, centerPoint)
-    const delta = normalizeDeltaAngle(currentPointerAngle - startPointerAngle())
-
-    let nextAngle = normalizeAngle(startAngle() + delta)
-    if (e.shiftKey && snapStep > 0) {
-      nextAngle = Math.round(nextAngle / snapStep) * snapStep
-      nextAngle = normalizeAngle(nextAngle)
-    }
-
-    if (shape.props.angle === nextAngle) return
-
-    edit.update(id, 'props', {
-      ...shape.props,
-      angle: nextAngle,
-    })
-
-    view.scheduleAutoGrow(
-      getRotatedBoxBounds({
-        x: shape.props.x,
-        y: shape.props.y,
-        w: shape.props.w,
-        h: shape.props.h,
-        angle: nextAngle,
-      }),
-    )
-  }
-
-  function end(): void {
-    if (session.isPending()) {
-      session.finish()
-    }
-    reset()
-  }
-
-  function cancel(): void {
-    if (session.isPending()) {
-      session.cancel()
-    }
-    reset()
-  }
-
-  function reset(): void {
-    batch(() => {
-      setTargetId(null)
-      setCenter(null)
-      setStartAngle(0)
-      setStartPointerAngle(0)
-    })
-  }
+  const start = (id: string, e: MouseEvent): boolean => session.begin({ id, event: e })
+  const move = (e: MouseEvent): void => session.move(e)
+  const end = (): void => session.end()
+  const cancel = (): void => session.cancel()
 
   onCleanup(() => {
-    if (session.isPending()) cancel()
+    if (session.isActive()) cancel()
   })
 
   return {
-    isRotating,
-    isPending: session.isPending,
-    targetId,
+    isActive: session.isActive,
+    state: session.state,
     start,
     move,
     end,

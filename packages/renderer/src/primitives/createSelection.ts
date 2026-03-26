@@ -10,7 +10,7 @@ export function createSelection(options: { minSize?: number } = {}) {
   const { minSize = 5 } = options
   const { selection, element } = useDesigner()
 
-  const [isSelecting, setIsSelecting] = createSignal(false)
+  const [isActive, setIsActive] = createSignal(false)
   const [startPoint, setStartPoint] = createSignal<Point | null>(null)
   const [endPoint, setEndPoint] = createSignal<Point | null>(null)
 
@@ -26,16 +26,18 @@ export function createSelection(options: { minSize?: number } = {}) {
     }
   })
 
-  const start = (point: Point) => {
+  const start = (point: Point): boolean => {
+    if (isActive()) return false
     batch(() => {
       setStartPoint(point)
       setEndPoint(point)
-      setIsSelecting(true)
+      setIsActive(true)
     })
+    return true
   }
 
   const move = (point: Point) => {
-    if (isSelecting()) {
+    if (isActive()) {
       setEndPoint(point)
     }
   }
@@ -54,7 +56,7 @@ export function createSelection(options: { minSize?: number } = {}) {
 
   const reset = () => {
     batch(() => {
-      setIsSelecting(false)
+      setIsActive(false)
       setStartPoint(null)
       setEndPoint(null)
     })
@@ -73,7 +75,7 @@ export function createSelection(options: { minSize?: number } = {}) {
     }
   }
 
-  return { isSelecting, bounds, start, move, end, cancel }
+  return { isActive, bounds, start, move, end, cancel }
 }
 
 export type CreateSelection = ReturnType<typeof createSelection>

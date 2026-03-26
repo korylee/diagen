@@ -90,9 +90,12 @@ export function LinkCreateOverlay() {
 
     e.preventDefault()
     e.stopPropagation()
-    pointer.machine.startQuickCreateLinker(e, {
-      sourceShapeId: shape.id,
+    pointer.machine.beginLinkerCreate(e, {
       linkerId,
+      from: {
+        type: 'shape',
+        shapeId: shape.id,
+      },
     })
   }
 

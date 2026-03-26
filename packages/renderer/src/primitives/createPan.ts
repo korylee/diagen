@@ -15,7 +15,7 @@ export function createPan(
   const designer = useDesigner()
   const { view } = designer
 
-  const [isPanning, setIsPanning] = createSignal(false)
+  const [isActive, setIsActive] = createSignal(false)
   const [isSpacePressed, setIsSpacePressed] = createSignal(false)
   const [startMouse, setStartMouse] = createSignal<Point | null>(null)
   const [startViewport, setStartViewport] = createSignal<Point | null>(null)
@@ -37,36 +37,37 @@ export function createPan(
 
   const canPan = (e: MouseEvent): boolean => e.button === button || (isSpacePressed() && e.button === 0)
 
-  const start = (e: MouseEvent) => {
-    if (!canPan(e)) return
+  const start = (e: MouseEvent): boolean => {
+    if (isActive() || !canPan(e)) return false
     const vp = designer.state.viewport
     batch(() => {
-      setIsPanning(true)
+      setIsActive(true)
       setStartMouse({ x: e.clientX, y: e.clientY })
       setStartViewport({ x: vp.x, y: vp.y })
     })
+    return true
   }
 
   const move = (e: MouseEvent) => {
     const sm = startMouse()
     const sv = startViewport()
-    if (!isPanning() || !sm || !sv) return
+    if (!isActive() || !sm || !sv) return
     view.pan(sv.x + e.clientX - sm.x, sv.y + e.clientY - sm.y)
   }
 
   const end = () => {
     batch(() => {
-      setIsPanning(false)
+      setIsActive(false)
       setStartMouse(null)
       setStartViewport(null)
     })
   }
 
   onCleanup(() => {
-    if (isPanning()) end()
+    if (isActive()) end()
   })
 
-  return { isPanning, isSpacePressed, canPan, start, move, end }
+  return { isActive, isSpacePressed, canPan, start, move, end }
 }
 
 export type CreatePan = ReturnType<typeof createPan>

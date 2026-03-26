@@ -1,12 +1,12 @@
-import { batch, createSignal, onCleanup } from 'solid-js'
-import { calculateResizeGuideSnap, isShape, type GuideLine } from '@diagen/core'
+import { createSignal, onCleanup } from 'solid-js'
+import { calculateResizeGuideSnap, isShape, type GuideLine, type ShapeElement } from '@diagen/core'
 import { getRotatedBoxBounds } from '@diagen/shared'
 import type { Bounds, Point } from '@diagen/shared'
 import { useDesigner } from '../components'
 import { type EventToCanvas } from './createCoordinateService'
-import type { CreateDragSessionOptions } from './createDragSession'
+import { createDragSession } from './createDragSession'
+import type { CreatePointerDragTrackerOptions } from './createPointerDragTracker'
 import { createPointerDeltaState } from './pointerDeltaState'
-import { createTransactionalSession } from './createTransactionalSession'
 
 // ============================================================================
 // 调整大小 Hook - 与 Designer 集成
@@ -16,8 +16,17 @@ export type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
 
 const HANDLE_SIZE = 8
 
+export interface ResizeDragState {
+  targetId: string
+  direction: ResizeDirection
+  startBounds: Bounds
+  guideCandidates: Bounds[]
+  ratio: number
+  startProps: ShapeElement['props']
+}
+
 export function createResize(
-  options: CreateDragSessionOptions & {
+  options: CreatePointerDragTrackerOptions & {
     minWidth?: number
     minHeight?: number
     eventToCanvas?: EventToCanvas
@@ -28,156 +37,98 @@ export function createResize(
   const { element, history, selection, view, edit } = useDesigner()
   const transaction = history.transaction.createScope('调整尺寸')
   const pointerDelta = createPointerDeltaState({ eventToCanvas })
-  const session = createTransactionalSession({
+  const [guides, setGuides] = createSignal<GuideLine[]>([])
+  const session = createDragSession<{ id: string; dir: ResizeDirection; event: MouseEvent }, ResizeDragState>({
     threshold,
     transaction,
+    getEvent: input => input.event,
+    setup: input => {
+      const el = element.getElementById(input.id)
+      if (!el || !isShape(el)) return null
+
+      const bounds = view.getElementBounds(el)
+      if (!bounds) return null
+
+      setGuides([])
+      pointerDelta.begin(input.event)
+
+      return {
+        targetId: input.id,
+        direction: input.dir,
+        startBounds: bounds,
+        guideCandidates: element
+          .shapes()
+          .filter(shape => shape.id !== input.id)
+          .map(shape => view.getShapeBounds(shape)),
+        ratio: bounds.w / bounds.h,
+        startProps: { ...el.props },
+      }
+    },
+    update: ({ state, event, moveState }) => {
+      const delta = pointerDelta.resolveDelta({
+        moveState,
+        zoom: view.viewport().zoom,
+        event,
+      })
+      const nextBounds = resolveResizeBounds({
+        state,
+        delta,
+        keepRatio: event.shiftKey,
+        center: event.altKey,
+        minWidth,
+        minHeight,
+      })
+      const snapped = calculateResizeGuideSnap({
+        draftBounds: nextBounds,
+        direction: state.direction,
+        candidates: state.guideCandidates,
+        tolerance: guideTolerance,
+        minWidth,
+        minHeight,
+      })
+      const snappedBounds = snapped.bounds
+      setGuides(snapped.guides)
+
+      edit.update(state.targetId, {
+        props: {
+          ...state.startProps,
+          x: snappedBounds.x,
+          y: snappedBounds.y,
+          w: snappedBounds.w,
+          h: snappedBounds.h,
+        },
+      })
+      view.scheduleAutoGrow(
+        getRotatedBoxBounds({
+          x: snappedBounds.x,
+          y: snappedBounds.y,
+          w: snappedBounds.w,
+          h: snappedBounds.h,
+          angle: state.startProps.angle,
+        }),
+      )
+    },
+    reset: () => {
+      setGuides([])
+      pointerDelta.reset()
+    },
     onCommit: () => {
       view.flushAutoGrow()
     },
   })
 
-  const [targetId, setTargetId] = createSignal<string | null>(null)
-  const [direction, setDirection] = createSignal<ResizeDirection | null>(null)
-  const [startBounds, setStartBounds] = createSignal<Bounds | null>(null)
-  const [guideCandidates, setGuideCandidates] = createSignal<Bounds[]>([])
-  const [guides, setGuides] = createSignal<GuideLine[]>([])
-  const [ratio, setRatio] = createSignal(1)
-
-  const isResizing = () => targetId() !== null
-
-  const start = (id: string, dir: ResizeDirection, e: MouseEvent) => {
-    const el = element.getElementById(id)
-    if (!el || !isShape(el)) return
-
-    const bounds = view.getElementBounds(el)
-
-    if (!bounds) return
-
-    batch(() => {
-      setTargetId(id)
-      setDirection(dir)
-      setStartBounds(bounds)
-      setGuideCandidates(
-        element
-          .shapes()
-          .filter(shape => shape.id !== id)
-          .map(shape => view.getShapeBounds(shape)),
-      )
-      setGuides([])
-      pointerDelta.setStartFromEvent(e)
-      setRatio(bounds.w / bounds.h)
-    })
-    session.begin({ x: e.clientX, y: e.clientY })
-  }
+  const start = (id: string, dir: ResizeDirection, e: MouseEvent): boolean => session.begin({ id, dir, event: e })
 
   const move = (e: MouseEvent) => {
-    const moveState = session.update({ x: e.clientX, y: e.clientY })
-    if (!moveState || !moveState.shouldUpdate) return
-
-    const bounds = startBounds()
-    const dir = direction()
-    const id = targetId()
-    if (!bounds || !dir || !id) return
-
-    const zoom = view.viewport().zoom
-    const delta = pointerDelta.resolveDelta({
-      moveState,
-      zoom,
-      event: e,
-    })
-    const dx = delta.x
-    const dy = delta.y
-
-    let { x, y, w, h } = bounds
-    const keepRatio = e.shiftKey
-    const center = e.altKey
-
-    if (dir.includes('n')) {
-      y = bounds.y + dy
-      h = bounds.h - dy
-    }
-    if (dir.includes('s')) {
-      h = bounds.h + dy
-    }
-    if (dir.includes('w')) {
-      x = bounds.x + dx
-      w = bounds.w - dx
-    }
-    if (dir.includes('e')) {
-      w = bounds.w + dx
-    }
-
-    if (keepRatio) {
-      const r = ratio()
-      if (['n', 's'].includes(dir)) w = h * r
-      else if (['e', 'w'].includes(dir)) h = w / r
-      else if (Math.abs(dx) > Math.abs(dy)) h = w / r
-      else w = h * r
-    }
-
-    if (center) {
-      const cx = bounds.x + bounds.w / 2
-      const cy = bounds.y + bounds.h / 2
-      x = cx - w / 2
-      y = cy - h / 2
-    }
-
-    w = Math.max(minWidth, w)
-    h = Math.max(minHeight, h)
-
-    const snapped = calculateResizeGuideSnap({
-      draftBounds: { x, y, w, h },
-      direction: dir,
-      candidates: guideCandidates(),
-      tolerance: guideTolerance,
-      minWidth,
-      minHeight,
-    })
-    const snappedBounds = snapped.bounds
-    x = snappedBounds.x
-    y = snappedBounds.y
-    w = snappedBounds.w
-    h = snappedBounds.h
-    setGuides(snapped.guides)
-
-    const el = element.getElementById(id)
-    if (el && isShape(el)) {
-      edit.update(id, { props: { ...el.props, x, y, w, h } })
-      view.scheduleAutoGrow(
-        getRotatedBoxBounds({
-          x,
-          y,
-          w,
-          h,
-          angle: el.props.angle,
-        }),
-      )
-    }
+    session.move(e)
   }
 
   const end = () => {
-    if (session.isPending()) {
-      session.finish()
-    }
-    reset()
+    session.end()
   }
 
   const cancel = () => {
-    if (session.isPending()) {
-      session.cancel()
-    }
-    reset()
-  }
-
-  const reset = () => {
-    batch(() => {
-      setTargetId(null)
-      setDirection(null)
-      setStartBounds(null)
-      setGuideCandidates([])
-      setGuides([])
-      pointerDelta.clear()
-    })
+    session.cancel()
   }
 
   const hitTest = (point: Point): { id: string; dir: ResizeDirection } | null => {
@@ -211,10 +162,71 @@ export function createResize(
   }
 
   onCleanup(() => {
-    if (isResizing() || session.isPending()) cancel()
+    if (session.isActive()) cancel()
   })
 
-  return { isResizing, direction, targetId, guides, start, move, end, cancel, hitTest }
+  return {
+    isActive: session.isActive,
+    state: session.state,
+    guides,
+    start,
+    move,
+    end,
+    cancel,
+    hitTest,
+  }
+}
+
+function resolveResizeBounds(params: {
+  state: ResizeDragState
+  delta: Point
+  keepRatio: boolean
+  center: boolean
+  minWidth: number
+  minHeight: number
+}): Bounds {
+  const { state, delta, keepRatio, center, minWidth, minHeight } = params
+  const bounds = state.startBounds
+  const dx = delta.x
+  const dy = delta.y
+
+  let { x, y, w, h } = bounds
+
+  if (state.direction.includes('n')) {
+    y = bounds.y + dy
+    h = bounds.h - dy
+  }
+  if (state.direction.includes('s')) {
+    h = bounds.h + dy
+  }
+  if (state.direction.includes('w')) {
+    x = bounds.x + dx
+    w = bounds.w - dx
+  }
+  if (state.direction.includes('e')) {
+    w = bounds.w + dx
+  }
+
+  if (keepRatio) {
+    if (['n', 's'].includes(state.direction)) w = h * state.ratio
+    else if (['e', 'w'].includes(state.direction)) h = w / state.ratio
+    else if (Math.abs(dx) > Math.abs(dy)) h = w / state.ratio
+    else w = h * state.ratio
+  }
+
+  if (center) {
+    const cx = bounds.x + bounds.w / 2
+    const cy = bounds.y + bounds.h / 2
+    x = cx - w / 2
+    y = cy - h / 2
+  }
+
+  return {
+    x,
+    y,
+    w: Math.max(minWidth, w),
+    h: Math.max(minHeight, h),
+  }
 }
 
 export type CreateResize = ReturnType<typeof createResize>

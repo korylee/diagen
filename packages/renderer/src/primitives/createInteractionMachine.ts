@@ -1,10 +1,8 @@
 import { createSignal } from 'solid-js'
-import type { LinkerRoute } from '@diagen/core'
-import type { Point } from '@diagen/shared'
-import type { LinkerHit } from '../utils'
 import type { EventToCanvas } from './createCoordinateService'
-import type { CreateSelection } from './createSelection'
+import type { BeginLinkerCreateOptions, BeginLinkerEditOptions } from './createLinkerDrag'
 import type { CreateLinkerDrag } from './createLinkerDrag'
+import type { CreateSelection } from './createSelection'
 import type { CreatePan } from './createPan'
 import type { CreateResize, ResizeDirection } from './createResize'
 import type { CreateRotate } from './createRotate'
@@ -35,6 +33,15 @@ export function createInteractionMachine(options: CreateInteractionMachineOption
 
   const isIdle = (): boolean => mode() === 'idle'
   const isActive = (): boolean => mode() !== 'idle'
+  const shouldShowGrabbingCursor = (): boolean => {
+    const current = mode()
+    return (
+      current === 'panning' ||
+      current === 'draggingShape' ||
+      current === 'draggingLinker' ||
+      current === 'rotatingShape'
+    )
+  }
   const shouldAutoScroll = (): boolean => {
     const current = mode()
     return (
@@ -47,33 +54,33 @@ export function createInteractionMachine(options: CreateInteractionMachineOption
   }
 
   const startPan = (e: MouseEvent): boolean => {
-    if (!isIdle() || !pan.canPan(e)) return false
-    pan.start(e)
-    if (!pan.isPanning()) return false
+    if (!isIdle()) return false
+    const started = pan.start(e)
+    if (!started) return false
     setMode('panning')
     return true
   }
 
   const startBoxSelect = (e: MouseEvent): boolean => {
     if (!isIdle()) return false
-    boxSelect.start(eventToCanvas(e))
-    if (!boxSelect.isSelecting()) return false
+    const started = boxSelect.start(eventToCanvas(e))
+    if (!started) return false
     setMode('boxSelecting')
     return true
   }
 
   const startShapeDrag = (e: MouseEvent, ids?: string[]): boolean => {
     if (!isIdle()) return false
-    shapeDrag.start(e, ids)
-    if (!shapeDrag.isPending()) return false
+    const started = shapeDrag.start(e, ids)
+    if (!started) return false
     setMode('draggingShape')
     return true
   }
 
   const startResize = (id: string, dir: ResizeDirection, e: MouseEvent): boolean => {
     if (!isIdle()) return false
-    resize.start(id, dir, e)
-    if (!resize.isResizing()) return false
+    const started = resize.start(id, dir, e)
+    if (!started) return false
     setMode('resizing')
     return true
   }
@@ -81,49 +88,23 @@ export function createInteractionMachine(options: CreateInteractionMachineOption
   const startRotate = (id: string, e: MouseEvent): boolean => {
     if (!isIdle()) return false
     const started = rotate.start(id, e)
-    if (!started || !rotate.isPending()) return false
+    if (!started) return false
     setMode('rotatingShape')
     return true
   }
 
-  const startLinkerDrag = (
-    e: MouseEvent,
-    linkerId: string,
-    point: Point,
-    presetHit?: LinkerHit,
-    presetRoute?: LinkerRoute,
-  ): boolean => {
+  const beginLinkerEdit = (e: MouseEvent, options: BeginLinkerEditOptions): boolean => {
     if (!isIdle()) return false
-    const started = linkerDrag.start(e, linkerId, point, presetHit, presetRoute)
-    if (!started || !linkerDrag.isPending()) return false
+    const started = linkerDrag.beginEdit(e, options)
+    if (!started) return false
     setMode('draggingLinker')
     return true
   }
 
-  const startCreateLinkerFromPoint = (
-    e: MouseEvent,
-    options: {
-      linkerId: string
-      point: Point
-    },
-  ): boolean => {
+  const beginLinkerCreate = (e: MouseEvent, options: BeginLinkerCreateOptions): boolean => {
     if (!isIdle()) return false
-    const started = linkerDrag.startCreateFromPoint(e, options)
-    if (!started || !linkerDrag.isPending()) return false
-    setMode('draggingLinker')
-    return true
-  }
-
-  const startQuickCreateLinker = (
-    e: MouseEvent,
-    options: {
-      sourceShapeId: string
-      linkerId: string
-    },
-  ): boolean => {
-    if (!isIdle()) return false
-    const started = linkerDrag.startCreateFromShape(e, options)
-    if (!started || !linkerDrag.isPending()) return false
+    const started = linkerDrag.beginCreate(e, options)
+    if (!started) return false
     setMode('draggingLinker')
     return true
   }
@@ -209,15 +190,15 @@ export function createInteractionMachine(options: CreateInteractionMachineOption
     mode,
     isIdle,
     isActive,
+    shouldShowGrabbingCursor,
     shouldAutoScroll,
     startPan,
     startBoxSelect,
     startShapeDrag,
     startResize,
     startRotate,
-    startLinkerDrag,
-    startCreateLinkerFromPoint,
-    startQuickCreateLinker,
+    beginLinkerEdit,
+    beginLinkerCreate,
     move,
     end,
     cancel,

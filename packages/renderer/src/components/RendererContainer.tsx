@@ -3,12 +3,13 @@ import { Schema } from '@diagen/core'
 import { createEventListener, createKeyboard, createScroll } from '@diagen/primitives'
 import type { Point } from '@diagen/shared'
 import { createPointerInteraction } from '../primitives'
-import { hitTestScene } from '../utils'
+import { hitTestScene, type SceneHit, type SceneLinkerHit } from '../utils'
 import { DesignerGrids } from './DesignerGrids'
 import { useDesigner } from './DesignerProvider'
 import { InteractionOverlay } from './InteractionOverlay'
 import { InteractionProvider } from './InteractionProvider'
 import { createCoordinateService } from '../primitives/createCoordinateService'
+import { resolveContainerCursor, resolveScenePrimaryIntent } from './rendererInteractionUtils'
 
 const EDGE_AUTO_SCROLL_GAP = 28
 const EDGE_AUTO_SCROLL_MAX_STEP = 26
@@ -46,8 +47,6 @@ export function RendererContainer(props: {
   })
   const keyboard = createKeyboard()
   const scroll = createScroll(viewportRef)
-  type SceneHit = ReturnType<typeof hitTestScene>
-  type LinkerSceneHit = Extract<NonNullable<SceneHit>, { type: 'linker' }>
 
   keyboard.bind('delete', () => edit.remove(selection.selectedIds()))
   keyboard.bind('ctrl+a', () => selection.selectAll())
@@ -83,15 +82,10 @@ export function RendererContainer(props: {
       position: 'relative',
       'background-color': `var(--dg-page-background)`,
       'box-sizing': 'content-box',
-      cursor:
-        pointer.pan.isPanning() ||
-        pointer.shapeDrag.isDragging() ||
-        pointer.linkerDrag.isDragging() ||
-        pointer.rotate.isRotating()
-          ? 'grabbing'
-          : state.tool.type === 'create-shape' || state.tool.type === 'create-linker'
-            ? 'crosshair'
-            : 'default',
+      cursor: resolveContainerCursor({
+        isGrabbing: pointer.machine.shouldShowGrabbingCursor(),
+        toolType: state.tool.type,
+      }),
     } as const
   })
   const layerStyle = createMemo(() => {
@@ -180,20 +174,26 @@ export function RendererContainer(props: {
     point: Point,
     linkerId: string,
     continuous: boolean,
-    sceneHit: SceneHit,
+    sceneHit: SceneHit | null,
   ): boolean => {
     e.stopPropagation()
     e.preventDefault()
 
     const started =
       sceneHit?.type === 'shape'
-        ? pointer.machine.startQuickCreateLinker(e, {
-            sourceShapeId: sceneHit.element.id,
+        ? pointer.machine.beginLinkerCreate(e, {
             linkerId,
+            from: {
+              type: 'shape',
+              shapeId: sceneHit.element.id,
+            },
           })
-        : pointer.machine.startCreateLinkerFromPoint(e, {
+        : pointer.machine.beginLinkerCreate(e, {
             linkerId,
-            point,
+            from: {
+              type: 'point',
+              point,
+            },
           })
 
     if (started && !continuous) {
@@ -203,11 +203,16 @@ export function RendererContainer(props: {
     return started
   }
 
-  const handleLinkerPrimaryDown = (e: MouseEvent, point: Point, sceneHit: LinkerSceneHit): boolean => {
+  const handleLinkerPrimaryDown = (e: MouseEvent, point: Point, sceneHit: SceneLinkerHit): boolean => {
     e.stopPropagation()
     e.preventDefault()
     applySelection(sceneHit.element.id, e)
-    return pointer.machine.startLinkerDrag(e, sceneHit.element.id, point, sceneHit.hit, sceneHit.route)
+    return pointer.machine.beginLinkerEdit(e, {
+      linkerId: sceneHit.element.id,
+      point,
+      hit: sceneHit.hit,
+      route: sceneHit.route,
+    })
   }
 
   const handleShapePrimaryDown = (e: MouseEvent, point: Point, shapeId: string): boolean => {
@@ -227,8 +232,33 @@ export function RendererContainer(props: {
     e.stopPropagation()
     e.preventDefault()
     selection.clear()
-    pointer.machine.startBoxSelect(e)
-    return true
+    return pointer.machine.startBoxSelect(e)
+  }
+
+  const getSceneHit = (point: Point): SceneHit | null =>
+    hitTestScene(designer.element.elements(), point, {
+      zoom: view.viewport().zoom,
+      getLinkerLayout: linker => view.getLinkerLayout(linker),
+    })
+
+  const handleResolvedScenePrimaryDown = (
+    e: MouseEvent,
+    intent: ReturnType<typeof resolveScenePrimaryIntent>,
+  ): boolean => {
+    switch (intent.type) {
+      case 'create-shape':
+        return handleCreateShapeDown(e, intent.shapeId, intent.continuous, intent.point)
+      case 'create-linker':
+        return handleCreateLinkerDown(e, intent.point, intent.linkerId, intent.continuous, intent.sceneHit)
+      case 'edit-linker':
+        return handleLinkerPrimaryDown(e, intent.point, intent.sceneHit)
+      case 'interact-shape':
+        return handleShapePrimaryDown(e, intent.point, intent.shapeId)
+      case 'blank':
+        return handleBlankPrimaryDown(e)
+      default:
+        return false
+    }
   }
 
   const handleSceneMouseDown = (e: MouseEvent): boolean => {
@@ -237,29 +267,14 @@ export function RendererContainer(props: {
 
     const currentTool = tool.tool()
     const point = coordinate.eventToCanvas(e)
-
-    if (currentTool.type === 'create-shape') {
-      return handleCreateShapeDown(e, currentTool.shapeId, currentTool.continuous, point)
-    }
-
-    const sceneHit = hitTestScene(designer.element.elements(), point, {
-      zoom: view.viewport().zoom,
-      getLinkerLayout: linker => view.getLinkerLayout(linker),
+    const sceneHit = currentTool.type === 'create-shape' ? null : getSceneHit(point)
+    const intent = resolveScenePrimaryIntent({
+      tool: currentTool,
+      point,
+      sceneHit,
     })
 
-    if (currentTool.type === 'create-linker') {
-      return handleCreateLinkerDown(e, point, currentTool.linkerId, currentTool.continuous, sceneHit)
-    }
-
-    if (sceneHit?.type === 'linker') {
-      return handleLinkerPrimaryDown(e, point, sceneHit)
-    }
-
-    if (sceneHit?.type === 'shape') {
-      return handleShapePrimaryDown(e, point, sceneHit.element.id)
-    }
-
-    return handleBlankPrimaryDown(e)
+    return handleResolvedScenePrimaryDown(e, intent)
   }
 
   const calcEdgeStep = (distanceToEdge: number): number => {

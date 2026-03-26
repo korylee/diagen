@@ -1,7 +1,6 @@
-import { createSignal } from 'solid-js'
 import type { Point } from '@diagen/shared'
 import type { EventToCanvas } from './createCoordinateService'
-import type { DragMoveState } from './createDragSession'
+import type { PointerDragMoveState } from './createPointerDragTracker'
 
 interface PointerEventLike {
   clientX: number
@@ -14,24 +13,23 @@ export interface CreatePointerDeltaStateOptions {
 
 export function createPointerDeltaState(options: CreatePointerDeltaStateOptions = {}) {
   const { eventToCanvas } = options
-  const [startPointerCanvas, setStartPointerCanvas] = createSignal<Point | null>(null)
+  let startPointerCanvas: Point | null = null
 
-  function setStartFromEvent(event: PointerEventLike): void {
-    setStartPointerCanvas(eventToCanvas ? eventToCanvas(event) : null)
+  function begin(event: PointerEventLike): void {
+    startPointerCanvas = eventToCanvas ? eventToCanvas(event) : null
   }
 
-  function clear(): void {
-    setStartPointerCanvas(null)
+  function reset(): void {
+    startPointerCanvas = null
   }
 
-  function resolveDelta(params: { moveState: DragMoveState; zoom: number; event: PointerEventLike }): Point {
+  function resolveDelta(params: { moveState: PointerDragMoveState; zoom: number; event: PointerEventLike }): Point {
     const { moveState, zoom, event } = params
-    const startPoint = startPointerCanvas()
-    if (eventToCanvas && startPoint) {
+    if (eventToCanvas && startPointerCanvas) {
       const current = eventToCanvas(event)
       return {
-        x: current.x - startPoint.x,
-        y: current.y - startPoint.y,
+        x: current.x - startPointerCanvas.x,
+        y: current.y - startPointerCanvas.y,
       }
     }
 
@@ -42,9 +40,8 @@ export function createPointerDeltaState(options: CreatePointerDeltaStateOptions 
   }
 
   return {
-    startPointerCanvas,
-    setStartFromEvent,
-    clear,
+    begin,
+    reset,
     resolveDelta,
   }
 }

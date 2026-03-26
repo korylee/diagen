@@ -25,7 +25,7 @@ function GuideOverlay() {
   const { pointer, coordinate } = useInteraction()
 
   const guides = createMemo<GuideLine[]>(() => {
-    if (pointer.resize.isResizing()) {
+    if (pointer.resize.isActive()) {
       return pointer.resize.guides()
     }
 
@@ -105,7 +105,7 @@ export function SelectionLayer() {
   })
 
   return (
-    <Show when={pointer.boxSelect.isSelecting() && screenBounds()}>
+    <Show when={pointer.boxSelect.isActive() && screenBounds()}>
       {bounds => (
         <div
           style={{
@@ -141,13 +141,13 @@ function LinkTargetOverlay() {
   const { pointer, coordinate } = useInteraction()
 
   const isLinkEndDragging = createMemo(() => {
-    const mode = pointer.linkerDrag.dragSnapshot()?.mode
-    return pointer.linkerDrag.isPending() && (mode === 'from' || mode === 'to')
+    const mode = pointer.linkerDrag.state()?.mode
+    return pointer.linkerDrag.isActive() && (mode === 'from' || mode === 'to')
   })
 
   const linkTargetItems = createMemo<ShapeHighlightItem[]>(() => {
     if (!isLinkEndDragging()) return []
-    const activeId = pointer.linkerDrag.candidateAnchor()?.shapeId ?? null
+    const activeId = pointer.linkerDrag.snapTarget()?.shapeId ?? null
 
     return element
       .shapes()
@@ -217,9 +217,9 @@ function LinkerSelectionOverlay() {
       canvas: point,
     }))
   })
-  const candidateAnchor = createMemo(() => pointer.linkerDrag.candidateAnchor())
-  const fixedCandidateAnchor = createMemo(() => {
-    const candidate = candidateAnchor()
+  const snapTarget = createMemo(() => pointer.linkerDrag.snapTarget())
+  const fixedSnapTarget = createMemo(() => {
+    const candidate = snapTarget()
     return candidate && candidate.binding.type === 'fixed' ? candidate : null
   })
 
@@ -231,7 +231,12 @@ function LinkerSelectionOverlay() {
     e.stopPropagation()
     e.preventDefault()
     const point = endpoints[type].canvas
-    pointer.machine.startLinkerDrag(e, linker.id, point, { type }, linkerRoute ?? undefined)
+    pointer.machine.beginLinkerEdit(e, {
+      linkerId: linker.id,
+      point,
+      hit: { type },
+      route: linkerRoute ?? undefined,
+    })
   }
 
   const startControlDrag = (e: MouseEvent, index: number, point: Point) => {
@@ -240,13 +245,12 @@ function LinkerSelectionOverlay() {
     if (!linker) return
     e.stopPropagation()
     e.preventDefault()
-    pointer.machine.startLinkerDrag(
-      e,
-      linker.id,
+    pointer.machine.beginLinkerEdit(e, {
+      linkerId: linker.id,
       point,
-      { type: 'control', controlIndex: index },
-      linkerRoute ?? undefined,
-    )
+      hit: { type: 'control', controlIndex: index },
+      route: linkerRoute ?? undefined,
+    })
   }
 
   return (
@@ -343,7 +347,7 @@ function LinkerSelectionOverlay() {
           )}
         </For>
 
-        <Show when={fixedCandidateAnchor()}>
+        <Show when={fixedSnapTarget()}>
           {candidate => <AnchorPreview elementId={candidate().shapeId} highlightAnchor={candidate().anchorId} />}
         </Show>
       </div>

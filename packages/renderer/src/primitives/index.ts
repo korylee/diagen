@@ -1,5 +1,5 @@
 export * from './createDragSession'
-export * from './createTransactionalSession'
+export * from './createPointerDragTracker'
 export * from './createInteractionMachine'
 export * from './createPointerInteraction'
 export * from './createShapeDrag'
