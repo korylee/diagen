@@ -67,6 +67,21 @@
 - shape/linker 的正式画布创建链路已接入 `RendererContainer`
 - shape 快捷建线已通过 `createLinkerDrag.beginCreate(...) + LinkCreateOverlay` 进入主交互链
 
+## 6.1 编辑命令与快照边界
+- `packages/core/src/designer/managers/edit.ts` 已把 `patch / setter / nested setter` 的历史命令构造统一到同一套 change entry 流程。
+- 本轮问题根因有两层：
+  - 历史系统给对象型字段做 `before/after` 快照时抓到了 Solid store proxy，导致 `before` 不是稳定 plain value，回退时会读到被后续写入污染的引用。
+  - 函数型 setter / produce 若直接跑在 plain clone 上，数组与嵌套结构的更新语义会和 Solid store draft 不一致，容易把结构改坏。
+- 当前修正策略：
+  - 历史快照统一先基于 `unwrap(...)` 脱离 proxy，再转成 plain snapshot。
+  - 函数型 setter 改为先在临时 `createStore` draft 上执行，再把结果转回 plain snapshot。
+- 结论：
+  - `edit.update(id, setter)`、`edit.update(id, 'props', setter)`、`edit.update(id, 'props', wholeObject)` 这几类入口现在都应视为同一历史语义体系的一部分。
+  - 复杂编辑动作若基于这些入口构建，优先保证“单次会话 = 单个 transaction”，不要额外自己缓存可变引用。
+  - 后续若继续改 `edit.update`：
+    - 不要直接把 store proxy、draft 或共享对象引用写进 history entry。
+    - 不要让 produce/setter 直接运行在手写 plain clone 上；若要兼容 Solid store 语义，优先复用临时 store draft 的做法。
+
 ## 7. 连线路由主链路
 - 主入口：`packages/core/src/designer/managers/view.ts`
 - 路由配置来自运行时 `state.config.linkerRoute`

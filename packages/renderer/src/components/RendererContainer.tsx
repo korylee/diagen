@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, JSX, onMount } from 'solid-js'
-import { Schema } from '@diagen/core'
+import { DesignerToolState, Schema } from '@diagen/core'
 import { createEventListener, createKeyboard, createScroll } from '@diagen/primitives'
 import type { Point } from '@diagen/shared'
 import { createPointerInteraction } from '../primitives'
@@ -9,10 +9,74 @@ import { useDesigner } from './DesignerProvider'
 import { InteractionOverlay } from './InteractionOverlay'
 import { InteractionProvider } from './InteractionProvider'
 import { createCoordinateService } from '../primitives/createCoordinateService'
-import { resolveContainerCursor, resolveScenePrimaryIntent } from './rendererInteractionUtils'
 
 const EDGE_AUTO_SCROLL_GAP = 28
 const EDGE_AUTO_SCROLL_MAX_STEP = 26
+
+type ContainerCursor = 'default' | 'crosshair' | 'grabbing'
+
+type ScenePrimaryIntent =
+  | { type: 'create-shape'; shapeId: string; continuous: boolean; point: Point }
+  | { type: 'create-linker'; linkerId: string; continuous: boolean; point: Point; sceneHit: SceneHit | null }
+  | { type: 'edit-linker'; point: Point; sceneHit: SceneLinkerHit }
+  | { type: 'interact-shape'; point: Point; shapeId: string }
+  | { type: 'blank' }
+
+function resolveContainerCursor(params: { isGrabbing: boolean; toolType: DesignerToolState['type'] }): ContainerCursor {
+  const { isGrabbing, toolType } = params
+  if (isGrabbing) return 'grabbing'
+
+  if (toolType === 'create-shape' || toolType === 'create-linker') {
+    return 'crosshair'
+  }
+
+  return 'default'
+}
+
+function resolveScenePrimaryIntent(params: {
+  tool: DesignerToolState
+  point: Point
+  sceneHit: SceneHit | null
+}): ScenePrimaryIntent {
+  const { tool, point, sceneHit } = params
+
+  if (tool.type === 'create-shape') {
+    return {
+      type: 'create-shape',
+      point,
+      shapeId: tool.shapeId,
+      continuous: tool.continuous,
+    }
+  }
+
+  if (tool.type === 'create-linker') {
+    return {
+      type: 'create-linker',
+      point,
+      linkerId: tool.linkerId,
+      continuous: tool.continuous,
+      sceneHit,
+    }
+  }
+
+  if (sceneHit?.type === 'linker') {
+    return {
+      type: 'edit-linker',
+      point,
+      sceneHit,
+    }
+  }
+
+  if (sceneHit?.type === 'shape') {
+    return {
+      type: 'interact-shape',
+      point,
+      shapeId: sceneHit.element.id,
+    }
+  }
+
+  return { type: 'blank' }
+}
 
 export function RendererContainer(props: {
   children: JSX.Element

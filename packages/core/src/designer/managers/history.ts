@@ -86,6 +86,23 @@ export interface HistoryEvents {
   'history:clear': void
 }
 
+function shouldMergeCommand(params: {
+  lastCommand?: Command
+  nextCommand: Command & CommandMeta
+  mergeWindow: number
+  now?: number
+}): boolean {
+  const { lastCommand, nextCommand, mergeWindow, now = Date.now() } = params
+
+  if (!lastCommand || nextCommand.mergeStrategy === 'append') return false
+
+  const withinWindow = now - lastCommand.timestamp <= mergeWindow
+  return (
+    (nextCommand.mergeStrategy === 'replace' && lastCommand.name === nextCommand.name) ||
+    (nextCommand.mergeStrategy === 'custom' && withinWindow)
+  )
+}
+
 export function createHistoryManager(ctx: DesignerContext) {
   const { emit } = ctx.emitter
 
@@ -95,6 +112,16 @@ export function createHistoryManager(ctx: DesignerContext) {
     maxHistory: 50,
     mergeWindow: 300,
   })
+
+  function updateHistoryState(recipe: (state: HistoryState) => void): void {
+    setState(produce(recipe))
+  }
+
+  function enrichCommand<T extends Command>(command: T, meta?: CommandMeta): T & CommandMeta {
+    if (!meta) return command as T & CommandMeta
+
+    return Object.assign(Object.create(Object.getPrototypeOf(command)), command, meta)
+  }
 
   // ==================== 核心状态查询 ====================
 
@@ -107,25 +134,23 @@ export function createHistoryManager(ctx: DesignerContext) {
   // ==================== 命令合并逻辑 ====================
 
   function tryMerge(command: Command & CommandMeta): boolean {
-    if (command.mergeStrategy === 'append') return false
-
     const lastCommand = state.undoStack[state.undoStack.length - 1]
-    if (!lastCommand) return false
+    if (
+      !shouldMergeCommand({
+        lastCommand,
+        nextCommand: command,
+        mergeWindow: state.mergeWindow,
+      })
+    ) {
+      return false
+    }
 
-    const now = Date.now()
-    const withinWindow = now - lastCommand.timestamp <= state.mergeWindow
-    const shouldMerge =
-      (command.mergeStrategy === 'replace' && lastCommand.name === command.name) ||
-      (command.mergeStrategy === 'custom' && withinWindow)
-
-    if (shouldMerge && lastCommand.canMergeWith?.(command)) {
+    if (lastCommand.canMergeWith?.(command)) {
       const merged = lastCommand.merge?.(command)
       if (merged) {
-        setState(
-          produce(s => {
-            s.undoStack[s.undoStack.length - 1] = merged
-          }),
-        )
+        updateHistoryState(s => {
+          s.undoStack[s.undoStack.length - 1] = merged
+        })
         return true
       }
     }
@@ -140,20 +165,18 @@ export function createHistoryManager(ctx: DesignerContext) {
       return
     }
 
-    setState(
-      produce(s => {
-        s.undoStack.push(command)
-        if (s.undoStack.length > s.maxHistory) s.undoStack.shift()
-        s.redoStack = []
-      }),
-    )
+    updateHistoryState(s => {
+      s.undoStack.push(command)
+      if (s.undoStack.length > s.maxHistory) s.undoStack.shift()
+      s.redoStack = []
+    })
 
     if (!command.silent) emit('history:execute', command)
   }
 
   function execute(command: Command, meta?: CommandMeta) {
     if (command.isNoOp) return
-    const enrichedCommand = Object.assign(command, meta)
+    const enrichedCommand = enrichCommand(command, meta)
 
     if (state.transaction) {
       enrichedCommand.execute()
@@ -184,11 +207,9 @@ export function createHistoryManager(ctx: DesignerContext) {
       return null
     }
     const id = generateId()
-    setState(
-      produce(s => {
-        s.transaction = { id, name, commands: [] }
-      }),
-    )
+    updateHistoryState(s => {
+      s.transaction = { id, name, commands: [] }
+    })
     return id
   }
 
@@ -197,11 +218,9 @@ export function createHistoryManager(ctx: DesignerContext) {
     if (!transaction) return false
     if (transactionId && transaction.id !== transactionId) return false
 
-    setState(
-      produce(s => {
-        s.transaction = undefined
-      }),
-    )
+    updateHistoryState(s => {
+      s.transaction = undefined
+    })
 
     if (transaction.commands.length > 0) {
       pushCommand(new CompositeCommand(transaction.name, transaction.commands))
@@ -215,11 +234,9 @@ export function createHistoryManager(ctx: DesignerContext) {
     if (transactionId && transaction.id !== transactionId) return false
 
     transaction.commands.reduceRight((_, cmd) => cmd.undo(), null as any)
-    setState(
-      produce(s => {
-        s.transaction = undefined
-      }),
-    )
+    updateHistoryState(s => {
+      s.transaction = undefined
+    })
     return true
   }
 
@@ -274,7 +291,7 @@ export function createHistoryManager(ctx: DesignerContext) {
     }
   }
 
-  async function transaction<T>(name: string, fn: () => Promise<T> | T): Promise<T> {
+  function transaction<T>(name: string, fn: () => Promise<T> | T): Promise<T> {
     const scope = createTransactionScope(name)
     return scope.run(fn)
   }
@@ -287,12 +304,10 @@ export function createHistoryManager(ctx: DesignerContext) {
 
     const command = state.undoStack[state.undoStack.length - 1]
     command.undo()
-    setState(
-      produce(s => {
-        s.undoStack.pop()
-        s.redoStack.push(command)
-      }),
-    )
+    updateHistoryState(s => {
+      s.undoStack.pop()
+      s.redoStack.push(command)
+    })
     emit('history:undo', command)
   }
 
@@ -302,32 +317,27 @@ export function createHistoryManager(ctx: DesignerContext) {
 
     const command = state.redoStack[state.redoStack.length - 1]
     command.redo()
-    setState(
-      produce(s => {
-        s.redoStack.pop()
-        s.undoStack.push(command)
-      }),
-    )
+    updateHistoryState(s => {
+      s.redoStack.pop()
+      s.undoStack.push(command)
+    })
     emit('history:redo', command)
   }
 
   function clear() {
     if (state.transaction) return
-    setState(
-      produce(s => {
-        s.undoStack = []
-        s.redoStack = []
-      }),
-    )
+    updateHistoryState(s => {
+      s.undoStack = []
+      s.redoStack = []
+    })
     emit('history:clear')
   }
 
-  // ==================== 配置与高级功能 ====================
-
-  function jumpTo(index: number) {
+  function move(position: number): void {
     if (state.transaction) return
-    const target = Math.max(0, Math.min(index, state.undoStack.length - 1))
-    const current = state.undoStack.length - 1
+    const total = state.undoStack.length + state.redoStack.length
+    const target = Math.max(0, Math.min(position, total))
+    const current = state.undoStack.length
     const diff = target - current
 
     if (diff > 0) {
@@ -336,8 +346,6 @@ export function createHistoryManager(ctx: DesignerContext) {
       for (let i = 0; i < Math.abs(diff) && canUndo(); i++) undo()
     }
   }
-
-  // ==================== API 暴露 ====================
 
   return {
     // 状态查询
@@ -366,16 +374,14 @@ export function createHistoryManager(ctx: DesignerContext) {
 
     // 配置
     setMaxHistory: (max: number) =>
-      setState(
-        produce(s => {
-          s.maxHistory = max
-          if (s.undoStack.length > max) {
-            s.undoStack = s.undoStack.slice(s.undoStack.length - max)
-          }
-        }),
-      ),
+      updateHistoryState(s => {
+        s.maxHistory = max
+        if (s.undoStack.length > max) {
+          s.undoStack = s.undoStack.slice(s.undoStack.length - max)
+        }
+      }),
     setMergeWindow: (ms: number) => setState('mergeWindow', ms),
-    jumpTo,
+    move,
   }
 }
 

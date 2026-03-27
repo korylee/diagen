@@ -149,7 +149,7 @@ describe('history manager', () => {
     })
   })
 
-  it('setMaxHistory 与 jumpTo 应按预期裁剪并回退历史', () => {
+  it('setMaxHistory 与 move 应按时间线位置跳转', () => {
     withDesigner(designer => {
       const counter = { value: 0 }
       designer.history.setMaxHistory(2)
@@ -161,8 +161,13 @@ describe('history manager', () => {
       expect(counter.value).toBe(3)
       expect(designer.history.undoStack().length).toBe(2)
 
-      designer.history.jumpTo(0)
-      expect(counter.value).toBe(2)
+      designer.history.move(0)
+      expect(counter.value).toBe(1)
+      expect(designer.history.canRedo()).toBe(true)
+
+      designer.history.move(2)
+      expect(counter.value).toBe(3)
+      expect(designer.history.canUndo()).toBe(true)
     })
   })
 })

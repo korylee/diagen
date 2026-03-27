@@ -11,7 +11,7 @@ import {
   UnionValue,
 } from '@diagen/shared'
 import { batch } from 'solid-js'
-import type { StoreSetter } from 'solid-js/store'
+import { createStore, unwrap, type StoreSetter } from 'solid-js/store'
 import type { DiagramElement } from '../../model'
 import type { CreateMethods, ElementManager } from './element'
 import { type Command, createCommand, type HistoryManager } from './history'
@@ -60,13 +60,20 @@ function takeEditOptions(args: unknown[]): EditOptions {
 }
 
 function hasChanged(prev: unknown, next: unknown): boolean {
-  if (shallowEqual(prev, next)) return false
+  const prevSnapshot = unwrap(prev as any)
+  const nextSnapshot = unwrap(next as any)
+
+  if (shallowEqual(prevSnapshot, nextSnapshot)) return false
 
   try {
-    return JSON.stringify(prev) !== JSON.stringify(next)
+    return JSON.stringify(prevSnapshot) !== JSON.stringify(nextSnapshot)
   } catch {
     return true
   }
+}
+
+function snapshotValue<T>(value: T): T {
+  return deepClone(unwrap(value))
 }
 
 /**
@@ -74,9 +81,11 @@ function hasChanged(prev: unknown, next: unknown): boolean {
  */
 function resolveSetter<T>(prev: T, setter: StoreSetter<T, any>): T {
   if (typeof setter !== 'function') return setter as T
-  const draft = deepClone(prev)
-  const maybeNext = (setter as (value: T) => T | void)(draft)
-  return (maybeNext === undefined ? draft : maybeNext) as T
+  const [draft] = createStore<{ value: T }>({
+    value: snapshotValue(prev),
+  })
+  const maybeNext = (setter as (value: T) => T | void)(draft.value)
+  return (maybeNext === undefined ? snapshotValue(draft.value) : maybeNext) as T
 }
 
 function createChangeCommand<T>(name: string, entries: ChangeEntry<T>[], apply: (id: string, value: T) => void) {
@@ -100,11 +109,7 @@ function createChangeCommand<T>(name: string, entries: ChangeEntry<T>[], apply: 
   })
 }
 
-function createPatchChangeEntries(
-  deps: EditDeps,
-  ids: string[],
-  patch: Partial<DiagramElement>,
-): ChangeEntry<Partial<DiagramElement>>[] {
+function createPatchChangeEntries(ids: string[], patch: Partial<DiagramElement>, deps: EditDeps): ChangeEntry<Partial<DiagramElement>>[] {
   const patchKeys = keys(patch)
   if (patchKeys.length === 0) return []
 
@@ -123,8 +128,8 @@ function createPatchChangeEntries(
       const nextValue = patch[key]
       if (Object.is(prevValue, nextValue)) continue
       changed = true
-      ;(before as any)[key] = deepClone(prevValue)
-      ;(after as any)[key] = deepClone(nextValue)
+      ;(before as any)[key] = snapshotValue(prevValue)
+      ;(after as any)[key] = snapshotValue(nextValue)
     }
 
     if (!changed) continue
@@ -134,11 +139,11 @@ function createPatchChangeEntries(
   return entries
 }
 
-function collectSetterChangeEntries<T>(
-  deps: EditDeps,
+function createSetterChangeEntries<T>(
   ids: string[],
   readValue: (el: DiagramElement) => T,
   setter: StoreSetter<T, any>,
+  deps: EditDeps,
 ): ChangeEntry<T>[] {
   const entries: ChangeEntry<T>[] = []
   for (const id of ids) {
@@ -151,57 +156,45 @@ function collectSetterChangeEntries<T>(
 
     entries.push({
       id,
-      before: deepClone(prev),
-      after: deepClone(next),
+      before: snapshotValue(prev),
+      after: snapshotValue(next),
     })
   }
   return entries
 }
 
-function createUpdatePatchCommand(deps: EditDeps, ids: string[], patch: Partial<DiagramElement>) {
-  const entries = createPatchChangeEntries(deps, ids, patch)
-  return createChangeCommand('update_els', entries, (id, value) => {
-    deps.element.update(id, value)
-  })
+function createSetterChangeCommand<T>(params: {
+  name: string
+  ids: string[]
+  readValue: (el: DiagramElement) => T
+  setter: StoreSetter<T, any>
+  apply:  (id: string, value: T) => void
+  deps: EditDeps
+}) {
+  const { name, ids, readValue, setter, apply, deps } = params
+  const entries = createSetterChangeEntries(ids, readValue, setter, deps)
+  return createChangeCommand(name, entries, apply)
 }
 
-function createUpdateRootSetterCommand(deps: EditDeps, ids: string[], setter: StoreSetter<DiagramElement>) {
-  const entries = collectSetterChangeEntries(deps, ids, el => el, setter)
-  return createChangeCommand('update_els_by_setter', entries, (id, value) => {
-    deps.element.update(id, value)
-  })
-}
-
-function createUpdateByPathCommand<K1 extends UnionKeyOf<DiagramElement>>(
-  deps: EditDeps,
-  ids: string[],
-  k1: K1,
-  setter: StoreSetter<UnionValue<DiagramElement, K1>, [K1]>,
-) {
-  const entries = collectSetterChangeEntries(deps, ids, el => (el as any)[k1] as UnionValue<DiagramElement, K1>, setter)
-  return createChangeCommand('update_els_by_path', entries, (id, value) => {
-    deps.element.update(id, k1 as any, value as any)
-  })
-}
-
-function createUpdateByNestedPathCommand<
+function createNestedUpdateCommand<
   K1 extends UnionKeyOf<DiagramElement>,
   K2 extends UnionNestedKeyOf<DiagramElement, K1>,
 >(
-  deps: EditDeps,
   ids: string[],
   k1: K1,
   k2: K2,
   setter: StoreSetter<UnionNestedValue<DiagramElement, K1, K2>, [K2, K1]>,
+  deps: EditDeps,
 ) {
-  const entries = collectSetterChangeEntries(
-    deps,
+  return createSetterChangeCommand({
+    name: 'update_els_by_nested_path',
     ids,
-    el => ((el as any)[k1] as any)?.[k2] as UnionNestedValue<DiagramElement, K1, K2>,
+    readValue: el => ((el as any)[k1] as any)?.[k2] as UnionNestedValue<DiagramElement, K1, K2>,
     setter,
-  )
-  return createChangeCommand('update_els_by_nested_path', entries, (id, value) => {
-    deps.element.update(id, k1 as any, k2 as any, value as any)
+    apply: (id, value) => {
+      deps.element.update(id, k1 as any, k2 as any, value as any)
+    },
+    deps,
   })
 }
 
@@ -209,17 +202,38 @@ function createUpdateCommand(deps: EditDeps, ids: string[], args: unknown[]) {
   if (args.length === 1) {
     const updatePayload = args[0]
     if (typeof updatePayload === 'function') {
-      return createUpdateRootSetterCommand(deps, ids, updatePayload as StoreSetter<DiagramElement>)
+      return createSetterChangeCommand({
+        name: 'update_els_by_setter',
+        ids,
+        readValue: el => el,
+        setter: updatePayload as StoreSetter<DiagramElement>,
+        apply: (id, value) => {
+          deps.element.update(id, value)
+        },
+        deps,
+      })
     }
-    return createUpdatePatchCommand(deps, ids, updatePayload as Partial<DiagramElement>)
+    return createChangeCommand('update_els', createPatchChangeEntries(ids, updatePayload as Partial<DiagramElement>, deps), (id, value) => {
+      deps.element.update(id, value)
+    })
   }
 
   if (args.length === 2) {
-    return createUpdateByPathCommand(deps, ids, args[0] as UnionKeyOf<DiagramElement>, args[1] as any)
+    const [k1, setter] = args as [UnionKeyOf<DiagramElement>, StoreSetter<any, any>]
+    return createSetterChangeCommand({
+      name: 'update_els_by_path',
+      ids,
+      readValue: el => (el as any)[k1],
+      setter,
+      apply: (id, value) => {
+        deps.element.update(id, k1 as any, value)
+      },
+      deps,
+    })
   }
 
   if (args.length === 3) {
-    return createUpdateByNestedPathCommand(deps, ids, ...(args as [any, any, any]))
+    return createNestedUpdateCommand(ids, ...(args as [any, any, any]), deps)
   }
 
   throw new Error('edit.update 参数不合法')
@@ -327,7 +341,7 @@ function createMoveCommand(deps: EditDeps, elements: DiagramElement[], dx: numbe
   return command
 }
 
-function createClearCommand(ctx: DesignerContext, deps: EditDeps) {
+function createClearCommand(deps: EditDeps) {
   const { element, selection } = deps
   const snapshotElements = deepClone(element.elementMap())
   const snapshotOrderList = element.orderList().slice()
@@ -344,7 +358,7 @@ function createClearCommand(ctx: DesignerContext, deps: EditDeps) {
   })
 }
 
-export function createEditManager(ctx: DesignerContext, deps: EditDeps) {
+export function createEditManager(_ctx: DesignerContext, deps: EditDeps) {
   const { element, selection, history } = deps
 
   function add(elements: DiagramElement[], options: { select?: boolean; record?: boolean } = {}): void {
@@ -429,7 +443,7 @@ export function createEditManager(ctx: DesignerContext, deps: EditDeps) {
       return
     }
 
-    history.execute(createClearCommand(ctx, deps))
+    history.execute(createClearCommand(deps))
   }
 
   function move(ids: string[], dx: number, dy: number, options: EditOptions = {}): void {

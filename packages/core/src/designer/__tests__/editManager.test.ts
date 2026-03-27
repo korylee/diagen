@@ -77,6 +77,30 @@ describe('edit manager', () => {
     })
   })
 
+  it('k1 整对象更新应支持 undo/redo', () => {
+    withDesigner(designer => {
+      const shape = createShape({
+        id: 'shape_k1_object',
+        name: 'shape_k1_object',
+        group: null,
+        props: { x: 15, y: 25, w: 100, h: 80, angle: 0 },
+      })
+      designer.edit.add([shape], { record: false, select: false })
+
+      designer.edit.update(shape.id, 'props', {
+        ...shape.props,
+        angle: 90,
+      })
+      expect(designer.getElementById<ShapeElement>(shape.id)?.props.angle).toBe(90)
+
+      designer.undo()
+      expect(designer.getElementById<ShapeElement>(shape.id)?.props.angle).toBe(0)
+
+      designer.redo()
+      expect(designer.getElementById<ShapeElement>(shape.id)?.props.angle).toBe(90)
+    })
+  })
+
   it('同值更新不应写入 history', () => {
     withDesigner(designer => {
       const shape = createShape({

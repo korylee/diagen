@@ -33,6 +33,7 @@
 - `RendererContainer` 已接入 shape / linker 创建主链路。
 - `LinkCreateOverlay` 已接入快捷建线运行时。
 - `clipboard manager` 已支持 `copy / cut / paste / duplicate` 与事务化历史。
+- `edit manager` 已收敛更新命令构造，`patch / root setter / path setter / nested setter` 统一走快照化变更记录。
 - `createToolbarBridge` 已有 undo/redo、group/ungroup、delete、zoom 入口。
 - `rendererTestHarness` 已落地，已有首批容器级测试覆盖：
   - box select
@@ -43,6 +44,7 @@
   - rotate
   - `shift` 旋转吸附
 - `edit.update(id, 'props', wholeObject)` 已可正确 `undo / redo`。
+- `edit.update` 的 produce/setter 路径现在会先脱离 Solid store proxy 再记录历史，避免回退时拿到被污染的引用。
 
 当前缺口：
 - `RendererContainer` 尚未接入 `copy / cut / paste / duplicate` 快捷键。

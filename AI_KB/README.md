@@ -22,7 +22,8 @@
 - `core` 已具备 `tool / history / clipboard / edit / view` 等核心 manager。
 - `renderer` 已接入 shape / linker 正式创建链路，`LinkCreateOverlay` 可直接发起快捷建线。
 - `renderer` 已有首批 `RendererContainer` 容器级回归：`box select / drag / resize / rotate / zoom / scroll`。
-- `edit manager` 已修复整对象字段更新的历史快照问题，`rotate + history.transaction` 回退已恢复。
+- `edit manager` 已统一 `patch / path setter / nested setter` 的变更命令构造，并通过 `unwrap + snapshot` 修复整对象与 produce 写法的历史快照问题。
+- `rotate + history.transaction` 回退已恢复；`clipboard` 仍保持事务化提交。
 - 当前最近一轮开发应先补 `clipboard` 键盘/toolbar 入口闭环，再补 `create-linker / LinkCreateOverlay / auto-scroll` 的容器级回归。
 - 再下一阶段再进入连续编辑串联验证与 move/resize guide line。
 

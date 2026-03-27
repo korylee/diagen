@@ -3,7 +3,7 @@ import path, { resolve } from 'node:path'
 import solid from 'vite-plugin-solid'
 
 export default defineConfig({
-  plugins: [solid()],
+  plugins: [solid({ hot: !process.env.VITEST })],
   resolve: {
     alias: {
       '@diagen/core': path.resolve(import.meta.dirname, 'packages/core/src'),
