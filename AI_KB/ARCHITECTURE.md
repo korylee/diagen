@@ -1,4 +1,4 @@
-# 架构总览（2026-03-19）
+# 架构总览（2026-03-27）
 
 ## 1. 包级分层
 - 领域核心：`@diagen/core`
@@ -64,7 +64,8 @@
 
 补充：
 - `tool manager` 已进入 `core`，是运行时状态，不持久化到 `Diagram`
-- 当前只完成工具态基础设施，尚未完成 shape/linker 的正式画布创建闭环
+- shape/linker 的正式画布创建链路已接入 `RendererContainer`
+- shape 快捷建线已通过 `createLinkerDrag.beginCreate(...) + LinkCreateOverlay` 进入主交互链
 
 ## 7. 连线路由主链路
 - 主入口：`packages/core/src/designer/managers/view.ts`
@@ -89,7 +90,7 @@
   - 对应 `view manager` 与 `renderer/primitives` 分离
 
 ## 9. 当前主要架构风险
-- 缺少 move/resize 吸附线机制，影响复杂排版效率。
-- clipboard / group / linker 的结构联动仍未形成闭环。
+- `RendererContainer` 已有首批容器级回归，但 `LinkCreateOverlay / create-linker / auto-scroll / 更多 zoom-scroll 组合` 仍偏薄。
+- clipboard 语义已经落地，但键盘快捷键与壳层命令入口尚未完全闭环。
+- 连续操作场景仍需继续补齐。
 - `lineJumps` 当前为最小实现，仅覆盖正交/直线段的抬桥绘制，后续仍可继续细化视觉与性能策略。
-- 测试偏重 `core/utils`，交互层缺少自动化回归。

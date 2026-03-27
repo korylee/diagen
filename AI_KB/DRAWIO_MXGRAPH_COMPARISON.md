@@ -1,8 +1,8 @@
 # draw.io / mxGraph 对照与 Diagen 映射（2026-03-13）
 
-本文件用于回答两个问题：
+本文件只回答两个问题：
 1. draw.io/mxGraph 的哪些结构原则值得继续借鉴；
-2. 这些原则在 Diagen 当前代码中的映射位置与待补点。
+2. 这些原则在 Diagen 中映射到哪里。
 
 说明：此处参考的是 mxGraph 的稳定架构思想（View/Model/Handler/Undo/Overlay），不是逐行复刻 draw.io 实现。
 
@@ -80,10 +80,10 @@
 
 ### Diagen 映射
 - 已有路由库：`packages/core/src/utils/router/*`
-- 当前主链路使用统一入口 `calculateLinkerRoute`（当前策略为基础路径）
+- 当前主链路已通过统一入口 `calculateLinkerRoute` 接入 `view` 布局分发
 
 ### 结论
-- “算法存在但未接入主链路”是当前关键差距。
+- 关键差距已从“是否接入”转为“路径质量、视觉细节与复杂场景策略”。
 
 ---
 
@@ -99,28 +99,12 @@
 
 ---
 
-## 7. 近期优先级建议（和 2 周计划一致）
-
-1. Guide（吸附线）
-- 新增 guide 计算与 overlay 呈现。
-
-2. Clipboard Manager
-- 在 core 定义结构化 copy/cut/paste/duplicate 语义。
-
-3. Router 主链路接入 + line jump
-- 把已有 router 策略接入 view/linker layout。
-
-4. 交互测试补齐
-- 至少覆盖：拖拽、缩放、连线端点、撤销重做。
-
----
-
-## 8. 小结
+## 7. 小结
 
 draw.io/mxGraph 对 Diagen 的最大价值不是“某个 API 名字”，而是：
 - View/Model/Handler/Overlay/Undo 的职责边界。
 
-Diagen 已具备这套边界，下一阶段重点是沿着该边界补齐 `.processon` 的核心生产力能力。
+Diagen 已具备这套边界；具体优先级和排期请看 `ROADMAP.md`，这里不重复展开。
 
 补充边界：
 - 评论/批注不属于基础架构能力，若有需求应在应用层基于 `core + renderer` 组合实现，而不是进入 `Diagram` 根模型。

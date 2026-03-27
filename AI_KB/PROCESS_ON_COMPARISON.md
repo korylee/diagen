@@ -2,8 +2,8 @@
 
 本文件直接基于仓库内 `.processon/` 源码分析，目标是识别：
 1. `.processon` 已验证的高价值机制；
-2. Diagen 当前已吸收与未吸收部分；
-3. 未来 1-2 周内可执行的落地顺序。
+2. Diagen 已吸收与未吸收的部分；
+3. 哪些原则值得继续保留。
 
 参考源码：
 - `.processon/designer.core.js`
@@ -113,11 +113,12 @@
   - 与 UI 状态联动（`designer.events.js:212`）
 
 ### Diagen 当前状态
-- 尚未形成统一 clipboard 模块
-- Playground 层仅有基础编辑行为
+- `core` 已有 `clipboard manager`
+- 已支持 `copy / cut / paste / duplicate` 与事务化历史
+- 当前缺口主要是容器快捷键与壳层命令入口尚未完全接上
 
 ### 结论
-- 应在 core 新增 clipboard manager，避免把语义塞进 UI 层。
+- 方向已经成立；接下来重点是把现有语义暴露到 `RendererContainer` 与 UI 命令入口，而不是回退到 playground 临时逻辑。
 
 ---
 
@@ -181,9 +182,8 @@
 
 ---
 
-## 11. 对 Diagen 的直接行动建议
+## 11. 使用方式
 
-1. 先补吸附线（move/resize），提升编辑效率与“可控感”。
-2. 再补 clipboard manager，建立结构化复制粘贴语义。
-3. 路由主链路与 line jump 已接入，后续只需继续打磨路径质量与视觉细节。
-4. 然后补导出等产品层功能；评论能力若需要，保持在应用层实现，避免反向侵入基础模型。
+- 这份对照文档用于校验设计方向，而不是记录近期排期。
+- 若需要知道“接下来先做什么”，统一查看 `ROADMAP.md`。
+- 若需要确认某项能力应该落在 `core / renderer / 应用层` 哪一层，可回到本文件按专题查找。

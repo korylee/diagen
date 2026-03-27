@@ -22,6 +22,20 @@
 定向测试命令：
 - `pnpm exec vitest run --project unit packages/core/src/utils/__tests__/transform.test.ts`
 - `pnpm exec vitest run --project unit packages/core/src/utils/router/__tests__/router.test.ts`
+- `pnpm exec vitest run --project unit packages/renderer/src/components/__tests__/RendererContainer.test.ts`
+- `pnpm exec vitest run --project unit packages/core/src/designer/__tests__/editManager.test.ts`
+
+当前容器级测试夹具：
+- `packages/renderer/src/components/__tests__/rendererTestHarness.ts`
+- 用途：挂载 `DesignerProvider + RendererContainer`，stub viewport/scene 几何，统一派发 `mousedown / mousemove / mouseup / wheel / scroll`
+- 当前已覆盖：`box select / scroll 后框选 / zoom 下拖拽 / ctrl+wheel / resize / rotate / shift 旋转吸附`
+
+下一批建议优先补：
+1. `Ctrl/Cmd+C/X/V/D`
+2. `create-linker` 工具态
+3. `LinkCreateOverlay` 显示与触发
+4. `auto-scroll`
+5. `zoom / scroll -> drag|resize|rotate` 串联场景
 
 手工回归清单（playground）：
 1. `Ctrl + 滚轮` 缩放后，缩放中心点不跳变。
@@ -29,6 +43,7 @@
 3. 单选后 resize 手柄命中准确（不同 zoom）。
 4. 拖拽到视口边缘时自动滚动连续。
 5. 连线端点拖拽时锚点高亮与吸附位置一致。
+6. `Ctrl/Cmd+C/X/V/D` 与 toolbar 操作后，selection 与 undo/redo 粒度一致。
 
 ## 4. 构建说明
 - Turbo 任务配置：`turbo.json`
