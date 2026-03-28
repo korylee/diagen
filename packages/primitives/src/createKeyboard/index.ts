@@ -1,191 +1,488 @@
-import { ensureArray, ValueOf } from '@diagen/shared'
+import { ensureArray } from '@diagen/shared'
+import type { ValueOf } from '@diagen/shared'
 import { onCleanup, onMount } from 'solid-js'
+import type { ConfigurableWindow } from '../_configurable'
+import { defaultWindow } from '../_configurable'
+import { makeEventListener } from '../createEventListener'
 
 export type KeyCombo = string | string[]
 
+export interface CreateKeyboardOptions extends ConfigurableWindow {
+  ignore?: (e: KeyboardEvent, target: Element | null, combo: string | null) => boolean
+}
+
+interface ParsedCombo {
+  key: string | null
+  modifiers: Modifier[]
+}
+
 interface Binding {
-  keys: string[][]
+  id: string
+  lookupKey: string
+  combos: ParsedCombo[]
   action: () => void
 }
 
-// ============================================================================
-// 修饰键处理
-// ============================================================================
+const PLUS_PLACEHOLDER = '__diagen_plus__'
+const SEQUENCE_TIMEOUT = 1000
+
 const MODIFIER_ALIASES = {
+  ctrl: 'ctrl',
   control: 'ctrl',
-  cmd: 'meta',
-  command: 'meta',
-  mod: 'ctrl', // Windows: ctrl, Mac: meta
+  alt: 'alt',
+  option: 'alt',
   shift: 'shift',
   meta: 'meta',
-  alt: 'alt',
+  cmd: 'meta',
+  command: 'meta',
+  os: 'meta',
 } as const
+
+const KEY_ALIASES = {
+  return: 'enter',
+  escape: 'esc',
+  esc: 'esc',
+  del: 'delete',
+  delete: 'delete',
+  ins: 'insert',
+  insert: 'insert',
+  ' ': 'space',
+  space: 'space',
+  spacebar: 'space',
+  arrowleft: 'left',
+  left: 'left',
+  arrowright: 'right',
+  right: 'right',
+  arrowup: 'up',
+  up: 'up',
+  arrowdown: 'down',
+  down: 'down',
+  plus: '+',
+} as const
+
+const CODE_ALIASES = {
+  backspace: 'backspace',
+  tab: 'tab',
+  enter: 'enter',
+  escape: 'esc',
+  space: 'space',
+  delete: 'delete',
+  insert: 'insert',
+  home: 'home',
+  end: 'end',
+  pageup: 'pageup',
+  pagedown: 'pagedown',
+  arrowleft: 'left',
+  arrowright: 'right',
+  arrowup: 'up',
+  arrowdown: 'down',
+  metaleft: 'meta',
+  metaright: 'meta',
+  controlleft: 'ctrl',
+  controlright: 'ctrl',
+  shiftleft: 'shift',
+  shiftright: 'shift',
+  altleft: 'alt',
+  altright: 'alt',
+  minus: '-',
+  equal: '=',
+  bracketleft: '[',
+  bracketright: ']',
+  backslash: '\\',
+  semicolon: ';',
+  quote: "'",
+  comma: ',',
+  period: '.',
+  slash: '/',
+  backquote: '`',
+} as const
+
+const SHIFT_REQUIRED_KEYS = new Set([
+  '~',
+  '!',
+  '@',
+  '#',
+  '$',
+  '%',
+  '^',
+  '&',
+  '*',
+  '(',
+  ')',
+  '_',
+  '+',
+  ':',
+  '"',
+  '<',
+  '>',
+  '?',
+  '|',
+])
 
 type Modifier = ValueOf<typeof MODIFIER_ALIASES>
 
-const MODIFIER_STATE: Record<Modifier, (e: KeyboardEvent) => boolean> = {
-  ctrl: e => e.ctrlKey,
-  alt: e => e.altKey,
-  shift: e => e.shiftKey,
-  meta: e => e.metaKey,
+const MODIFIER_ORDER: Modifier[] = ['ctrl', 'alt', 'shift', 'meta']
+
+const isModifier = (key: string): key is Modifier => MODIFIER_ORDER.includes(key as Modifier)
+
+const isMacPlatform = (platform?: string): boolean => /Mac|iPod|iPhone|iPad/.test(platform ?? '')
+
+const sortModifiers = (modifiers: Modifier[]): Modifier[] =>
+  [...modifiers].sort((left, right) => MODIFIER_ORDER.indexOf(left) - MODIFIER_ORDER.indexOf(right))
+
+function normalizeKeyToken(key: string, platform?: string): string {
+  const normalized = key.trim().toLowerCase()
+  if (!normalized) return ''
+
+  if (normalized === 'mod') {
+    return isMacPlatform(platform) ? 'meta' : 'ctrl'
+  }
+
+  if (normalized in MODIFIER_ALIASES) {
+    return MODIFIER_ALIASES[normalized as keyof typeof MODIFIER_ALIASES]
+  }
+
+  if (normalized in KEY_ALIASES) {
+    return KEY_ALIASES[normalized as keyof typeof KEY_ALIASES]
+  }
+
+  return normalized
 }
 
-const isModifier = (key: string): key is Modifier => key in MODIFIER_STATE
+function normalizeCode(code: string): string {
+  if (!code) return ''
 
-const normalizeKey = (key: string): string => (MODIFIER_ALIASES as any)[key] ?? key
+  if (code.startsWith('Key')) {
+    return code.slice(3).toLowerCase()
+  }
 
-// ============================================================================
-// 按键解析
-// ============================================================================
+  if (code.startsWith('Digit')) {
+    return code.slice(5)
+  }
 
-/** 解析单个组合键，如 'ctrl+shift+f' -> ['ctrl', 'shift', 'f'] */
-function parseCombo(combo: string): string[] {
-  return combo
-    .trim()
-    .toLowerCase()
-    .split('+')
-    .map(k => k.trim())
-    .filter(Boolean)
-    .map(normalizeKey)
+  if (/^Numpad[0-9]$/.test(code)) {
+    return code.slice(6)
+  }
+
+  if (code.startsWith('Numpad')) {
+    const value = code.slice(6).toLowerCase()
+    if (value === 'add') return '+'
+    if (value === 'subtract') return '-'
+    if (value === 'multiply') return '*'
+    if (value === 'divide') return '/'
+    if (value === 'decimal') return '.'
+    if (value === 'enter') return 'enter'
+  }
+
+  const normalized = code.toLowerCase()
+  if (normalized in CODE_ALIASES) {
+    return CODE_ALIASES[normalized as keyof typeof CODE_ALIASES]
+  }
+
+  return normalized
 }
 
-/** 解析按键序列，如 'up up down down' -> [['up'], ['up'], ['down'], ['down']] */
-function parseKeys(key: KeyCombo): string[][] {
-  return ensureArray(key).flatMap(combo => combo.trim().split(/\s+/).map(parseCombo))
+function normalizeEventKey(e: KeyboardEvent): string | null {
+  if (e.key && e.key !== 'Unidentified') {
+    const normalizedKey = normalizeKeyToken(e.key)
+    if (normalizedKey) return normalizedKey
+  }
+
+  const normalizedCode = normalizeCode(e.code)
+  return normalizedCode || null
 }
 
-// ============================================================================
-// 按键匹配
-// ============================================================================
+function parseCombo(combo: string, platform?: string): ParsedCombo {
+  const normalizedCombo = combo.trim().toLowerCase()
+  if (!normalizedCombo) {
+    return { key: null, modifiers: [] }
+  }
 
-/** 检查按键事件是否匹配组合键 */
-function matchCombo(e: KeyboardEvent, combo: string[]): boolean {
-  const requiredMods: Modifier[] = []
-  let requiredKey: string | undefined
+  const tokens =
+    normalizedCombo === '+'
+      ? ['plus']
+      : normalizedCombo
+          .replace(/\+{2}/g, `+${PLUS_PLACEHOLDER}`)
+          .split('+')
+          .map(token => token.replace(PLUS_PLACEHOLDER, 'plus').trim())
+          .filter(Boolean)
 
-  // 分离修饰键和主键
-  for (const key of combo) {
-    if (isModifier(key)) {
-      requiredMods.push(key)
-    } else {
-      requiredKey = key
+  const modifiers: Modifier[] = []
+  let key: string | null = null
+
+  for (const token of tokens) {
+    const normalizedKey = normalizeKeyToken(token, platform)
+    if (!normalizedKey) continue
+
+    if (isModifier(normalizedKey)) {
+      if (!modifiers.includes(normalizedKey)) {
+        modifiers.push(normalizedKey)
+      }
+      continue
     }
+
+    key = normalizedKey
   }
 
-  // 验证所有必需修饰键已按下
-  for (const mod of requiredMods) {
-    if (!MODIFIER_STATE[mod](e)) return false
+  return {
+    key,
+    modifiers: sortModifiers(modifiers),
+  }
+}
+
+function parseKeys(key: KeyCombo, platform?: string): ParsedCombo[][] {
+  return ensureArray(key)
+    .map(combo => combo.trim())
+    .filter(Boolean)
+    .map(combo =>
+      combo
+        .split(/\s+/)
+        .map(part => parseCombo(part, platform))
+        .filter(parsed => parsed.key !== null || parsed.modifiers.length > 0),
+    )
+    .filter(combos => combos.length > 0)
+}
+
+function comboToId(combo: ParsedCombo): string {
+  return [...combo.modifiers, ...(combo.key ? [combo.key] : [])].join('+')
+}
+
+function getBindingId(combos: ParsedCombo[]): string {
+  return combos.map(comboToId).join(' ')
+}
+
+function getLookupKey(combo: ParsedCombo): string {
+  return combo.key ? `key:${combo.key}` : `mods:${combo.modifiers.join('+')}`
+}
+
+function getEventModifiers(e: KeyboardEvent): Modifier[] {
+  const modifiers: Modifier[] = []
+
+  if (e.ctrlKey) modifiers.push('ctrl')
+  if (e.altKey) modifiers.push('alt')
+  if (e.shiftKey) modifiers.push('shift')
+  if (e.metaKey) modifiers.push('meta')
+
+  return sortModifiers(modifiers)
+}
+
+function getEventCombo(e: KeyboardEvent): ParsedCombo {
+  return {
+    key: normalizeEventKey(e),
+    modifiers: getEventModifiers(e),
+  }
+}
+
+function getEventLookupKeys(combo: ParsedCombo): string[] {
+  const lookupKeys: string[] = []
+
+  if (combo.key) {
+    lookupKeys.push(`key:${combo.key}`)
   }
 
-  // 验证没有多余修饰键按下
-  const allMods: Modifier[] = ['ctrl', 'alt', 'shift', 'meta']
-  for (const mod of allMods) {
-    if (!requiredMods.includes(mod) && MODIFIER_STATE[mod](e)) {
+  if (combo.modifiers.length > 0) {
+    lookupKeys.push(`mods:${combo.modifiers.join('+')}`)
+  }
+
+  return lookupKeys
+}
+
+function matchCombo(eventCombo: ParsedCombo, combo: ParsedCombo): boolean {
+  if (combo.key) {
+    if (eventCombo.key !== combo.key) return false
+  } else if (!eventCombo.key || !isModifier(eventCombo.key) || !combo.modifiers.includes(eventCombo.key as Modifier)) {
+    return false
+  }
+
+  for (const modifier of combo.modifiers) {
+    if (!eventCombo.modifiers.includes(modifier)) {
       return false
     }
   }
 
-  // 无主键时仅检查修饰键（如单独 ctrl）
-  if (!requiredKey) return true
+  const extraModifiers = eventCombo.modifiers.filter(modifier => !combo.modifiers.includes(modifier))
+  if (extraModifiers.length === 0) {
+    return true
+  }
 
-  // 匹配主键
-  const eventKey = e.key.toLowerCase()
-  return eventKey === requiredKey || e.code.toLowerCase() === requiredKey
+  return (
+    combo.key !== null &&
+    SHIFT_REQUIRED_KEYS.has(combo.key) &&
+    !combo.modifiers.includes('shift') &&
+    extraModifiers.length === 1 &&
+    extraModifiers[0] === 'shift'
+  )
 }
 
-// ============================================================================
-// Hook 实现
-// ============================================================================
+function resolveElement(target: EventTarget | null): Element | null {
+  if (!target) return null
+  if (target instanceof Element) return target
+  if (target instanceof Node) return target.parentElement
+  return null
+}
 
-const defaultWindow = window
+function getEventTargetElement(e: KeyboardEvent): Element | null {
+  if (typeof e.composedPath === 'function') {
+    const initialTarget = e.composedPath()[0]
+    const resolved = resolveElement(initialTarget ?? null)
+    if (resolved) {
+      return resolved
+    }
+  }
 
-export function createKeyboard(options: { enabled?: () => boolean; window?: EventTarget } = {}) {
-  const { enabled = () => true, window = defaultWindow } = options
+  return resolveElement(e.target)
+}
+
+function defaultIgnoreCallback(_e: KeyboardEvent, target: Element | null): boolean {
+  if (!target) return false
+  if (target.closest('.mousetrap')) return false
+
+  const tagName = target.tagName
+  return (
+    (target as HTMLElement).isContentEditable || tagName === 'INPUT' || tagName === 'SELECT' || tagName === 'TEXTAREA'
+  )
+}
+
+export function createKeyboard(options: CreateKeyboardOptions = {}) {
+  const { window: targetWindow = defaultWindow, ignore = defaultIgnoreCallback } = options
+
+  const platform = targetWindow?.navigator?.platform
 
   const bindings = new Map<string, Binding>()
-  let sequence: string[][] = []
-  let sequenceTimer: ReturnType<typeof setTimeout> | null = null
-  const SEQUENCE_TIMEOUT = 1000 // 按键序列超时时间
+  const lookup = new Map<string, Map<string, Binding>>()
 
-  const getBindingKey = (keys: string[][]): string => keys.map(combo => combo.join('+')).join(' ')
+  let sequence: ParsedCombo[] = []
+  let sequenceTimer: ReturnType<typeof setTimeout> | null = null
+
+  const clearSequenceTimer = () => {
+    if (sequenceTimer !== null) {
+      clearTimeout(sequenceTimer)
+      sequenceTimer = null
+    }
+  }
+
+  const resetSequence = () => {
+    sequence = []
+    clearSequenceTimer()
+  }
+
+  const removeBinding = (id: string) => {
+    const binding = bindings.get(id)
+    if (!binding) return
+
+    bindings.delete(id)
+    const bucket = lookup.get(binding.lookupKey)
+    bucket?.delete(id)
+    if (bucket?.size === 0) {
+      lookup.delete(binding.lookupKey)
+    }
+  }
+
+  const addBinding = (combos: ParsedCombo[], action: () => void): string => {
+    const id = getBindingId(combos)
+    removeBinding(id)
+
+    const binding: Binding = {
+      id,
+      lookupKey: getLookupKey(combos[combos.length - 1]),
+      combos,
+      action,
+    }
+
+    bindings.set(id, binding)
+
+    const bucket = lookup.get(binding.lookupKey) ?? new Map<string, Binding>()
+    bucket.set(id, binding)
+    lookup.set(binding.lookupKey, bucket)
+
+    return id
+  }
+
+  const getCandidates = (eventCombo: ParsedCombo): Binding[] => {
+    const candidates = new Map<string, Binding>()
+
+    for (const lookupKey of getEventLookupKeys(eventCombo)) {
+      const bucket = lookup.get(lookupKey)
+      if (!bucket) continue
+
+      bucket.forEach((binding, id) => {
+        candidates.set(id, binding)
+      })
+    }
+
+    return Array.from(candidates.values())
+  }
 
   const handleKeyDown = (e: KeyboardEvent) => {
-    if (!enabled()) return
+    const eventCombo = getEventCombo(e)
+    const comboText = comboToId(eventCombo) || null
+    const target = getEventTargetElement(e)
 
-    // 收集当前按键的所有可能组合
-    const currentCombo = [
-      ...(e.ctrlKey ? ['ctrl'] : []),
-      ...(e.shiftKey ? ['shift'] : []),
-      ...(e.altKey ? ['alt'] : []),
-      ...(e.metaKey ? ['meta'] : []),
-      e.key.toLowerCase(),
-    ]
+    if (ignore(e, target, comboText)) {
+      return
+    }
 
-    // 更新序列
-    clearTimeout(sequenceTimer!)
-    sequence.push(currentCombo)
+    clearSequenceTimer()
+    sequence = [...sequence, eventCombo]
     sequenceTimer = setTimeout(() => {
       sequence = []
+      sequenceTimer = null
     }, SEQUENCE_TIMEOUT)
 
-    // 查找匹配的绑定
-    for (const binding of bindings.values()) {
-      const { keys, action } = binding
+    for (const binding of getCandidates(eventCombo)) {
+      if (binding.combos.length === 1) {
+        if (!matchCombo(eventCombo, binding.combos[0])) continue
 
-      // 单组合键匹配
-      if (keys.length === 1 && matchCombo(e, keys[0])) {
         e.preventDefault()
-        action()
-        sequence = []
+        binding.action()
+        resetSequence()
         return
       }
 
-      // 序列匹配
-      if (keys.length > 1) {
-        const seqLen = keys.length
-        const recentSeq = sequence.slice(-seqLen)
-        if (
-          recentSeq.length === seqLen &&
-          recentSeq.every((combo, i) => combo.length === keys[i].length && combo.every(k => keys[i].includes(k)))
-        ) {
-          e.preventDefault()
-          action()
-          sequence = []
-          return
-        }
-      }
+      const recentSequence = sequence.slice(-binding.combos.length)
+      if (recentSequence.length !== binding.combos.length) continue
+
+      const matched = recentSequence.every((combo, index) => matchCombo(combo, binding.combos[index]))
+      if (!matched) continue
+
+      e.preventDefault()
+      binding.action()
+      resetSequence()
+      return
     }
   }
 
   const bind = (key: KeyCombo, action: () => void): (() => void) => {
-    const keys = parseKeys(key)
-    const id = getBindingKey(keys)
-    bindings.set(id, { keys, action })
-    return () => bindings.delete(id)
+    const ids = parseKeys(key, platform).map(combos => addBinding(combos, action))
+    return () => {
+      ids.forEach(removeBinding)
+    }
   }
 
   const unbind = (key: KeyCombo): void => {
-    const keys = parseKeys(key)
-    const id = getBindingKey(keys)
-    bindings.delete(id)
+    parseKeys(key, platform).forEach(combos => {
+      removeBinding(getBindingId(combos))
+    })
   }
 
   const trigger = (key: KeyCombo): void => {
-    const keys = parseKeys(key)
-    const id = getBindingKey(keys)
-    const binding = bindings.get(id)
-    if (binding) binding.action()
+    parseKeys(key, platform).forEach(combos => {
+      bindings.get(getBindingId(combos))?.action()
+    })
   }
 
   const reset = (): void => {
     bindings.clear()
-    sequence = []
+    lookup.clear()
+    resetSequence()
   }
 
-  onMount(() => window.addEventListener('keydown', handleKeyDown as EventListener))
+  onMount(() => {
+    targetWindow && makeEventListener(targetWindow, 'keydown', handleKeyDown as EventListener)
+  })
+
   onCleanup(() => {
-    window.removeEventListener('keydown', handleKeyDown as EventListener)
-    clearTimeout(sequenceTimer!)
+    resetSequence()
   })
 
   return { bind, unbind, trigger, reset }
