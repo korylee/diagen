@@ -90,7 +90,7 @@ export function RendererContainer(props: {
   resizeGuideTolerance?: number
 }) {
   const designer = useDesigner()
-  const { selection, edit, view, state, history, tool } = designer
+  const { selection, edit, view, state, history, tool, clipboard } = designer
 
   const [viewportRef, setViewportRef] = createSignal<HTMLDivElement | null>(null)
   const [sceneLayerRef, setSceneLayerRef] = createSignal<HTMLDivElement | null>(null)
@@ -113,7 +113,7 @@ export function RendererContainer(props: {
   const scroll = createScroll(viewportRef)
 
   keyboard.bind('delete', () => edit.remove(selection.selectedIds()))
-  keyboard.bind('ctrl+a', () => selection.selectAll())
+  keyboard.bind('mod+a', () => selection.selectAll())
   keyboard.bind('escape', () => {
     if (pointer.machine.isActive()) {
       pointer.machine.cancel()
@@ -122,11 +122,23 @@ export function RendererContainer(props: {
       tool.setIdle()
     }
   })
-  keyboard.bind('ctrl+z', () => {
+  keyboard.bind('mod+z', () => {
     history.undo()
   })
-  keyboard.bind('ctrl+y', () => {
+  keyboard.bind(['mod+y', 'mod+shift+z'], () => {
     history.redo()
+  })
+  keyboard.bind('mod+c', () => {
+    clipboard.copy(selection.selectedIds())
+  })
+  keyboard.bind('mod+v', () => {
+    clipboard.paste()
+  })
+  keyboard.bind('mod+x', () => {
+    clipboard.cut(selection.selectedIds())
+  })
+  keyboard.bind('mod+d', () => {
+    clipboard.duplicate(selection.selectedIds())
   })
 
   const interaction = {
