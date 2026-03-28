@@ -15,7 +15,7 @@ function toggleCreationTool(
   creationMode: SidebarCreationMode,
 ): void {
   const { tool } = designer
-  const current = tool.tool()
+  const current = tool.toolState()
   const isSameTool = () => {
     if (config.type !== current.type) return false
     const currentId = current.type === 'create-shape' ? current.shapeId : current.linkerId
@@ -51,7 +51,7 @@ export function selectLinkerCreationTool(
 export function syncCreationModeForActiveTool(designer: Designer, creationMode: SidebarCreationMode): void {
   const { tool } = designer
   const continuous = resolveCreationContinuous(creationMode)
-  const current = tool.tool()
+  const current = tool.toolState()
 
   if (current.type === 'idle' || current.continuous === continuous) {
     return

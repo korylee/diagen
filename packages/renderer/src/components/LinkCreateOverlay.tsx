@@ -67,7 +67,7 @@ export function LinkCreateOverlay() {
     const ids = selection.selectedIds()
     if (ids.length !== 1) return null
 
-    const target = element.getById(ids[0])
+    const target = element.getElementById(ids[0])
     return isQuickCreateShape(target) ? target : null
   })
 

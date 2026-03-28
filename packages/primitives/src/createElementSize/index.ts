@@ -4,7 +4,7 @@ import {
   CreateResizeObserverOptions,
 } from '../createResizeObserver'
 import { defaultWindow } from '../_configurable.ts'
-import { access, MaybeAccessor, MaybeElement, tryOnCleanup } from '../_shared.ts'
+import { access, MaybeAccessor, MaybeElement, tryOnCleanup } from '../helper'
 import { ensureArray } from '@diagen/shared'
 import { Accessor, createEffect, createMemo, createRoot, createSignal } from 'solid-js'
 

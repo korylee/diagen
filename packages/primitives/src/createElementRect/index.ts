@@ -1,4 +1,4 @@
-import { access, MaybeAccessor, MaybeElement } from '../_shared.ts'
+import { access, MaybeAccessor, MaybeElement } from '../helper'
 import { createEffect, createSignal, onMount } from 'solid-js'
 import { createResizeObserver } from '../createResizeObserver'
 import { createEventListener } from '../createEventListener'

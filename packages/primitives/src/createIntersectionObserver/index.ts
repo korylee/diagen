@@ -1,5 +1,5 @@
 import { ConfigurableWindow, defaultWindow } from '../_configurable'
-import { access, MaybeAccessor, MaybeElement, tryOnCleanup } from '../_shared'
+import { access, MaybeAccessor, MaybeElement, tryOnCleanup } from '../helper'
 import { Accessor, createEffect, createMemo, createRoot, createSignal, onCleanup } from 'solid-js'
 import { ensureArray, isNil } from '@diagen/shared'
 

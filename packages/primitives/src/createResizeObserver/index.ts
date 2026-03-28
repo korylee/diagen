@@ -1,4 +1,4 @@
-import { access, MaybeAccessor, MaybeElement, tryOnCleanup } from '../_shared.ts'
+import { access, MaybeAccessor, MaybeElement, tryOnCleanup } from '../helper'
 import { Accessor, createEffect, createMemo, createRoot, onCleanup } from 'solid-js'
 import { ConfigurableWindow, defaultWindow } from '../_configurable.ts'
 import { ensureArray, isNil } from '@diagen/shared'

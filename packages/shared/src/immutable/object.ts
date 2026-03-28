@@ -1,13 +1,30 @@
 import { isObject, isPlainObject } from './is'
 
+function cloneProperty<T extends object>(source: T, target: T, key: PropertyKey, cache: WeakMap<object, any>): void {
+  const desc = Object.getOwnPropertyDescriptor(source, key)
+  if (!desc) return
+
+  if ('value' in desc) {
+    Object.defineProperty(target, key, {
+      ...desc,
+      value: deepClone(desc.value, cache),
+    })
+    return
+  }
+
+  Object.defineProperty(target, key, {
+    value: deepClone(Reflect.get(source, key), cache),
+    writable: true,
+    enumerable: desc.enumerable,
+    configurable: desc.configurable,
+  })
+}
+
 export function deepClone<T>(obj: T, cache = new WeakMap<object, any>()): T {
-  // 1. 基础类型直接返回
   if (obj === null || typeof obj !== 'object') return obj
 
-  // 2. 循环引用检查
   if (cache.has(obj as object)) return cache.get(obj as object)
 
-  // 3. 特殊对象实例化
   if (obj instanceof Date) return new Date(obj) as unknown as T
   if (obj instanceof RegExp) return new RegExp(obj.source, obj.flags) as unknown as T
   if (obj instanceof Map) {
@@ -22,21 +39,16 @@ export function deepClone<T>(obj: T, cache = new WeakMap<object, any>()): T {
     obj.forEach(v => cloned.add(deepClone(v, cache)))
     return cloned as unknown as T
   }
-  // 简化：二进制数据直接利用构造函数复制
+
   if (ArrayBuffer.isView(obj) || obj instanceof ArrayBuffer) {
     return new (obj.constructor as any)(obj) as T
   }
 
-  // 4. 普通对象/数组
-  const cloned = Object.create(Object.getPrototypeOf(obj))
+  const cloned = Array.isArray(obj) ? [] : Object.create(Object.getPrototypeOf(obj))
   cache.set(obj as object, cloned) // 注意：需在递归前缓存
 
-  // 5. 复制所有属性（统一逻辑）
-  Reflect.ownKeys(obj).forEach(key => {
-    const desc = Object.getOwnPropertyDescriptor(obj, key)!
-    // 如果是数据属性，递归克隆；如果是访问器属性，直接复用描述符
-    if ('value' in desc) desc.value = deepClone(desc.value, cache)
-    Object.defineProperty(cloned, key, desc)
+  keys(obj as object).forEach(key => {
+    cloneProperty(obj as object, cloned, key, cache)
   })
 
   return cloned

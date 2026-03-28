@@ -1,5 +1,5 @@
 import { createEffect, createRenderEffect } from 'solid-js'
-import { access, MaybeAccessor, tryOnCleanup } from '../_shared'
+import { access, MaybeAccessor, tryOnCleanup } from '../helper'
 import { ensureArray, isFunction, MaybeArray } from '@diagen/shared'
 
 interface InferEventTarget<Events> {

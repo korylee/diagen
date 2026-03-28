@@ -1,6 +1,6 @@
 import { createRoot } from 'solid-js'
 import { describe, expect, it } from 'vitest'
-import { createLinker, createShape } from '../../model'
+import { createLinker, createShape, type ShapeElement } from '../../model'
 import { createDesigner } from '../create'
 
 function withDesigner(run: (designer: ReturnType<typeof createDesigner>) => void) {
@@ -167,6 +167,24 @@ describe('clipboard manager', () => {
       designer.undo()
       expect(pastedIds.every(id => designer.getElementById(id) === undefined)).toBe(true)
       expect(designer.getElementById(shape.id)?.id).toBe(shape.id)
+    })
+  })
+
+  it('paste 的历史快照不应被后续元素修改污染', () => {
+    withDesigner(designer => {
+      const shape = createTestShape('shape_l', 0)
+      designer.edit.add([shape], { record: false, select: false })
+
+      designer.clipboard.copy([shape.id])
+      const [pastedId] = designer.clipboard.paste()
+
+      designer.edit.update(pastedId, 'props', 'x', 999, { record: false })
+
+      designer.undo()
+      expect(designer.getElementById(pastedId)).toBeUndefined()
+
+      designer.redo()
+      expect(designer.getElementById<ShapeElement>(pastedId)?.props.x).toBe(24)
     })
   })
 })

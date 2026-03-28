@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal } from 'solid-js'
 import { ConfigurableWindow, defaultWindow } from '../_configurable'
-import { access, MaybeAccessor } from '../_shared'
+import { access, MaybeAccessor } from '../helper'
 import { isFunction } from '@diagen/shared'
 import { createEventListener } from '../createEventListener'
 

@@ -21,9 +21,10 @@ export function createSelectionManager(
   const [selected, setSelected] = createStore<Record<string, boolean>>({})
 
   const isSelected = (id: string): boolean => selected[id]
-  const selectedIds = createMemo(() => Object.keys(selected))
-  const isEmpty = createMemo(() => selectedIds().length === 0)
-  const hasMultiple = createMemo(() => selectedIds().length > 1)
+  const selectedIds = createMemo(() => keys(selected))
+  const selectedCount = createMemo(() => selectedIds().length)
+  const isEmpty = createMemo(() =>selectedCount() === 0)
+  const hasMultiple = createMemo(() =>selectedCount() > 1)
 
   function replace(ids: string[], anchorPoint?: Point) {
     const previous = selectedIds().slice()
@@ -102,6 +103,7 @@ export function createSelectionManager(
 
     setSelected,
     selectedIds,
+    selectedCount,
     hasMultiple,
     isEmpty,
     isSelected,

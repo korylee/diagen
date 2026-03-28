@@ -1,4 +1,4 @@
-export * from './_shared'
+export * from './helper'
 export * from './createEventListener'
 export * from './createDebounce'
 export * from './createScroll'

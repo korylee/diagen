@@ -1,12 +1,7 @@
 import { createMemo } from 'solid-js'
 import type { Designer } from '@diagen/core'
 
-import type {
-  ToolbarBridge,
-  ToolbarBridgeButtonItem,
-  ToolbarBridgeDividerItem,
-  ToolbarBridgeItem,
-} from './types'
+import type { ToolbarBridge, ToolbarBridgeButtonItem, ToolbarBridgeDividerItem, ToolbarBridgeItem } from './types'
 
 function createButton(item: Omit<ToolbarBridgeButtonItem, 'kind'>): ToolbarBridgeButtonItem {
   return {
@@ -24,32 +19,29 @@ function createDivider(id: string, size: 'normal' | 'small' = 'normal'): Toolbar
 }
 
 export function createToolbarBridge(designer: Designer): ToolbarBridge {
-  const selectionCount = createMemo<number>(() => designer.selection.selectedIds().length)
-  const selectedGroupCount = createMemo<number>(() => designer.group.getGroupsFromElements(designer.selection.selectedIds()).size)
-  const canGroup = createMemo<boolean>(() => selectionCount() > 1)
+  const { element, selection, group, history, edit, tool, view } = designer
+  const selectedGroups = createMemo(() => group.getGroupsFromElementIds(selection.selectedIds()))
+  const selectedGroupCount = createMemo<number>(() => selectedGroups().length)
+  const canGroup = createMemo<boolean>(() => selection.selectedCount() > 1)
   const canUngroup = createMemo<boolean>(() => selectedGroupCount() > 0)
-  const canDelete = createMemo<boolean>(() => selectionCount() > 0)
-  const canUndo = createMemo<boolean>(() => designer.canUndo())
-  const canRedo = createMemo<boolean>(() => designer.canRedo())
-  const currentTool = createMemo(() => designer.tool.tool())
 
   const leftItems = createMemo<readonly ToolbarBridgeItem[]>(() => [
     createButton({
       id: 'history:undo',
       title: '撤销 (Ctrl+Z)',
       iconKey: 'undo',
-      disabled: !canUndo(),
+      disabled: !history.canUndo(),
       execute: () => {
-        designer.undo()
+        history.undo()
       },
     }),
     createButton({
       id: 'history:redo',
       title: '重做 (Ctrl+Y)',
       iconKey: 'redo',
-      disabled: !canRedo(),
+      disabled: !history.canRedo(),
       execute: () => {
-        designer.redo()
+        history.redo()
       },
     }),
     createDivider('divider:edit'),
@@ -59,12 +51,12 @@ export function createToolbarBridge(designer: Designer): ToolbarBridge {
       iconKey: 'group',
       disabled: !canGroup(),
       execute: () => {
-        const ids = designer.selection.selectedIds()
+        const ids = selection.selectedIds()
         if (ids.length < 2) {
           return
         }
 
-        designer.group.group(ids)
+        group.group(ids)
       },
     }),
     createButton({
@@ -73,22 +65,22 @@ export function createToolbarBridge(designer: Designer): ToolbarBridge {
       iconKey: 'ungroup',
       disabled: !canUngroup(),
       execute: () => {
-        const groups = designer.group.getGroupsFromElements(designer.selection.selectedIds())
-        groups.forEach(groupId => designer.group.ungroup(groupId))
+        const groups = group.getGroupsFromElementIds(selection.selectedIds())
+        groups.forEach(groupId => group.ungroup(groupId))
       },
     }),
     createButton({
       id: 'edit:delete',
       title: '删除',
       iconKey: 'delete',
-      disabled: !canDelete(),
+      disabled: selection.isEmpty(),
       execute: () => {
-        const ids = designer.selection.selectedIds()
+        const ids = selection.selectedIds()
         if (ids.length === 0) {
           return
         }
 
-        designer.removeElements(ids)
+        edit.remove(ids)
       },
     }),
     createDivider('divider:view'),
@@ -97,7 +89,7 @@ export function createToolbarBridge(designer: Designer): ToolbarBridge {
       title: '缩小',
       iconKey: 'zoom-out',
       execute: () => {
-        designer.view.zoomOut()
+        view.zoomOut()
       },
     }),
     createButton({
@@ -105,7 +97,7 @@ export function createToolbarBridge(designer: Designer): ToolbarBridge {
       title: '适应内容',
       iconKey: 'fit',
       execute: () => {
-        designer.view.fitToContent()
+        view.fitToContent()
       },
     }),
     createButton({
@@ -113,7 +105,7 @@ export function createToolbarBridge(designer: Designer): ToolbarBridge {
       title: '放大',
       iconKey: 'zoom-in',
       execute: () => {
-        designer.view.zoomIn()
+        view.zoomIn()
       },
     }),
   ])

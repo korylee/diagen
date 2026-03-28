@@ -1,8 +1,8 @@
 import { createRoot } from 'solid-js'
 import { produce } from 'solid-js/store'
 import { describe, expect, it } from 'vitest'
-import { createShape, ShapeElement } from '../../model'
-import { createDesigner } from '../create'
+import { createShape, ShapeElement } from '../../../../model'
+import { createDesigner } from '../../../create'
 
 function withDesigner(run: (designer: ReturnType<typeof createDesigner>) => void) {
   createRoot(dispose => {
@@ -132,10 +132,67 @@ describe('edit manager', () => {
       })
       designer.edit.add([shape], { record: false, select: false })
 
-      designer.edit.update(shape.id, produce(el => {}))
+      designer.edit.update(
+        shape.id,
+        produce(el => {}),
+      )
       expect(designer.canUndo()).toBe(false)
 
-      designer.edit.update(shape.id, 'props', produce(props => {}))
+      designer.edit.update(
+        shape.id,
+        'props',
+        produce(props => {}),
+      )
+      expect(designer.canUndo()).toBe(false)
+    })
+  })
+
+  it('layer 调整应支持 undo/redo', () => {
+    withDesigner(designer => {
+      const shapeA = createShape({
+        id: 'shape_layer_a',
+        name: 'shape_layer_a',
+        group: null,
+        props: { x: 0, y: 0, w: 100, h: 80, angle: 0 },
+      })
+      const shapeB = createShape({
+        id: 'shape_layer_b',
+        name: 'shape_layer_b',
+        group: null,
+        props: { x: 120, y: 0, w: 100, h: 80, angle: 0 },
+      })
+      const shapeC = createShape({
+        id: 'shape_layer_c',
+        name: 'shape_layer_c',
+        group: null,
+        props: { x: 240, y: 0, w: 100, h: 80, angle: 0 },
+      })
+
+      designer.edit.add([shapeA, shapeB, shapeC], { record: false, select: false })
+
+      designer.edit.moveForward([shapeA.id])
+      expect(designer.element.orderList()).toEqual([shapeB.id, shapeA.id, shapeC.id])
+
+      designer.undo()
+      expect(designer.element.orderList()).toEqual([shapeA.id, shapeB.id, shapeC.id])
+
+      designer.redo()
+      expect(designer.element.orderList()).toEqual([shapeB.id, shapeA.id, shapeC.id])
+    })
+  })
+
+  it('layer 无实际改动时不应写入 history', () => {
+    withDesigner(designer => {
+      const shape = createShape({
+        id: 'shape_layer_noop',
+        name: 'shape_layer_noop',
+        group: null,
+        props: { x: 0, y: 0, w: 100, h: 80, angle: 0 },
+      })
+
+      designer.edit.add([shape], { record: false, select: false })
+      designer.edit.toFront([shape.id])
+
       expect(designer.canUndo()).toBe(false)
     })
   })

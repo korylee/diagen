@@ -141,7 +141,7 @@ export function createDesigner(options: DesignerOptions = {}) {
   const selection = createSelectionManager(ctx, { element })
   const view = createViewManager(ctx, { element, selection })
   const edit = createEditManager(ctx, { element, selection, history })
-  const group = createGroupManager(ctx, { edit })
+  const group = createGroupManager(ctx, { edit, element, selection })
   const clipboard = createClipboardManager({ element, selection, group, edit, history })
   const tool = createToolManager(ctx)
 
@@ -205,6 +205,10 @@ export function createDesigner(options: DesignerOptions = {}) {
     updateElement: edit.update,
     clearElements: edit.clear,
     moveElements: edit.move,
+    toFront: edit.toFront,
+    toBack: edit.toBack,
+    moveForward: edit.moveForward,
+    moveBackward: edit.moveBackward,
     copy: clipboard.copy,
     cut: clipboard.cut,
     paste: clipboard.paste,

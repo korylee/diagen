@@ -1,4 +1,4 @@
-import { isNumeric } from '../is'
+import { isNumeric } from '../immutable'
 
 export function toUnit(str: string | number | null | undefined, unit = 'px'): string | undefined {
   if (str == null || str === '') return undefined

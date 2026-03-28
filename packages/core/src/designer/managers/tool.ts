@@ -12,7 +12,7 @@ export interface SetLinkerToolOptions {
 }
 
 export function createToolManager(ctx: DesignerContext) {
-  const tool = createMemo<DesignerToolState>(() => ctx.state.tool)
+  const toolState = createMemo<DesignerToolState>(() => ctx.state.tool)
 
   function setIdle(): void {
     ctx.setState('tool', reconcile({ type: 'idle' }))
@@ -41,7 +41,7 @@ export function createToolManager(ctx: DesignerContext) {
   }
 
   function toggleCreateShape(shapeId: string, options: SetShapeToolOptions = {}): void {
-    const current = tool()
+    const current = toolState()
     if (current.type === 'create-shape' && current.shapeId === shapeId) {
       setIdle()
       return
@@ -50,7 +50,7 @@ export function createToolManager(ctx: DesignerContext) {
   }
 
   function toggleCreateLinker(linkerId = 'linker', options: SetLinkerToolOptions = {}): void {
-    const current = tool()
+    const current = toolState()
     if (current.type === 'create-linker' && current.linkerId === linkerId) {
       setIdle()
       return
@@ -59,11 +59,11 @@ export function createToolManager(ctx: DesignerContext) {
   }
 
   function isIdle(): boolean {
-    return tool().type === 'idle'
+    return toolState().type === 'idle'
   }
 
   return {
-    tool,
+    toolState,
     
     isIdle,
     setIdle,

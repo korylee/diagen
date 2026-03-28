@@ -1,7 +1,7 @@
 import { batch, createSignal, onMount } from 'solid-js'
 import { createMutable, createStore } from 'solid-js/store'
 import { type ConfigurableWindow, defaultWindow } from '../_configurable'
-import { access, MaybeAccessor } from '../_shared'
+import { access, MaybeAccessor } from '../helper'
 import { createEventListener, EventListenerOptions } from '../createEventListener'
 import { createDebounce } from '../createDebounce'
 

@@ -1,8 +1,8 @@
 import { createRoot } from 'solid-js'
 import { produce } from 'solid-js/store'
 import { describe, expect, it } from 'vitest'
-import { createLinker, createShape, type ShapeElement } from '../../model'
-import { createDesigner } from '../create'
+import { createLinker, createShape, type ShapeElement } from '../../../../model'
+import { createDesigner } from '../../../create'
 
 function withDesigner(run: (designer: ReturnType<typeof createDesigner>) => void) {
   createRoot(dispose => {
@@ -25,6 +25,44 @@ function createShapeById(id: string, x: number, y: number, w = 80, h = 60) {
 }
 
 describe('element manager', () => {
+  it('getRelatedLinkers/getInternalLinkerIds/getGroupElementIds 应返回稳定结果', () => {
+    withDesigner(designer => {
+      const a = createShapeById('el_rel_a', 0, 0)
+      const b = createShapeById('el_rel_b', 100, 0)
+      const c = createShapeById('el_rel_c', 200, 0)
+      const linkerInternal = createLinker({
+        id: 'el_rel_internal',
+        name: 'el_rel_internal',
+        group: null,
+        from: { id: a.id, x: 80, y: 30, binding: { type: 'free' } },
+        to: { id: b.id, x: 100, y: 30, binding: { type: 'free' } },
+      })
+      const linkerExternal = createLinker({
+        id: 'el_rel_external',
+        name: 'el_rel_external',
+        group: null,
+        from: { id: a.id, x: 80, y: 30, binding: { type: 'free' } },
+        to: { id: c.id, x: 200, y: 30, binding: { type: 'free' } },
+      })
+
+      designer.element.add([
+        { ...a, group: 'group_rel' },
+        c,
+        linkerExternal,
+        { ...b, group: 'group_rel' },
+        linkerInternal,
+      ])
+
+      expect(designer.element.getRelatedLinkers(a.id).map(linker => linker.id)).toEqual([
+        linkerExternal.id,
+        linkerInternal.id,
+      ])
+      expect(designer.element.getRelatedLinkers(b.id).map(linker => linker.id)).toEqual([linkerInternal.id])
+      expect(designer.element.getInternalLinkerIds([a.id, b.id])).toEqual([linkerInternal.id])
+      expect(designer.element.getGroupElementIds('group_rel')).toEqual([a.id, b.id])
+    })
+  })
+
   it('add/remove 应维护 elementMap 与 orderList', () => {
     withDesigner(designer => {
       const a = createShapeById('el_a', 0, 0)
@@ -88,7 +126,7 @@ describe('element manager', () => {
     })
   })
 
-  it('toFront/toBack/bringForward/sendBackward 应按预期调整顺序', () => {
+  it('toFront/toBack/moveForward/moveBackward 应按预期调整顺序', () => {
     withDesigner(designer => {
       const a = createShapeById('el_layer_a', 0, 0)
       const b = createShapeById('el_layer_b', 100, 0)
@@ -101,10 +139,10 @@ describe('element manager', () => {
       designer.element.toBack([a.id])
       expect(designer.element.orderList()).toEqual([a.id, b.id, c.id])
 
-      designer.element.bringForward([a.id])
+      designer.element.moveForward([a.id])
       expect(designer.element.orderList()).toEqual([b.id, a.id, c.id])
 
-      designer.element.sendBackward([a.id])
+      designer.element.moveBackward([a.id])
       expect(designer.element.orderList()).toEqual([a.id, b.id, c.id])
     })
   })
@@ -127,34 +165,6 @@ describe('element manager', () => {
       expect(designer.element.getElementById<ShapeElement>(a.id)?.props.x).toBe(0)
       expect(designer.element.getElementById<ShapeElement>(b.id)?.props.x).toBe(150)
       expect(designer.element.getElementById<ShapeElement>(c.id)?.props.x).toBe(300)
-    })
-  })
-
-  it('group/ungroup/load/clear 应保持数据一致', () => {
-    withDesigner(designer => {
-      const a = createShapeById('el_group_a', 0, 0)
-      const b = createShapeById('el_group_b', 100, 0)
-      designer.element.add([a, b])
-
-      const groupId = designer.element.group([a.id, b.id])
-      expect(groupId).toBeTruthy()
-      expect(designer.element.getElementById(a.id)?.group).toBe(groupId)
-      expect(designer.element.getElementById(b.id)?.group).toBe(groupId)
-
-      designer.element.ungroup(groupId as string)
-      expect(designer.element.getElementById(a.id)?.group).toBeNull()
-      expect(designer.element.getElementById(b.id)?.group).toBeNull()
-
-      const loaded = {
-        [a.id]: a,
-      }
-      designer.element.load(loaded, [a.id])
-      expect(designer.element.elementCount()).toBe(1)
-      expect(designer.element.orderList()).toEqual([a.id])
-
-      designer.element.clear()
-      expect(designer.element.elementCount()).toBe(0)
-      expect(designer.element.orderList()).toEqual([])
     })
   })
 })

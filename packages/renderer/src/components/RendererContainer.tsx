@@ -329,7 +329,7 @@ export function RendererContainer(props: {
     if (e.button !== 0) return false
     if (!pointer.machine.isIdle()) return false
 
-    const currentTool = tool.tool()
+    const currentTool = tool.toolState()
     const point = coordinate.eventToCanvas(e)
     const sceneHit = currentTool.type === 'create-shape' ? null : getSceneHit(point)
     const intent = resolveScenePrimaryIntent({

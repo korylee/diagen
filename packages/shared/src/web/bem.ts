@@ -1,4 +1,4 @@
-import { isPlainObject, isString } from '../is'
+import { isPlainObject, isString } from '../immutable'
 
 type BemModifierRecord = Record<string, unknown>
 

@@ -16,7 +16,7 @@ function withDesigner(run: (designer: ReturnType<typeof createDesigner>) => void
 describe('tool manager', () => {
   it('默认应处于 idle 状态', () => {
     withDesigner(designer => {
-      expect(designer.tool.tool()).toEqual({ type: 'idle' })
+      expect(designer.tool.toolState()).toEqual({ type: 'idle' })
       expect(designer.tool.isIdle()).toBe(true)
     })
   })
@@ -25,14 +25,14 @@ describe('tool manager', () => {
     withDesigner(designer => {
       designer.tool.setCreateShape('rectangle')
 
-      expect(designer.tool.tool()).toEqual({
+      expect(designer.tool.toolState()).toEqual({
         type: 'create-shape',
         shapeId: 'rectangle',
         continuous: true,
       })
 
       designer.tool.setIdle()
-      expect(designer.tool.tool()).toEqual({ type: 'idle' })
+      expect(designer.tool.toolState()).toEqual({ type: 'idle' })
     })
   })
 
@@ -40,7 +40,7 @@ describe('tool manager', () => {
     withDesigner(designer => {
       designer.tool.setCreateLinker('curve_linker', { continuous: false })
 
-      expect(designer.tool.tool()).toEqual({
+      expect(designer.tool.toolState()).toEqual({
         type: 'create-linker',
         linkerId: 'curve_linker',
         continuous: false,
@@ -51,16 +51,16 @@ describe('tool manager', () => {
   it('toggleCreateShape / toggleCreateLinker 应支持开关行为', () => {
     withDesigner(designer => {
       designer.tool.toggleCreateShape('rectangle')
-      expect(designer.tool.tool().type).toBe('create-shape')
+      expect(designer.tool.toolState().type).toBe('create-shape')
 
       designer.tool.toggleCreateShape('rectangle')
-      expect(designer.tool.tool()).toEqual({ type: 'idle' })
+      expect(designer.tool.toolState()).toEqual({ type: 'idle' })
 
       designer.tool.toggleCreateLinker('linker')
-      expect(designer.tool.tool().type).toBe('create-linker')
+      expect(designer.tool.toolState().type).toBe('create-linker')
 
       designer.tool.toggleCreateLinker('linker')
-      expect(designer.tool.tool()).toEqual({ type: 'idle' })
+      expect(designer.tool.toolState()).toEqual({ type: 'idle' })
     })
   })
 })

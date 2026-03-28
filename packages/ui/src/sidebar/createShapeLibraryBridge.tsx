@@ -6,7 +6,7 @@ import { SidebarCanvasPreview } from './SidebarCanvasPreview'
 import { selectLinkerCreationTool, selectShapeCreationTool, type SidebarCreationMode } from './creationMode'
 
 function resolveActiveItemId(designer: Designer): string | undefined {
-  const current = designer.tool.tool()
+  const current = designer.tool.toolState()
 
   if (current.type === 'create-shape') {
     return `tool:shape:${current.shapeId}`

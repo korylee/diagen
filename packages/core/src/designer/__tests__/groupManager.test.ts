@@ -1,6 +1,6 @@
 import { createRoot } from 'solid-js'
 import { describe, expect, it } from 'vitest'
-import { createLinker, createShape } from '../../model'
+import { createShape } from '../../model'
 import { createDesigner } from '../create'
 
 function withDesigner(run: (designer: ReturnType<typeof createDesigner>) => void) {
@@ -39,7 +39,7 @@ describe('group manager', () => {
       expect(groupId).toBe('group_1')
       expect(designer.getElementById(shapeA.id)?.group).toBe('group_1')
       expect(designer.getElementById(shapeB.id)?.group).toBe('group_1')
-      expect(designer.group.getGroupMemberIds('group_1')).toEqual([shapeB.id, shapeA.id])
+      expect(designer.group.getGroupElementIds('group_1')).toEqual([shapeB.id, shapeA.id])
     })
   })
 
@@ -65,50 +65,62 @@ describe('group manager', () => {
     })
   })
 
-  it('resolveSelectionForClipboard 应分组展开并补齐内部连线，且顺序稳定', () => {
+  it('group/ungroup 应支持 undo/redo', () => {
     withDesigner(designer => {
       const shapeA = createShape({
         id: 'shape_e',
         name: 'shape_e',
-        group: 'group_3',
+        group: null,
         props: { x: 0, y: 0, w: 100, h: 80, angle: 0 },
       })
       const shapeB = createShape({
         id: 'shape_f',
         name: 'shape_f',
-        group: 'group_3',
+        group: null,
         props: { x: 200, y: 0, w: 100, h: 80, angle: 0 },
       })
-      const shapeC = createShape({
+      designer.edit.add([shapeA, shapeB], { record: false, select: false })
+
+      const groupId = designer.group.group([shapeA.id, shapeB.id], { groupId: 'group_3' })
+      expect(groupId).toBe('group_3')
+      expect(designer.getElementById(shapeA.id)?.group).toBe('group_3')
+      expect(designer.getElementById(shapeB.id)?.group).toBe('group_3')
+
+      designer.undo()
+      expect(designer.getElementById(shapeA.id)?.group).toBeNull()
+      expect(designer.getElementById(shapeB.id)?.group).toBeNull()
+
+      designer.redo()
+      expect(designer.getElementById(shapeA.id)?.group).toBe('group_3')
+      expect(designer.getElementById(shapeB.id)?.group).toBe('group_3')
+
+      designer.group.ungroup('group_3')
+      expect(designer.getElementById(shapeA.id)?.group).toBeNull()
+      expect(designer.getElementById(shapeB.id)?.group).toBeNull()
+    })
+  })
+
+  it('ungroupByElements 应展开同组元素', () => {
+    withDesigner(designer => {
+      const shapeA = createShape({
         id: 'shape_g',
         name: 'shape_g',
-        group: null,
-        props: { x: 400, y: 0, w: 100, h: 80, angle: 0 },
+        group: 'group_4',
+        props: { x: 0, y: 0, w: 100, h: 80, angle: 0 },
       })
-      const internalLinker = createLinker({
-        id: 'linker_internal',
-        name: 'linker_internal',
-        from: { id: shapeA.id, x: 0, y: 0, binding: { type: 'free' } },
-        to: { id: shapeB.id, x: 0, y: 0, binding: { type: 'free' } },
+      const shapeB = createShape({
+        id: 'shape_h',
+        name: 'shape_h',
+        group: 'group_4',
+        props: { x: 200, y: 0, w: 100, h: 80, angle: 0 },
       })
-      const externalLinker = createLinker({
-        id: 'linker_external',
-        name: 'linker_external',
-        from: { id: shapeA.id, x: 0, y: 0, binding: { type: 'free' } },
-        to: { id: shapeC.id, x: 0, y: 0, binding: { type: 'free' } },
-      })
+      designer.edit.add([shapeA, shapeB], { record: false, select: false })
 
-      designer.edit.add([shapeB, shapeC, externalLinker, shapeA, internalLinker], {
-        record: false,
-        select: false,
-      })
+      const affected = designer.group.ungroupByElements([shapeA.id], { record: false })
 
-      const fromManager = designer.group.resolveSelectionForClipboard([shapeA.id])
-      const fromShortcut = designer.group.resolveSelectionForClipboard([shapeA.id])
-
-      expect(fromManager).toEqual([shapeB.id, shapeA.id, internalLinker.id])
-      expect(fromShortcut).toEqual(fromManager)
-      expect(fromManager.includes(externalLinker.id)).toBe(false)
+      expect(affected).toEqual([shapeA.id, shapeB.id])
+      expect(designer.getElementById(shapeA.id)?.group).toBeNull()
+      expect(designer.getElementById(shapeB.id)?.group).toBeNull()
     })
   })
 })

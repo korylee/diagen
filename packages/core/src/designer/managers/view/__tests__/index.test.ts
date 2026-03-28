@@ -1,8 +1,8 @@
 import { createRoot } from 'solid-js'
 import { describe, expect, it } from 'vitest'
 import { lineIntersectsBounds } from '@diagen/shared'
-import { createLinker, createShape, type ShapeElement } from '../../model'
-import { createDesigner } from '../create'
+import { createLinker, createShape, type ShapeElement } from '../../../../model'
+import { createDesigner } from '../../../create'
 
 function withDesigner(run: (designer: ReturnType<typeof createDesigner>) => void) {
   createRoot(dispose => {
@@ -148,6 +148,35 @@ describe('view manager', () => {
     })
   })
 
+  it('新增障碍物后 obstacle 连线布局缓存应自动失效', () => {
+    withDesigner(designer => {
+      const a = createShapeById('route_dynamic_a', 0, 0, 100, 80)
+      const b = createShapeById('route_dynamic_b', 320, 0, 100, 80)
+      const linker = createLinker({
+        id: 'route_dynamic_linker',
+        name: 'route_dynamic_linker',
+        linkerType: 'broken',
+        from: { id: a.id, x: a.props.x + a.props.w, y: a.props.y + a.props.h / 2, binding: { type: 'free' } },
+        to: { id: b.id, x: b.props.x, y: b.props.y + b.props.h / 2, binding: { type: 'free' } },
+      })
+      designer.edit.add([a, b, linker], { record: false, select: false })
+
+      const initialLayout = designer.view.getLinkerLayout(linker)
+      const blocker = createShapeById('route_dynamic_blocker', 140, -20, 120, 120)
+      designer.edit.add([blocker], { record: false, select: false })
+
+      const layout = designer.view.getLinkerLayout(linker)
+      const blockerBounds = designer.view.getShapeBounds(blocker)
+      const intersects = layout.route.points.some((point, index, points) => {
+        if (index === points.length - 1) return false
+        return lineIntersectsBounds(point, points[index + 1], blockerBounds)
+      })
+
+      expect(initialLayout.route.points).not.toEqual(layout.route.points)
+      expect(intersects).toBe(false)
+    })
+  })
+
   it('切回 basic 策略后应保留基础折线行为', () => {
     withDesigner(designer => {
       const a = createShapeById('route_basic_a', 0, 0, 100, 80)
@@ -175,6 +204,23 @@ describe('view manager', () => {
       })
 
       expect(intersects).toBe(true)
+    })
+  })
+
+  it('setLinkerRouteConfig 应合并局部配置', () => {
+    withDesigner(designer => {
+      const before = designer.view.linkerRouteConfig()
+      designer.view.setLinkerRouteConfig({
+        obstacleConfig: {
+          padding: 32,
+        },
+      })
+
+      const next = designer.view.linkerRouteConfig()
+      expect(next.obstacleConfig.padding).toBe(32)
+      expect(next.obstacleOptions).toEqual(before.obstacleOptions)
+      expect(next.lineJumpRadius).toBe(before.lineJumpRadius)
+      expect(next.strategies).toEqual(before.strategies)
     })
   })
 

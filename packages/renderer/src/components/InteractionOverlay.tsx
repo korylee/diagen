@@ -171,7 +171,7 @@ function LinkerSelectionOverlay() {
     if (!tool.isIdle()) return null
     const selectedIds = selection.selectedIds()
     if (selectedIds.length !== 1) return null
-    const selected = element.getById(selectedIds[0])
+    const selected = element.getElementById(selectedIds[0])
     return selected && isLinker(selected) ? selected : null
   })
 
@@ -364,7 +364,7 @@ function ShapeSelectionOverlay(props: ShapeSelectionLayerProps) {
     const selectedIds = selection.selectedIds()
     if (selectedIds.length === 0) return null
 
-    const selectedElements = selectedIds.map(id => element.getById(id))
+    const selectedElements = element.getElementsByIds(selectedIds);
     return selectedElements.every(el => !!el && isShape(el)) ? selectedElements : null
   })
 
@@ -498,7 +498,7 @@ function AnchorPreview(props: { elementId: string; highlightAnchor?: number | st
   const { element } = useDesigner()
   const { coordinate } = useInteraction()
   const shape = createMemo(() => {
-    const el = element.getById(props.elementId)
+    const el = element.getElementById(props.elementId)
     return el && isShape(el) ? el : null
   })
 
