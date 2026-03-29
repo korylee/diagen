@@ -242,4 +242,81 @@ describe('RendererContainer', () => {
       harness.dispose()
     }
   })
+
+  it('连线拖拽时应按 shape 语义渲染目标高亮', async () => {
+    const harness = await createRendererTestHarness({
+      shapes: [
+        { id: 'shape_source', x: 100, y: 100, w: 100, h: 80 },
+        { id: 'shape_target', x: 320, y: 100, w: 100, h: 80 },
+      ],
+    })
+
+    try {
+      const interaction = harness.getInteraction()
+      const startClient = harness.canvasToClient({ x: 150, y: 140 })
+      const started = interaction.pointer.machine.beginLinkerCreate(
+        new MouseEvent('mousedown', {
+          bubbles: true,
+          cancelable: true,
+          clientX: startClient.x,
+          clientY: startClient.y,
+          buttons: 1,
+        }),
+        {
+          linkerId: 'linker',
+          from: {
+            type: 'shape',
+            shapeId: 'shape_source',
+          },
+        },
+      )
+
+      expect(started).toBe(true)
+      expect(interaction.pointer.machine.mode()).toBe('draggingLinker')
+
+      await harness.dispatchWindowMouseMoveAtClient({
+        x: startClient.x + 120,
+        y: startClient.y,
+      })
+
+      const highlights = harness.overlayLayer.querySelectorAll('[data-shape-highlight-kind="link-target"]')
+      expect(highlights).toHaveLength(2)
+
+      const activeTarget = harness.overlayLayer.querySelector(
+        '[data-shape-highlight-kind="link-target"][data-shape-highlight-id="shape_target"][data-shape-highlight-state="active"]',
+      )
+      expect(activeTarget).toBeTruthy()
+
+      await harness.dispatchWindowMouseUp()
+      expect(interaction.pointer.machine.mode()).toBe('idle')
+    } finally {
+      harness.dispose()
+    }
+  })
+
+  it('单选可连线图形时应显示 quick-create 面板和源高亮', async () => {
+    const harness = await createRendererTestHarness({
+      shapes: [{ id: 'shape_source_panel', x: 100, y: 100, w: 100, h: 80 }],
+    })
+
+    try {
+      await harness.dispatchSceneMouseDownAtCanvas({ x: 140, y: 140 })
+      await harness.dispatchWindowMouseUp()
+
+      expect(harness.designer.selection.selectedIds()).toEqual(['shape_source_panel'])
+
+      const panel = harness.overlayLayer.querySelector('[data-linker-create-panel="true"]')
+      expect(panel).toBeTruthy()
+
+      const buttons = panel?.querySelectorAll('button')
+      expect(buttons).toHaveLength(3)
+
+      const sourceHighlight = harness.overlayLayer.querySelector(
+        '[data-shape-highlight-kind="link-source"][data-shape-highlight-id="shape_source_panel"][data-shape-highlight-state="armed"]',
+      )
+      expect(sourceHighlight).toBeTruthy()
+    } finally {
+      harness.dispose()
+    }
+  })
 })
