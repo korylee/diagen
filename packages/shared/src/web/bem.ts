@@ -1,41 +1,12 @@
-import { isPlainObject, isString } from '../immutable'
+import { isString } from '../immutable'
+import { ClassValue, collectClassNames } from './cx'
 
-type BemModifierRecord = Record<string, unknown>
-
-export type BemMods = string | BemModifierRecord | false | null | undefined | readonly BemMods[]
+export type BemMods = ClassValue
 
 export interface Bem {
   (): string
   (mods: BemMods): string
   (element: string, mods?: BemMods): string
-}
-
-function isBemModsArray(mods: BemMods): mods is readonly BemMods[] {
-  return Array.isArray(mods)
-}
-
-function collectBemMods(mods: BemMods, tokens: string[]): void {
-  if (!mods) {
-    return
-  }
-
-  if (isString(mods)) {
-    tokens.push(mods)
-    return
-  }
-
-  if (isBemModsArray(mods)) {
-    mods.forEach(item => collectBemMods(item, tokens))
-    return
-  }
-
-  if (isPlainObject(mods)) {
-    Object.keys(mods).forEach(key => {
-      if (mods[key]) {
-        tokens.push(key)
-      }
-    })
-  }
 }
 
 function resolveBemMods(base: string, namespaceModPrefix: string, mods?: BemMods): string {
@@ -44,7 +15,7 @@ function resolveBemMods(base: string, namespaceModPrefix: string, mods?: BemMods
   }
 
   const tokens: string[] = []
-  collectBemMods(mods, tokens)
+  collectClassNames(tokens, mods)
 
   if (tokens.length === 0) {
     return base
