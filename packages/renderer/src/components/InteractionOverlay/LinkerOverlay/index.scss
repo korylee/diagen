@@ -1,0 +1,52 @@
+.dg-linker-overlay {
+  &__panel {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    border-radius: 10px;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+    pointer-events: auto;
+    z-index: 1002;
+
+    &--left {
+      transform: translate(-100%, 0);
+    }
+    &--top {
+      transform: translate(-50%, -100%);
+    }
+    &--bottom {
+      transform: translate(-50%, 0);
+    }
+  }
+
+  &__panel-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 10px;
+    min-width: 88px;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 8px;
+    background: #fff;
+    color: #0f172a;
+    cursor: crosshair;
+    font-size: 12px;
+    line-height: 16px;
+  }
+
+  &__from-endpoint,
+  &__to-endpoint {
+    width: var(--dg-anchor-size);
+    height: var(--dg-anchor-size);
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: var(--dg-anchor-background);
+    border: var(--dg-anchor-border);
+    cursor: crosshair;
+    pointer-events: auto;
+  }
+}

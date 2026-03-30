@@ -2,7 +2,7 @@
  * 核心模型类型定义
  */
 
-import { RotatableBounds } from '@diagen/shared'
+import type { RotatableBounds } from '@diagen/shared'
 import type {
   ArrowStyle,
   ElementType,

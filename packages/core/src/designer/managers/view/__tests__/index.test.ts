@@ -1,6 +1,6 @@
 import { createRoot } from 'solid-js'
 import { describe, expect, it } from 'vitest'
-import { lineIntersectsBounds } from '@diagen/shared'
+import { isIntersects } from '@diagen/shared'
 import { createLinker, createShape, type ShapeElement } from '../../../../model'
 import { createDesigner } from '../../../create'
 
@@ -141,7 +141,7 @@ describe('view manager', () => {
       const blockerBounds = designer.view.getShapeBounds(blocker)
       const intersects = layout.route.points.some((point, index, points) => {
         if (index === points.length - 1) return false
-        return lineIntersectsBounds(point, points[index + 1], blockerBounds)
+        return isIntersects([point, points[index + 1]], blockerBounds)
       })
 
       expect(intersects).toBe(false)
@@ -169,7 +169,7 @@ describe('view manager', () => {
       const blockerBounds = designer.view.getShapeBounds(blocker)
       const intersects = layout.route.points.some((point, index, points) => {
         if (index === points.length - 1) return false
-        return lineIntersectsBounds(point, points[index + 1], blockerBounds)
+        return isIntersects([point, points[index + 1]], blockerBounds)
       })
 
       expect(initialLayout.route.points).not.toEqual(layout.route.points)
@@ -200,7 +200,7 @@ describe('view manager', () => {
       const blockerBounds = designer.view.getShapeBounds(blocker)
       const intersects = layout.route.points.some((point, index, points) => {
         if (index === points.length - 1) return false
-        return lineIntersectsBounds(point, points[index + 1], blockerBounds)
+        return isIntersects([point, points[index + 1]], blockerBounds)
       })
 
       expect(intersects).toBe(true)

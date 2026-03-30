@@ -1,5 +1,5 @@
 import type { Bounds, Point } from '@diagen/shared'
-import { expandBounds, lineIntersectsBounds } from '@diagen/shared'
+import { expandBounds, isIntersects } from '@diagen/shared'
 
 export function euclideanDistance(p1: Point, p2: Point): number {
   const dx = p2.x - p1.x
@@ -106,7 +106,7 @@ export function isRouteValid(route: Point[], obstacles: Obstacle[]): boolean {
   for (let i = 0; i < route.length - 1; i++) {
     for (const obstacle of obstacles) {
       const expanded = expandBounds(obstacle.bounds, obstacle.padding)
-      if (lineIntersectsBounds(route[i], route[i + 1], expanded)) {
+      if (isIntersects([route[i], route[i + 1]], expanded)) {
         return false
       }
     }

@@ -4,6 +4,7 @@ import { createDevicePixelRatio } from '@diagen/primitives'
 import { createEffect, createMemo } from 'solid-js'
 import { useDesigner } from '../../components'
 import { renderLinker } from '../../utils'
+import { expandBounds } from '@diagen/shared'
 
 export interface LinkerCanvasProps {
   linker: LinkerElement
@@ -13,7 +14,6 @@ export function LinkerCanvas(props: LinkerCanvasProps) {
   const { view } = useDesigner()
   const pixelRatio = createDevicePixelRatio()
   const layout = createMemo(() => view.getLinkerLayout(props.linker))
-  const bounds = createMemo(() => layout().bounds)
 
   let canvasRef: HTMLCanvasElement | undefined
   let containerRef: HTMLDivElement | undefined
@@ -22,29 +22,23 @@ export function LinkerCanvas(props: LinkerCanvasProps) {
 
   /** 屏幕坐标系中的位置（DOM 定位用） */
   const screenBounds = createMemo(() => {
-    const vp = view.viewport()
-    const b = bounds()
+    const b = view.toCanvas(layout().bounds)
 
-    return {
-      x: b.x * vp.zoom + vp.x - padding,
-      y: b.y * vp.zoom + vp.y - padding,
-      w: b.w * vp.zoom + padding * 2,
-      h: b.h * vp.zoom + padding * 2,
-    }
+    return expandBounds(b, padding)
   })
 
   const renderFrame = createMemo(() => {
     const vp = view.viewport()
     const vpSize = view.viewportSize()
     const route = layout().route
-    const b = bounds()
+    const b = layout().bounds
     const rect = screenBounds()
     const ratio = pixelRatio()
     const width = Math.max(1, Math.ceil(rect.w))
     const height = Math.max(1, Math.ceil(rect.h))
 
     return {
-      visible: isBoundsVisible(b, vp, { width: vpSize.width, height: vpSize.height }),
+      visible: isBoundsVisible(b, vp, vpSize),
       route,
       bounds: b,
       zoom: vp.zoom,

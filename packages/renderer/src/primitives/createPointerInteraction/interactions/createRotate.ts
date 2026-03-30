@@ -1,7 +1,7 @@
 import { onCleanup } from 'solid-js'
 import { isRotatable, isShape } from '@diagen/core'
 import type { Point } from '@diagen/shared'
-import { getRotatedBoxBounds } from '@diagen/shared'
+import { getRotatedBounds, getAngle } from '@diagen/shared'
 import { useDesigner } from '../../../components'
 import type { EventToCanvas } from '../../createCoordinateService'
 import { createDragSession } from '../foundation/createDragSession'
@@ -17,10 +17,6 @@ export interface RotateDragState {
 export interface CreateRotateOptions extends CreatePointerDragTrackerOptions {
   eventToCanvas?: EventToCanvas
   snapStep?: number
-}
-
-function getAngleByPoint(point: Point, center: Point): number {
-  return (Math.atan2(point.y - center.y, point.x - center.x) * 180) / Math.PI
 }
 
 function normalizeAngle(angle: number): number {
@@ -57,7 +53,7 @@ export function createRotate(options: CreateRotateOptions = {}) {
         targetId: input.id,
         startAngle: shape.props.angle ?? 0,
         center,
-        startPointerAngle: getAngleByPoint(pointer, center),
+        startPointerAngle: getAngle(pointer, center),
       }
     },
     update: ({ state, event }) => {
@@ -70,7 +66,7 @@ export function createRotate(options: CreateRotateOptions = {}) {
       }
 
       const pointer = eventToCanvas(event)
-      const currentPointerAngle = getAngleByPoint(pointer, state.center)
+      const currentPointerAngle = getAngle(pointer, state.center)
       const delta = normalizeDeltaAngle(currentPointerAngle - state.startPointerAngle)
 
       let nextAngle = normalizeAngle(state.startAngle + delta)
@@ -79,22 +75,16 @@ export function createRotate(options: CreateRotateOptions = {}) {
         nextAngle = normalizeAngle(nextAngle)
       }
 
-      if (shape.props.angle === nextAngle) return
+      const { props } = shape
+      if (props.angle === nextAngle) return
 
-      edit.update(state.targetId, 'props', {
-        ...shape.props,
+      const b = {
+        ...props,
         angle: nextAngle,
-      })
+      }
+      edit.update(state.targetId, 'props', b)
 
-      view.scheduleAutoGrow(
-        getRotatedBoxBounds({
-          x: shape.props.x,
-          y: shape.props.y,
-          w: shape.props.w,
-          h: shape.props.h,
-          angle: nextAngle,
-        }),
-      )
+      view.scheduleAutoGrow(getRotatedBounds(b))
     },
     onCommit: () => {
       view.flushAutoGrow()

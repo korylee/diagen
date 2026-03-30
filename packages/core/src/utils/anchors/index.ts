@@ -3,7 +3,7 @@
  * 用于计算图形锚点（连线连接点）的位置
  */
 
-import type { Point } from '@diagen/shared'
+import { getDistance, isSamePoint, rotatePoint, type Point } from '@diagen/shared'
 import type { Anchor, LinkerEndpointBinding, ShapeElement } from '../../model'
 import { evaluateExpression, resolvePoints } from '../expression'
 
@@ -50,12 +50,6 @@ interface ShapePerimeterSegment {
   toCanvas: Point
 }
 
-interface SegmentProjection {
-  t: number
-  point: Point
-  distance: number
-}
-
 function toRadians(angle: number): number {
   return (angle * Math.PI) / 180
 }
@@ -65,10 +59,6 @@ function normalizeAngle(angle: number): number {
   while (value <= -Math.PI) value += Math.PI * 2
   while (value > Math.PI) value -= Math.PI * 2
   return value
-}
-
-function isSamePoint(a: Point, b: Point): boolean {
-  return Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.y - b.y) < 1e-6
 }
 
 function pushPoint(points: Point[], point: Point): void {
@@ -108,46 +98,18 @@ function sampleCubicBezier(p0: Point, p1: Point, p2: Point, p3: Point, segments:
   return points
 }
 
-function rotateVector(vector: Point, angle: number): Point {
-  if (!angle) return vector
-  const rad = toRadians(angle)
-  const cos = Math.cos(rad)
-  const sin = Math.sin(rad)
-  return {
-    x: vector.x * cos - vector.y * sin,
-    y: vector.x * sin + vector.y * cos,
-  }
-}
-
 function normalizeVector(vector: Point): Point | null {
   const len = Math.hypot(vector.x, vector.y)
   if (len <= 1e-8) return null
   return { x: vector.x / len, y: vector.y / len }
 }
 
-/**
- * 将相对图形坐标点绕图形中心旋转
- */
-export function rotatePointInBox(point: Point, w: number, h: number, angle: number = 0): Point {
-  if (!angle) return point
-  const rad = toRadians(angle)
-  const cos = Math.cos(rad)
-  const sin = Math.sin(rad)
-  const cx = w / 2
-  const cy = h / 2
-  const dx = point.x - cx
-  const dy = point.y - cy
-  return {
-    x: cx + dx * cos - dy * sin,
-    y: cy + dx * sin + dy * cos,
-  }
-}
-
 function localToCanvasPoint(shape: ShapeElement, point: Point): Point {
-  const rotated = rotatePointInBox(point, shape.props.w, shape.props.h, shape.props.angle)
+  const { y, x, w, h, angle } = shape.props
+  const rotated = rotatePoint(point, angle, { x: w / 2, y: h / 2 })
   return {
-    x: shape.props.x + rotated.x,
-    y: shape.props.y + rotated.y,
+    x: x + rotated.x,
+    y: y + rotated.y,
   }
 }
 
@@ -180,7 +142,8 @@ export function getShapeAnchors(shape: ShapeElement): Point[] {
   const { anchors, props } = shape
   const localAnchors = resolveAnchors(anchors, props.w, props.h)
   return localAnchors.map(anchor => {
-    const rotated = rotatePointInBox(anchor, props.w, props.h, props.angle)
+    const rotated = rotatePoint(anchor, props.angle, { x: props.w / 2, y: props.h / 2 })
+
     return {
       x: props.x + rotated.x,
       y: props.y + rotated.y,
@@ -194,13 +157,14 @@ export function getShapeAnchors(shape: ShapeElement): Point[] {
 export function getShapeAnchorPosition(shape: ShapeElement, anchorIndex: number): Point | null {
   if (!shape.anchors || anchorIndex < 0 || anchorIndex >= shape.anchors.length) return null
   const anchor = shape.anchors[anchorIndex]
-  const ax = evaluateExpression(anchor.x, shape.props.w, shape.props.h)
-  const ay = evaluateExpression(anchor.y, shape.props.w, shape.props.h)
-  const rotated = rotatePointInBox({ x: ax, y: ay }, shape.props.w, shape.props.h, shape.props.angle)
+  const { props } = shape
+  const ax = evaluateExpression(anchor.x, props.w, props.h)
+  const ay = evaluateExpression(anchor.y, props.w, props.h)
+  const rotated = rotatePoint({ x: ax, y: ay }, props.angle, { x: props.w / 2, y: props.h / 2 })
 
   return {
-    x: shape.props.x + rotated.x,
-    y: shape.props.y + rotated.y,
+    x: props.x + rotated.x,
+    y: props.y + rotated.y,
   }
 }
 
@@ -358,29 +322,29 @@ function resolveShapePerimeterSegments(shape: ShapeElement): ShapePerimeterSegme
   return segments
 }
 
-function projectPointToSegment(point: Point, from: Point, to: Point): SegmentProjection {
+function distancePointToSegment(point: Point, start: Point, end: Point): number {
+  const dx = end.x - start.x
+  const dy = end.y - start.y
+  const lengthSquared = dx * dx + dy * dy
+
+  if (lengthSquared === 0) return getDistance(point, start)
+
+  const t = ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared
+  const clampedT = Math.max(0, Math.min(1, t))
+
+  return getDistance(point, {
+    x: start.x + clampedT * dx,
+    y: start.y + clampedT * dy,
+  })
+}
+
+function getSegmentParam(point: Point, from: Point, to: Point): number {
   const dx = to.x - from.x
   const dy = to.y - from.y
-  const lenSq = dx * dx + dy * dy
-
-  if (lenSq <= 1e-8) {
-    return {
-      t: 0,
-      point: from,
-      distance: Math.hypot(point.x - from.x, point.y - from.y),
-    }
-  }
-
-  const t = Math.max(0, Math.min(1, ((point.x - from.x) * dx + (point.y - from.y) * dy) / lenSq))
-  const projected = {
-    x: from.x + t * dx,
-    y: from.y + t * dy,
-  }
-  return {
-    t,
-    point: projected,
-    distance: Math.hypot(point.x - projected.x, point.y - projected.y),
-  }
+  const lengthSquared = dx * dx + dy * dy
+  if (lengthSquared <= 1e-8) return 0
+  const t = ((point.x - from.x) * dx + (point.y - from.y) * dy) / lengthSquared
+  return Math.max(0, Math.min(1, t))
 }
 
 function isPointInPolygon(point: Point, points: Point[]): boolean {
@@ -392,7 +356,7 @@ function isPointInPolygon(point: Point, points: Point[]): boolean {
   for (let i = 0; i < points.length; i++) {
     const a = points[i]
     const b = points[j]
-    const onDifferentSides = (a.y > point.y) !== (b.y > point.y)
+    const onDifferentSides = a.y > point.y !== b.y > point.y
     if (onDifferentSides) {
       const intersectionX = ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x
       if (point.x < intersectionX) inside = !inside
@@ -478,7 +442,7 @@ function buildPerimeterInfo(
     x: segment.toLocal.x - segment.fromLocal.x,
     y: segment.toLocal.y - segment.fromLocal.y,
   }
-  const tangentCanvas = rotateVector(tangentLocal, shape.props.angle)
+  const tangentCanvas = rotatePoint(tangentLocal, shape.props.angle)
   const angle = resolveOutwardNormalAngle(shape, localPoint, canvasPoint, tangentLocal, tangentCanvas, paths)
   if (angle === null) return null
 
@@ -507,10 +471,13 @@ export function getShapePerimeterInfo(shape: ShapeElement, point: Point): ShapeP
   if (segments.length === 0) return null
 
   let bestSegment: ShapePerimeterSegment | null = null
-  let bestProjection: SegmentProjection | null = null
+  let bestProjection: { t: number; distance: number } | null = null
 
   for (const segment of segments) {
-    const projection = projectPointToSegment(point, segment.fromCanvas, segment.toCanvas)
+    const projection = {
+      t: getSegmentParam(point, segment.fromCanvas, segment.toCanvas),
+      distance: distancePointToSegment(point, segment.fromCanvas, segment.toCanvas),
+    }
     if (!bestProjection || projection.distance < bestProjection.distance) {
       bestProjection = projection
       bestSegment = segment
@@ -656,10 +623,13 @@ export function resolvePreferredCreateAnchor(
   if (matched) return toPreferredFixedAnchor(matched)
   if (fixedAnchors.length === 0) return getShapePerimeterInfo(shape, reference)
 
-  const bestAnchor = fixedAnchors.reduce((best, anchor) => {
-    if (!best) return anchor
-    return comparePreferredFixedAnchors(anchor, best, reference) < 0 ? anchor : best
-  }, null as ShapeAnchorInfo | null)
+  const bestAnchor = fixedAnchors.reduce(
+    (best, anchor) => {
+      if (!best) return anchor
+      return comparePreferredFixedAnchors(anchor, best, reference) < 0 ? anchor : best
+    },
+    null as ShapeAnchorInfo | null,
+  )
 
   return bestAnchor ? toPreferredFixedAnchor(bestAnchor) : getShapePerimeterInfo(shape, reference)
 }

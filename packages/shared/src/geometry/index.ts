@@ -8,28 +8,15 @@ export interface Size {
   height: number
 }
 
-export interface Bounds extends Point {
+export interface Box {
   w: number
   h: number
 }
 
+export interface Bounds extends Point, Box {}
+
 export interface RotatableBounds extends Bounds {
   angle?: number
-}
-
-export interface Rect extends Point, Size {}
-
-export interface Line {
-  x1: number
-  y1: number
-  x2: number
-  y2: number
-}
-
-export interface Circle {
-  cx: number
-  cy: number
-  r: number
 }
 
 export function getDistance(p1: Point, p2: Point): number {
@@ -38,14 +25,16 @@ export function getDistance(p1: Point, p2: Point): number {
   return Math.sqrt(dx * dx + dy * dy)
 }
 
-export function getDistanceSquared(p1: Point, p2: Point): number {
-  const dx = p2.x - p1.x
-  const dy = p2.y - p1.y
-  return dx * dx + dy * dy
+export function isSamePoint(a: Point, b: Point): boolean {
+  return Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.y - b.y) < 1e-6
 }
 
 export function isPointInBounds(point: Point, b: Bounds): boolean {
   return point.x >= b.x && point.x <= b.x + b.w && point.y >= b.y && point.y <= b.y + b.h
+}
+
+function toRadians(angle: number): number {
+  return (angle * Math.PI) / 180
 }
 
 export function isPointInRotatedBounds(point: Point, b: Bounds, angle: number): boolean {
@@ -56,7 +45,7 @@ export function isPointInRotatedBounds(point: Point, b: Bounds, angle: number): 
   const px = point.x - cx
   const py = point.y - cy
 
-  const rad = (-angle * Math.PI) / 180
+  const rad = toRadians(-angle)
   const cos = Math.cos(rad)
   const sin = Math.sin(rad)
   const rx = px * cos - py * sin
@@ -65,13 +54,13 @@ export function isPointInRotatedBounds(point: Point, b: Bounds, angle: number): 
   return rx >= -b.w / 2 && rx <= b.w / 2 && ry >= -b.h / 2 && ry <= b.h / 2
 }
 
-export function getRotatedBoxBounds(bounds: RotatableBounds): Bounds {
+export function getRotatedBounds(bounds: RotatableBounds): Bounds {
   const { x, y, w, h, angle = 0 } = bounds
   if (!angle) {
     return { x, y, w, h }
   }
 
-  const rad = (angle * Math.PI) / 180
+  const rad = toRadians(angle)
   const cos = Math.cos(rad)
   const sin = Math.sin(rad)
   const cx = x + w / 2
@@ -108,7 +97,7 @@ export function getRotatedBoxBounds(bounds: RotatableBounds): Bounds {
   }
 }
 
-export function getBoundsCenter(b: Bounds): Point {
+export function boundsCenter(b: Bounds): Point {
   return { x: b.x + b.w / 2, y: b.y + b.h / 2 }
 }
 
@@ -136,68 +125,23 @@ export function unionBounds(rect1: Bounds, rect2: Bounds): Bounds {
   }
 }
 
-export function isBoundsIntersect(rect1: Bounds, rect2: Bounds): boolean {
-  return !(
-    rect1.x + rect1.w < rect2.x ||
-    rect2.x + rect2.w < rect1.x ||
-    rect1.y + rect1.h < rect2.y ||
-    rect2.y + rect2.h < rect1.y
-  )
-}
-
-export function getBoundsIntersection(rect1: Bounds, rect2: Bounds): Bounds | null {
-  const x = Math.max(rect1.x, rect2.x)
-  const y = Math.max(rect1.y, rect2.y)
-  const right = Math.min(rect1.x + rect1.w, rect2.x + rect2.w)
-  const bottom = Math.min(rect1.y + rect1.h, rect2.y + rect2.h)
-
-  if (right > x && bottom > y) {
-    return { x, y, w: right - x, h: bottom - y }
-  }
-  return null
-}
-
-export function isPointNearLine(point: Point, line: Line, threshold: number = 5): boolean {
-  const { x1, y1, x2, y2 } = line
-  const dx = x2 - x1
-  const dy = y2 - y1
-  const px = point.x - x1
-  const py = point.y - y1
-  const lineLengthSquared = dx * dx + dy * dy
-
-  if (lineLengthSquared === 0) return getDistance(point, { x: x1, y: y1 }) <= threshold
-
-  let t = (px * dx + py * dy) / lineLengthSquared
-  t = Math.max(0, Math.min(1, t))
-
-  return getDistance(point, { x: x1 + t * dx, y: y1 + t * dy }) <= threshold
-}
-
 export function getAngle(p1: Point, p2: Point): number {
   return Math.atan2(p2.y - p1.y, p2.x - p1.x) * (180 / Math.PI)
 }
 
-export function rotatePoint(point: Point, center: Point, angle: number): Point {
-  const rad = (angle * Math.PI) / 180
+export function rotatePoint(point: Point, angle: number, center?: Point): Point {
+  const rad = toRadians(angle)
   const cos = Math.cos(rad)
   const sin = Math.sin(rad)
-  const dx = point.x - center.x
-  const dy = point.y - center.y
-  return {
-    x: center.x + dx * cos - dy * sin,
-    y: center.y + dx * sin + dy * cos,
-  }
-}
+  const cx = center?.x ?? 0
+  const cy = center?.y ?? 0
 
-export function scalePoint(point: Point, center: Point, scale: number): Point {
+  const dx = point.x - cx
+  const dy = point.y - cy
   return {
-    x: center.x + (point.x - center.x) * scale,
-    y: center.y + (point.y - center.y) * scale,
+    x: cx + dx * cos - dy * sin,
+    y: cy + dx * sin + dy * cos,
   }
-}
-
-export function manhattanDistance(p1: Point, p2: Point): number {
-  return Math.abs(p2.x - p1.x) + Math.abs(p2.y - p1.y)
 }
 
 export function expandBounds(bounds: Bounds, padding: number): Bounds {
@@ -209,25 +153,41 @@ export function expandBounds(bounds: Bounds, padding: number): Bounds {
   }
 }
 
-export function snapToGrid(value: number, gridSize: number): number {
-  return Math.round(value / gridSize) * gridSize
+export function isIntersects(a: Bounds | [Point, Point], b: Bounds | [Point, Point]): boolean {
+  const aIsLine = Array.isArray(a)
+  const bIsLine = Array.isArray(b)
+
+  if (aIsLine) {
+    return bIsLine ? lineIntersectsLine(a[0], a[1], b[0], b[1]) : lineIntersectsBounds(a[0], a[1], b as Bounds)
+  }
+  return bIsLine ? lineIntersectsBounds(b[0], b[1], a as Bounds) : boundsIntersectBounds(a as Bounds, b as Bounds)
 }
 
-export function lineIntersectsBounds(p1: Point, p2: Point, bounds: Bounds): boolean {
+function boundsIntersectBounds(rect1: Bounds, rect2: Bounds): boolean {
+  return !(
+    rect1.x + rect1.w < rect2.x ||
+    rect2.x + rect2.w < rect1.x ||
+    rect1.y + rect1.h < rect2.y ||
+    rect2.y + rect2.h < rect1.y
+  )
+}
+
+function lineIntersectsBounds(p1: Point, p2: Point, bounds: Bounds): boolean {
   if (isPointInBounds(p1, bounds) || isPointInBounds(p2, bounds)) {
     return true
   }
 
-  const left = bounds.x
-  const right = bounds.x + bounds.w
-  const top = bounds.y
-  const bottom = bounds.y + bounds.h
+  const { x, y, w, h } = bounds
+  const tl: Point = { x, y }
+  const tr: Point = { x: x + w, y }
+  const br: Point = { x: x + w, y: y + h }
+  const bl: Point = { x, y: y + h }
 
   return (
-    lineIntersectsLine(p1, p2, { x: left, y: top }, { x: right, y: top }) ||
-    lineIntersectsLine(p1, p2, { x: right, y: top }, { x: right, y: bottom }) ||
-    lineIntersectsLine(p1, p2, { x: right, y: bottom }, { x: left, y: bottom }) ||
-    lineIntersectsLine(p1, p2, { x: left, y: bottom }, { x: left, y: top })
+    lineIntersectsLine(p1, p2, tl, tr) ||
+    lineIntersectsLine(p1, p2, tr, br) ||
+    lineIntersectsLine(p1, p2, br, bl) ||
+    lineIntersectsLine(p1, p2, bl, tl)
   )
 }
 
@@ -237,7 +197,7 @@ function lineIntersectsLine(p1: Point, p2: Point, p3: Point, p4: Point): boolean
   const d3 = direction(p1, p2, p3)
   const d4 = direction(p1, p2, p4)
 
-  if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) {
+  if (d1 * d2 < 0 && d3 * d4 < 0) {
     return true
   }
 

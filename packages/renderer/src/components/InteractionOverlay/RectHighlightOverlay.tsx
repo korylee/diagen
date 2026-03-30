@@ -1,5 +1,5 @@
-import { createMemo, For, Show } from 'solid-js'
-import type { Bounds } from '@diagen/shared'
+import { expandBounds, type Bounds } from '@diagen/shared'
+import { For, Show } from 'solid-js'
 
 export interface RectHighlightItem {
   id: string
@@ -8,7 +8,7 @@ export interface RectHighlightItem {
   background?: string
   boxShadow?: string
   opacity?: number
-  inset?: number
+  padding?: number
   radius?: number
   dataAttrs?: Record<string, string | undefined>
 }
@@ -19,27 +19,14 @@ export interface RectHighlightOverlayProps {
   zIndex?: number
 }
 
-function resolveRectHighlightBounds(bounds: Bounds, inset = 0): Bounds {
-  return {
-    x: bounds.x + inset,
-    y: bounds.y + inset,
-    w: Math.max(0, bounds.w - inset * 2),
-    h: Math.max(0, bounds.h - inset * 2),
-  }
-}
-
 /**
  * 通用矩形高亮层：
  * - 只负责渲染屏幕坐标系下的矩形高亮
  * - 上层可自行决定来源是 bounds、shapeId 或其他语义对象
  */
 export function RectHighlightOverlay(props: RectHighlightOverlayProps) {
-  const shouldRender = createMemo(() => {
-    return (props.visible ?? true) && props.items.length > 0
-  })
-
   return (
-    <Show when={shouldRender()}>
+    <Show when={(props.visible ?? true) && props.items.length > 0}>
       <div
         style={{
           position: 'absolute',
@@ -53,7 +40,7 @@ export function RectHighlightOverlay(props: RectHighlightOverlayProps) {
       >
         <For each={props.items}>
           {item => {
-            const bounds = resolveRectHighlightBounds(item.bounds, item.inset)
+            const bounds = item.padding ? expandBounds(item.bounds, item.padding!) : item.bounds
             return (
               <div
                 {...(item.dataAttrs ?? {})}

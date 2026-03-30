@@ -1,5 +1,5 @@
 import type { LinkerElement, LinkerRoute } from '@diagen/core'
-import { clamp, getDistance, type Point } from '@diagen/shared'
+import { getDistance, type Point } from '@diagen/shared'
 
 export type LinkerHitType = 'from' | 'to' | 'control' | 'segment' | 'line'
 
@@ -76,21 +76,18 @@ export function hitTestLinker(
   return null
 }
 
-function distancePointToSegment(p: Point, a: Point, b: Point): number {
-  const dx = b.x - a.x
-  const dy = b.y - a.y
-  const lenSq = dx * dx + dy * dy
+function distancePointToSegment(point: Point, start: Point, end: Point): number {
+  const dx = end.x - start.x
+  const dy = end.y - start.y
+  const lengthSquared = dx * dx + dy * dy
 
-  if (lenSq === 0) {
-    return getDistance(p, a)
-  }
+  if (lengthSquared === 0) return getDistance(point, start)
 
-  const t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq
-  const clamped = clamp(t, 0, 1)
-  const projected: Point = {
-    x: a.x + clamped * dx,
-    y: a.y + clamped * dy,
-  }
+  const t = ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared
+  const clampedT = Math.max(0, Math.min(1, t))
 
-  return getDistance(p, projected)
+  return getDistance(point, {
+    x: start.x + clampedT * dx,
+    y: start.y + clampedT * dy,
+  })
 }

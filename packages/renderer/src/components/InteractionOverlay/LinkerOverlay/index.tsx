@@ -1,9 +1,11 @@
-import { createMemo, For, Show } from 'solid-js'
 import { getShapeAnchorInfo, isLinker, isShape } from '@diagen/core'
-import type { Point } from '@diagen/shared'
+import { createDgBem, type Point } from '@diagen/shared'
+import { createMemo, For, Show } from 'solid-js'
 import { useDesigner } from '../../DesignerProvider'
 import { useInteraction } from '../../InteractionProvider'
 import { RectHighlightOverlay, type RectHighlightItem } from '../RectHighlightOverlay'
+
+import './index.scss'
 
 interface QuickCreateAction {
   id: string
@@ -35,35 +37,6 @@ const QUICK_CREATE_PANEL_OFFSETS: Record<QuickCreatePlacement, { x: number; y: n
   bottom: { x: 0, y: 10 },
 }
 
-const PANEL_STYLE = {
-  display: 'flex',
-  'flex-direction': 'column',
-  gap: '6px',
-  padding: '8px',
-  'border-radius': '10px',
-  border: '1px solid rgba(15, 23, 42, 0.12)',
-  background: 'rgba(255,255,255,0.96)',
-  'box-shadow': '0 10px 30px rgba(15, 23, 42, 0.12)',
-  'pointer-events': 'auto',
-  'z-index': 1002,
-} as const
-
-const BUTTON_STYLE = {
-  display: 'flex',
-  'align-items': 'center',
-  'justify-content': 'space-between',
-  gap: '10px',
-  padding: '6px 10px',
-  'min-width': '88px',
-  border: '1px solid rgba(148, 163, 184, 0.35)',
-  'border-radius': '8px',
-  background: '#fff',
-  color: '#0f172a',
-  cursor: 'crosshair',
-  'font-size': '12px',
-  'line-height': '16px',
-} as const
-
 const BADGE_STYLE = {
   width: '16px',
   height: '16px',
@@ -75,6 +48,8 @@ const BADGE_STYLE = {
   'justify-content': 'center',
   'font-size': '11px',
 } as const
+
+const bem = createDgBem('linker-overlay')
 
 export function LinkerOverlay() {
   const { selection, element, state, tool, view } = useDesigner()
@@ -150,7 +125,7 @@ export function LinkerOverlay() {
         bounds,
         border: 'var(--dg-hl-custom-outline-active)',
         background: 'var(--dg-hl-custom-bg-active)',
-        inset: -2,
+        padding: 2,
         dataAttrs: {
           'data-shape-highlight-id': shape.id,
           'data-shape-highlight-kind': 'link-source',
@@ -304,27 +279,35 @@ export function LinkerOverlay() {
       <RectHighlightOverlay items={sourceItems()} visible={sourceItems().length > 0} zIndex={998} />
 
       <Show when={quickCreatePanel()}>
-        {resolvedPanel => (
-          <div
-            style={resolvePanelStyle(resolvedPanel().origin.x, resolvedPanel().origin.y, resolvedPanel().placement)}
-            data-linker-create-panel="true"
-            data-quick-create-shape-id={resolvedPanel().shapeId}
-            data-quick-create-placement={resolvedPanel().placement}
-          >
-            <For each={resolvedPanel().actions}>
-              {action => (
-                <button
-                  type="button"
-                  style={BUTTON_STYLE}
-                  onMouseDown={e => startQuickCreate(e, resolvedPanel().shapeId, action.id)}
-                >
-                  <span>{action.label}</span>
-                  <span style={BADGE_STYLE}>+</span>
-                </button>
-              )}
-            </For>
-          </div>
-        )}
+        {resolvedPanel => {
+          const panel = resolvedPanel()
+          return (
+            <div
+              class={bem('panel', { [panel.placement]: true })}
+              style={{
+                position: 'absolute',
+                left: `${panel.origin.x}px`,
+                top: `${panel.origin.y}px`,
+              }}
+              data-linker-create-panel="true"
+              data-quick-create-shape-id={panel.shapeId}
+              data-quick-create-placement={panel.placement}
+            >
+              <For each={panel.actions}>
+                {action => (
+                  <button
+                    type="button"
+                    class={bem('panel-item')}
+                    onMouseDown={e => startQuickCreate(e, panel.shapeId, action.id)}
+                  >
+                    <span>{action.label}</span>
+                    <span style={BADGE_STYLE}>+</span>
+                  </button>
+                )}
+              </For>
+            </div>
+          )
+        }}
       </Show>
 
       <Show when={selectedLinker() && endpointHandles()}>
@@ -363,35 +346,21 @@ export function LinkerOverlay() {
             {handles => (
               <>
                 <div
+                  class={bem('from-endpoint')}
                   style={{
                     position: 'absolute',
                     left: `${handles().from.screen.x}px`,
                     top: `${handles().from.screen.y}px`,
-                    width: `var(--dg-anchor-size)`,
-                    height: `var(--dg-anchor-size)`,
-                    transform: 'translate(-50%, -50%)',
-                    'border-radius': '50%',
-                    background: 'var(--dg-anchor-background)',
-                    border: 'var(--dg-anchor-border)',
-                    cursor: 'crosshair',
-                    'pointer-events': 'auto',
                   }}
                   onMouseDown={e => startEndpointDrag(e, 'from')}
                 />
 
                 <div
+                  class={bem('to-endpoint')}
                   style={{
                     position: 'absolute',
                     left: `${handles().to.screen.x}px`,
                     top: `${handles().to.screen.y}px`,
-                    width: `var(--dg-anchor-size)`,
-                    height: `var(--dg-anchor-size)`,
-                    transform: 'translate(-50%, -50%)',
-                    'border-radius': '50%',
-                    background: 'var(--dg-anchor-background)',
-                    border: 'var(--dg-anchor-border)',
-                    cursor: 'crosshair',
-                    'pointer-events': 'auto',
                   }}
                   onMouseDown={e => startEndpointDrag(e, 'to')}
                 />
@@ -425,25 +394,6 @@ export function LinkerOverlay() {
       </Show>
     </>
   )
-}
-
-function resolvePanelStyle(x: number, y: number, placement: QuickCreatePlacement) {
-  const transform =
-    placement === 'left'
-      ? 'translate(-100%, 0)'
-      : placement === 'top'
-        ? 'translate(-50%, -100%)'
-        : placement === 'bottom'
-          ? 'translate(-50%, 0)'
-          : undefined
-
-  return {
-    ...PANEL_STYLE,
-    position: 'absolute',
-    left: `${x}px`,
-    top: `${y}px`,
-    transform,
-  } as const
 }
 
 function createRoutePath(points: Point[], linkerType: string): string {

@@ -1,7 +1,7 @@
 import type { ShapeElement } from '@diagen/core'
 import { isBoundsVisible } from '@diagen/core'
 import { createDevicePixelRatio } from '@diagen/primitives'
-import { getRotatedBoxBounds } from '@diagen/shared'
+import { expandBounds, getRotatedBounds } from '@diagen/shared'
 import { createEffect, createMemo } from 'solid-js'
 import { useDesigner } from '../../components'
 import { renderShape } from '../../utils'
@@ -16,20 +16,15 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
 
   const { selection, view } = useDesigner()
   const pixelRatio = createDevicePixelRatio()
-  const renderBounds = createMemo(() => getRotatedBoxBounds(props.shape.props))
+  const renderBounds = createMemo(() => getRotatedBounds(props.shape.props))
 
   const padding = 4
 
   /** 屏幕坐标系中的位置（DOM 定位用） */
   const getScreenBounds = createMemo(() => {
-    const vp = view.viewport()
-    const b = renderBounds()
-    return {
-      x: b.x * vp.zoom + vp.x - padding,
-      y: b.y * vp.zoom + vp.y - padding,
-      w: b.w * vp.zoom + padding * 2,
-      h: b.h * vp.zoom + padding * 2,
-    }
+    const b = view.toCanvas(renderBounds())
+
+    return expandBounds(b, padding)
   })
 
   const renderFrame = createMemo(() => {
@@ -41,7 +36,7 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
     const height = Math.max(1, Math.ceil(bounds.h))
 
     return {
-      visible: isBoundsVisible(rotatedBounds, vp, { width: vpSize.width, height: vpSize.height }),
+      visible: isBoundsVisible(rotatedBounds, vp, vpSize),
       zoom: vp.zoom,
       ratio: pixelRatio(),
       pixelWidth: width * pixelRatio(),

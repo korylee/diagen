@@ -1,28 +1,23 @@
-import { createEffect, createMemo, createSignal, JSX, onMount } from 'solid-js'
 import { DesignerToolState, Schema } from '@diagen/core'
 import { createEventListener, createKeyboard, createScroll } from '@diagen/primitives'
-import type { Point } from '@diagen/shared'
-import { createPointerInteraction } from '../primitives/createPointerInteraction'
-import { hitTestScene, type SceneHit, type SceneLinkerHit } from '../utils'
-import { DesignerGrids } from './DesignerGrids'
-import { useDesigner } from './DesignerProvider'
-import { InteractionOverlay } from './InteractionOverlay'
-import { InteractionProvider } from './InteractionProvider'
-import { createCoordinateService } from '../primitives/createCoordinateService'
+import { createDgBem, type Point } from '@diagen/shared'
+import { createEffect, createMemo, createSignal, JSX, onMount } from 'solid-js'
+import { CanvasRenderer } from '../../canvas'
+import { createCoordinateService } from '../../primitives/createCoordinateService'
+import { createPointerInteraction } from '../../primitives/createPointerInteraction'
+import { hitTestScene, type SceneHit, type SceneLinkerHit } from '../../utils'
+import { DesignerGrids } from '../DesignerGrids'
+import { useDesigner } from '../DesignerProvider'
+import { InteractionOverlay } from '../InteractionOverlay'
+import { InteractionProvider } from '../InteractionProvider'
+
+import './index.scss'
+import { isServer } from 'solid-js/web'
 
 const EDGE_AUTO_SCROLL_GAP = 28
 const EDGE_AUTO_SCROLL_MAX_STEP = 26
 
-type ContainerCursor = 'default' | 'crosshair' | 'grabbing'
-
-type ScenePrimaryIntent =
-  | { type: 'create-shape'; shapeId: string; continuous: boolean; point: Point }
-  | { type: 'create-linker'; linkerId: string; continuous: boolean; point: Point; sceneHit: SceneHit | null }
-  | { type: 'edit-linker'; point: Point; sceneHit: SceneLinkerHit }
-  | { type: 'interact-shape'; point: Point; shapeId: string }
-  | { type: 'blank' }
-
-function resolveContainerCursor(params: { isGrabbing: boolean; toolType: DesignerToolState['type'] }): ContainerCursor {
+function getCursor(params: { isGrabbing: boolean; toolType: DesignerToolState['type'] }) {
   const { isGrabbing, toolType } = params
   if (isGrabbing) return 'grabbing'
 
@@ -33,11 +28,7 @@ function resolveContainerCursor(params: { isGrabbing: boolean; toolType: Designe
   return 'default'
 }
 
-function resolveScenePrimaryIntent(params: {
-  tool: DesignerToolState
-  point: Point
-  sceneHit: SceneHit | null
-}): ScenePrimaryIntent {
+function resolveScenePrimaryIntent(params: { tool: DesignerToolState; point: Point; sceneHit: SceneHit | null }) {
   const { tool, point, sceneHit } = params
 
   if (tool.type === 'create-shape') {
@@ -46,7 +37,7 @@ function resolveScenePrimaryIntent(params: {
       point,
       shapeId: tool.shapeId,
       continuous: tool.continuous,
-    }
+    } as const
   }
 
   if (tool.type === 'create-linker') {
@@ -56,7 +47,7 @@ function resolveScenePrimaryIntent(params: {
       linkerId: tool.linkerId,
       continuous: tool.continuous,
       sceneHit,
-    }
+    } as const
   }
 
   if (sceneHit?.type === 'linker') {
@@ -64,7 +55,7 @@ function resolveScenePrimaryIntent(params: {
       type: 'edit-linker',
       point,
       sceneHit,
-    }
+    } as const
   }
 
   if (sceneHit?.type === 'shape') {
@@ -72,14 +63,18 @@ function resolveScenePrimaryIntent(params: {
       type: 'interact-shape',
       point,
       shapeId: sceneHit.element.id,
-    }
+    } as const
   }
 
-  return { type: 'blank' }
+  return { type: 'blank' } as const
 }
 
-export function RendererContainer(props: {
-  children: JSX.Element
+type ScenePrimaryIntent = ReturnType<typeof resolveScenePrimaryIntent>
+
+const bem = createDgBem('renderer')
+
+export function Renderer(props: {
+  children?: JSX.Element
   /** Optional class name for styling */
   class?: string
   /** Optional inline styles */
@@ -89,14 +84,13 @@ export function RendererContainer(props: {
   /** resize 吸附容差（画布坐标） */
   resizeGuideTolerance?: number
 }) {
-  const designer = useDesigner()
-  const { selection, edit, view, state, history, tool, clipboard } = designer
+  const { element, selection, edit, view, state, history, tool, clipboard } = useDesigner()
 
   const [viewportRef, setViewportRef] = createSignal<HTMLDivElement | null>(null)
-  const [sceneLayerRef, setSceneLayerRef] = createSignal<HTMLDivElement | null>(null)
+  const [sceneRef, setSceneRef] = createSignal<HTMLDivElement | null>(null)
   const coordinate = createCoordinateService({
     viewportRef,
-    sceneLayerRef,
+    sceneLayerRef: sceneRef,
   })
   const pointer = createPointerInteraction({
     coordinate,
@@ -158,20 +152,20 @@ export function RendererContainer(props: {
       position: 'relative',
       'background-color': `var(--dg-page-background)`,
       'box-sizing': 'content-box',
-      cursor: resolveContainerCursor({
+      cursor: getCursor({
         isGrabbing: pointer.machine.shouldShowGrabbingCursor(),
         toolType: state.tool.type,
       }),
     } as const
   })
-  const layerStyle = createMemo(() => {
+  const canvasStyle = createMemo(() => {
     const { containerSize } = state
     const { viewport } = view
 
     return {
       position: 'relative' as const,
-      background: `var(--dg-page-background)`,
       overflow: 'visible',
+      background: `var(--dg-page-background)`,
       'box-shadow': `var(--dg-page-shadow)`,
       'z-index': 0,
       width: `${containerSize.width}px`,
@@ -180,7 +174,7 @@ export function RendererContainer(props: {
       'transform-origin': '0 0',
     }
   })
-  const sceneLayerStyle = createMemo(() => {
+  const sceneStyle = createMemo(() => {
     const { containerSize, config } = state
     return {
       position: 'absolute' as const,
@@ -192,9 +186,9 @@ export function RendererContainer(props: {
       'z-index': 1,
     }
   })
-  const overlayLayerStyle = createMemo(() => {
+  const overlayStyle = createMemo(() => {
     return {
-      ...sceneLayerStyle(),
+      ...sceneStyle(),
       'z-index': 2,
       'pointer-events': 'none',
     } as const
@@ -215,7 +209,11 @@ export function RendererContainer(props: {
     }
   }
 
-  const handleCreateShapeDown = (e: MouseEvent, shapeId: string, continuous: boolean, point: Point): boolean => {
+  const handleCreateShapeDown = (
+    e: MouseEvent,
+    intent: Extract<ScenePrimaryIntent, { type: 'create-shape' }>,
+  ): boolean => {
+    const { shapeId, continuous, point } = intent
     const definition = Schema.getShape(shapeId)
     if (!definition) return false
 
@@ -247,11 +245,9 @@ export function RendererContainer(props: {
 
   const handleCreateLinkerDown = (
     e: MouseEvent,
-    point: Point,
-    linkerId: string,
-    continuous: boolean,
-    sceneHit: SceneHit | null,
+    intent: Extract<ScenePrimaryIntent, { type: 'create-linker' }>,
   ): boolean => {
+    const { point, linkerId, continuous, sceneHit } = intent
     e.stopPropagation()
     e.preventDefault()
 
@@ -279,7 +275,11 @@ export function RendererContainer(props: {
     return started
   }
 
-  const handleLinkerPrimaryDown = (e: MouseEvent, point: Point, sceneHit: SceneLinkerHit): boolean => {
+  const handleLinkerPrimaryDown = (
+    e: MouseEvent,
+    intent: Extract<ScenePrimaryIntent, { type: 'edit-linker' }>,
+  ): boolean => {
+    const { point, sceneHit } = intent
     e.stopPropagation()
     e.preventDefault()
     applySelection(sceneHit.element.id, e)
@@ -291,7 +291,11 @@ export function RendererContainer(props: {
     })
   }
 
-  const handleShapePrimaryDown = (e: MouseEvent, point: Point, shapeId: string): boolean => {
+  const handleShapePrimaryDown = (
+    e: MouseEvent,
+    intent: Extract<ScenePrimaryIntent, { type: 'interact-shape' }>,
+  ): boolean => {
+    const { point, shapeId } = intent
     e.stopPropagation()
     e.preventDefault()
 
@@ -312,30 +316,18 @@ export function RendererContainer(props: {
   }
 
   const getSceneHit = (point: Point): SceneHit | null =>
-    hitTestScene(designer.element.elements(), point, {
+    hitTestScene(element.elements(), point, {
       zoom: view.viewport().zoom,
       getLinkerLayout: linker => view.getLinkerLayout(linker),
     })
 
-  const handleResolvedScenePrimaryDown = (
-    e: MouseEvent,
-    intent: ReturnType<typeof resolveScenePrimaryIntent>,
-  ): boolean => {
-    switch (intent.type) {
-      case 'create-shape':
-        return handleCreateShapeDown(e, intent.shapeId, intent.continuous, intent.point)
-      case 'create-linker':
-        return handleCreateLinkerDown(e, intent.point, intent.linkerId, intent.continuous, intent.sceneHit)
-      case 'edit-linker':
-        return handleLinkerPrimaryDown(e, intent.point, intent.sceneHit)
-      case 'interact-shape':
-        return handleShapePrimaryDown(e, intent.point, intent.shapeId)
-      case 'blank':
-        return handleBlankPrimaryDown(e)
-      default:
-        return false
-    }
-  }
+  const PrimaryDownMap = {
+    'create-shape': handleCreateShapeDown,
+    'create-linker': handleCreateLinkerDown,
+    'edit-linker': handleLinkerPrimaryDown,
+    'interact-shape': handleShapePrimaryDown,
+    blank: handleBlankPrimaryDown,
+  } as const
 
   const handleSceneMouseDown = (e: MouseEvent): boolean => {
     if (e.button !== 0) return false
@@ -350,7 +342,9 @@ export function RendererContainer(props: {
       sceneHit,
     })
 
-    return handleResolvedScenePrimaryDown(e, intent)
+    const handle = PrimaryDownMap[intent.type]
+    if (!handle) return false
+    return handle(e, intent as any)
   }
 
   const calcEdgeStep = (distanceToEdge: number): number => {
@@ -416,20 +410,14 @@ export function RendererContainer(props: {
     }
   }
 
-  createEventListener(
-    () => window,
-    'mousemove',
-    e => {
+  if (!isServer) {
+    createEventListener(window, 'mousemove', e => {
       onMouseMove(e)
-    },
-  )
-  createEventListener(
-    () => window,
-    'mouseup',
-    () => {
+    })
+    createEventListener(window, 'mouseup', () => {
       onMouseUp()
-    },
-  )
+    })
+  }
 
   createEffect(() => {
     const { width, height } = coordinate.viewportRect()
@@ -446,37 +434,36 @@ export function RendererContainer(props: {
 
   return (
     <InteractionProvider interaction={interaction}>
-      <div
-        ref={setViewportRef}
-        class="designer-viewport"
-        style="overflow: scroll;position: relative;z-index: 0;background: #eaecee;height: 900px;"
-      >
+      <div ref={setViewportRef} class={bem('viewport')}>
         {/*滚动容器*/}
         <div
           style={containerStyle()}
-          class="designer-container"
+          class={bem('container')}
           onMouseDown={onMouseDown}
           on:wheel={{ passive: false, handleEvent: onWheel }}
         >
           {/*世界层（canvas 坐标，交给 transform 处理）*/}
-          <div style={layerStyle()} class="designer-layer">
+          <div style={canvasStyle()} class={bem('canvas')}>
             <DesignerGrids />
           </div>
 
           {/*渲染层（屏幕坐标，不做 transform）*/}
           <div
-            ref={setSceneLayerRef}
-            style={sceneLayerStyle()}
+            ref={setSceneRef}
+            class={bem('scene')}
+            style={sceneStyle()}
             on:mousedown={e => {
               handleSceneMouseDown(e)
             }}
           >
-            {props.children}
+            <CanvasRenderer />
           </div>
 
           {/*交互覆盖层（屏幕坐标，不做 transform）*/}
-          <div style={overlayLayerStyle()}>
+          <div class={bem('overlay')} style={overlayStyle()}>
             <InteractionOverlay />
+
+            {props.children}
           </div>
         </div>
       </div>

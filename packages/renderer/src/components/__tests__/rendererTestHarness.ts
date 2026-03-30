@@ -1,9 +1,9 @@
 import { batch, createComponent, createEffect } from 'solid-js'
 import { render } from 'solid-js/web'
 import { createDesigner, createShape, type Designer, type ShapeElement } from '@diagen/core'
-import type { Point } from '@diagen/shared'
+import { createDgBem, type Point } from '@diagen/shared'
 import { DesignerProvider } from '../DesignerProvider'
-import { RendererContainer } from '../RendererContainer'
+import { Renderer } from '../Renderer'
 import { useInteraction } from '../InteractionProvider'
 
 interface RectLike {
@@ -135,7 +135,7 @@ function HarnessApp(props: {
   return createComponent(DesignerProvider, {
     designer,
     get children() {
-      return createComponent(RendererContainer, {
+      return createComponent(Renderer, {
         get children() {
           return createComponent(InteractionProbe, {
             onReady: interaction => {
@@ -150,6 +150,8 @@ function HarnessApp(props: {
     },
   })
 }
+
+const bem = createDgBem('renderer')
 
 export async function createRendererTestHarness(options: CreateRendererTestHarnessOptions = {}): Promise<{
   designer: Designer
@@ -195,11 +197,10 @@ export async function createRendererTestHarness(options: CreateRendererTestHarne
 
   await flushEffects()
 
-  const viewportCandidate = host.querySelector('.designer-viewport')
-  const containerCandidate = host.querySelector('.designer-container')
-  const probe = host.querySelector('[data-testid="renderer-test-probe"]')
-  const sceneLayerCandidate = probe?.parentElement
-  const overlayLayerCandidate = sceneLayerCandidate?.nextElementSibling
+  const viewportCandidate = host.querySelector(`.${bem('viewport')}`)
+  const containerCandidate = host.querySelector(`.${bem('container')}`)
+  const sceneLayerCandidate = host.querySelector(`.${bem('scene')}`)
+  const overlayLayerCandidate = host.querySelector(`.${bem('overlay')}`)
 
   if (
     !viewportCandidate ||

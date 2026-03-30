@@ -1,5 +1,5 @@
 import { batch, createMemo, createSignal } from 'solid-js'
-import { type Bounds, isBoundsIntersect, type Point } from '@diagen/shared'
+import { type Bounds, isIntersects, type Point } from '@diagen/shared'
 import { useDesigner } from '../../../components'
 
 // ============================================================================
@@ -66,7 +66,7 @@ export function createSelection(options: { minSize?: number } = {}) {
     const ids: string[] = []
     for (const el of element.shapes()) {
       const elRect = { x: el.props.x, y: el.props.y, w: el.props.w, h: el.props.h }
-      if (isBoundsIntersect(r, elRect)) {
+      if (isIntersects(r, elRect)) {
         ids.push(el.id)
       }
     }

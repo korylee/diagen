@@ -1,6 +1,6 @@
 import { createSignal, onCleanup } from 'solid-js'
 import { calculateResizeGuideSnap, isShape, type GuideLine, type ShapeElement } from '@diagen/core'
-import { getRotatedBoxBounds } from '@diagen/shared'
+import { getRotatedBounds } from '@diagen/shared'
 import type { Bounds, Point } from '@diagen/shared'
 import { useDesigner } from '../../../components'
 import { type EventToCanvas } from '../../createCoordinateService'
@@ -99,7 +99,7 @@ export function createResize(
         },
       })
       view.scheduleAutoGrow(
-        getRotatedBoxBounds({
+        getRotatedBounds({
           x: snappedBounds.x,
           y: snappedBounds.y,
           w: snappedBounds.w,

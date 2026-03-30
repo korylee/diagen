@@ -16,7 +16,7 @@ function pointByAngle(center: { x: number; y: number }, angle: number, radius: n
   }
 }
 
-describe('RendererContainer', () => {
+describe('Renderer', () => {
   it('空白区域框选应选中命中的图形，并在结束后退出框选态', async () => {
     const harness = await createRendererTestHarness({
       shapes: [

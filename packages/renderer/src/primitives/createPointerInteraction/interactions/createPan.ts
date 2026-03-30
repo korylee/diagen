@@ -12,8 +12,7 @@ export function createPan(
   } = {},
 ) {
   const { button = 1 } = options
-  const designer = useDesigner()
-  const { view } = designer
+  const { state, view } = useDesigner()
 
   const [isActive, setIsActive] = createSignal(false)
   const [isSpacePressed, setIsSpacePressed] = createSignal(false)
@@ -39,8 +38,8 @@ export function createPan(
 
   const start = (e: MouseEvent): boolean => {
     if (isActive() || !canPan(e)) return false
-    const vp = designer.state.viewport
     batch(() => {
+      const vp = state.viewport
       setIsActive(true)
       setStartMouse({ x: e.clientX, y: e.clientY })
       setStartViewport({ x: vp.x, y: vp.y })

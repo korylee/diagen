@@ -1,5 +1,5 @@
 import type { Bounds, Point } from '@diagen/shared'
-import { createMinHeap, expandBounds, snapToGrid } from '@diagen/shared'
+import { createMinHeap, expandBounds } from '@diagen/shared'
 import type { Obstacle, RouteResult, RouterConfig } from './types'
 import { calculateBounds, simplifyOrthogonalPath } from './utils'
 
@@ -11,6 +11,11 @@ interface AStarNode {
   f: number
   parent: AStarNode | null
   direction: 'h' | 'v' | null
+}
+
+function snapToGrid(value: number, gridSize: number): number {
+  if (gridSize <= 0) return value
+  return Math.round(value / gridSize) * gridSize
 }
 
 export interface AStarRouteOptions {

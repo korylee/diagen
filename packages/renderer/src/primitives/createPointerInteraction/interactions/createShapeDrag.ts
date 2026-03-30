@@ -1,6 +1,6 @@
 import { calculateMoveGuideSnap, isShape, type GuideLine, type ShapeElement } from '@diagen/core'
 import type { Bounds, Point } from '@diagen/shared'
-import { getRotatedBoxBounds, unionBounds } from '@diagen/shared'
+import { getRotatedBounds, unionBounds } from '@diagen/shared'
 import { batch, createSignal, onCleanup } from 'solid-js'
 import { useDesigner } from '../../../components'
 import { type EventToCanvas } from '../../createCoordinateService'
@@ -139,7 +139,7 @@ export function createShapeDrag(options: UseShapeDragOptions = {}) {
           },
         })
 
-        const shapeBounds: Bounds = getRotatedBoxBounds({
+        const shapeBounds: Bounds = getRotatedBounds({
           x: nextX,
           y: nextY,
           w: target.startProps.w,
