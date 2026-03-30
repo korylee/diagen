@@ -7,7 +7,7 @@ const testContext = vi.hoisted(() => ({
   designer: null as ReturnType<typeof createDesigner> | null,
 }))
 
-vi.mock('../../components', () => ({
+vi.mock('../../../../components', () => ({
   useDesigner: () => {
     if (!testContext.designer) {
       throw new Error('designer context is not ready')
@@ -40,14 +40,14 @@ function withPan(
         reject(error)
       }
 
-    const designer = createDesigner({
-      autoGrow: {
-        enabled: false,
-      },
-    })
+      const designer = createDesigner({
+        autoGrow: {
+          enabled: false,
+        },
+      })
 
-    testContext.designer = designer
-    const pan = createPan(options)
+      testContext.designer = designer
+      const pan = createPan(options)
 
       Promise.resolve(run({ designer, pan })).then(finish, fail)
     })

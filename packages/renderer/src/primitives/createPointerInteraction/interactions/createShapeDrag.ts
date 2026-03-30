@@ -1,12 +1,13 @@
-import { batch, createSignal, onCleanup } from 'solid-js'
 import { calculateMoveGuideSnap, isShape, type GuideLine, type ShapeElement } from '@diagen/core'
-import { getRotatedBoxBounds, unionBounds } from '@diagen/shared'
 import type { Bounds, Point } from '@diagen/shared'
-import { useDesigner } from '../components'
-import { type EventToCanvas } from './createCoordinateService'
-import { createDragSession } from './createDragSession'
-import type { CreatePointerDragTrackerOptions } from './createPointerDragTracker'
-import { createPointerDeltaState } from './pointerDeltaState'
+import { getRotatedBoxBounds, unionBounds } from '@diagen/shared'
+import { batch, createSignal, onCleanup } from 'solid-js'
+import { useDesigner } from '../../../components'
+import { type EventToCanvas } from '../../createCoordinateService'
+import { createDragSession } from '../foundation/createDragSession'
+import { createPointerDeltaState } from '../foundation/createPointerDeltaState'
+import { type CreatePointerDragTrackerOptions } from '../foundation/createPointerDragTracker'
+
 
 export interface UseShapeDragOptions extends CreatePointerDragTrackerOptions {
   eventToCanvas?: EventToCanvas

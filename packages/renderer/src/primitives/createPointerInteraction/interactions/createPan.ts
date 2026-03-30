@@ -1,6 +1,6 @@
 import { batch, createSignal, onCleanup, onMount } from 'solid-js'
 import type { Point } from '@diagen/shared'
-import { useDesigner } from '../components'
+import { useDesigner } from '../../../components'
 
 // ============================================================================
 // 平移 Hook - 与 Designer 集成

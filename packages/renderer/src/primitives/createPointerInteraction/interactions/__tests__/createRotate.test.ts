@@ -7,7 +7,7 @@ const testContext = vi.hoisted(() => ({
   designer: null as ReturnType<typeof createDesigner> | null,
 }))
 
-vi.mock('../../components', () => ({
+vi.mock('../../../../components', () => ({
   useDesigner: () => {
     if (!testContext.designer) {
       throw new Error('designer context is not ready')
@@ -21,10 +21,7 @@ function withRotate(
     threshold?: number
     snapStep?: number
   },
-  run: (context: {
-    designer: ReturnType<typeof createDesigner>
-    rotate: ReturnType<typeof createRotate>
-  }) => void,
+  run: (context: { designer: ReturnType<typeof createDesigner>; rotate: ReturnType<typeof createRotate> }) => void,
 ) {
   createRoot(dispose => {
     const designer = createDesigner({

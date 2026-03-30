@@ -1,5 +1,9 @@
 import { createSignal } from 'solid-js'
-import { createPointerDragTracker, type CreatePointerDragTrackerOptions, type PointerDragMoveState } from './createPointerDragTracker'
+import {
+  createPointerDragTracker,
+  type CreatePointerDragTrackerOptions,
+  type PointerDragMoveState,
+} from './createPointerDragTracker'
 
 interface PointerEventLike {
   clientX: number

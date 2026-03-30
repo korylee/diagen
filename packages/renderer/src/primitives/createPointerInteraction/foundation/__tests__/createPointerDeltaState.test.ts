@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createPointerDeltaState } from '../pointerDeltaState'
+import { createPointerDeltaState } from '../createPointerDeltaState'
 
 describe('pointerDeltaState', () => {
   it('未提供 eventToCanvas 时应按屏幕位移和缩放计算 delta', () => {

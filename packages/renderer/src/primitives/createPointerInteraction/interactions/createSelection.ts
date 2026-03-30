@@ -1,6 +1,6 @@
 import { batch, createMemo, createSignal } from 'solid-js'
 import { type Bounds, isBoundsIntersect, type Point } from '@diagen/shared'
-import { useDesigner } from '../components'
+import { useDesigner } from '../../../components'
 
 // ============================================================================
 // 框选 Hook - 与 Designer 集成

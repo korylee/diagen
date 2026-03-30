@@ -7,7 +7,7 @@ const testContext = vi.hoisted(() => ({
   designer: null as ReturnType<typeof createDesigner> | null,
 }))
 
-vi.mock('../../components', () => ({
+vi.mock('../../../../components', () => ({
   useDesigner: () => {
     if (!testContext.designer) {
       throw new Error('designer context is not ready')
@@ -23,10 +23,7 @@ function withResize(
     minWidth?: number
     minHeight?: number
   },
-  run: (context: {
-    designer: ReturnType<typeof createDesigner>
-    resize: ReturnType<typeof createResize>
-  }) => void,
+  run: (context: { designer: ReturnType<typeof createDesigner>; resize: ReturnType<typeof createResize> }) => void,
 ) {
   createRoot(dispose => {
     const designer = createDesigner({

@@ -2,10 +2,10 @@ import { onCleanup } from 'solid-js'
 import { isRotatable, isShape } from '@diagen/core'
 import type { Point } from '@diagen/shared'
 import { getRotatedBoxBounds } from '@diagen/shared'
-import { useDesigner } from '../components'
-import type { EventToCanvas } from './createCoordinateService'
-import { createDragSession } from './createDragSession'
-import type { CreatePointerDragTrackerOptions } from './createPointerDragTracker'
+import { useDesigner } from '../../../components'
+import type { EventToCanvas } from '../../createCoordinateService'
+import { createDragSession } from '../foundation/createDragSession'
+import type { CreatePointerDragTrackerOptions } from '../foundation/createPointerDragTracker'
 
 export interface RotateDragState {
   targetId: string

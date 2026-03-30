@@ -2,11 +2,11 @@ import { createSignal, onCleanup } from 'solid-js'
 import { calculateResizeGuideSnap, isShape, type GuideLine, type ShapeElement } from '@diagen/core'
 import { getRotatedBoxBounds } from '@diagen/shared'
 import type { Bounds, Point } from '@diagen/shared'
-import { useDesigner } from '../components'
-import { type EventToCanvas } from './createCoordinateService'
-import { createDragSession } from './createDragSession'
-import type { CreatePointerDragTrackerOptions } from './createPointerDragTracker'
-import { createPointerDeltaState } from './pointerDeltaState'
+import { useDesigner } from '../../../components'
+import { type EventToCanvas } from '../../createCoordinateService'
+import { createDragSession } from '../foundation/createDragSession'
+import type { CreatePointerDragTrackerOptions } from '../foundation/createPointerDragTracker'
+import { createPointerDeltaState } from '../foundation/createPointerDeltaState'
 
 // ============================================================================
 // 调整大小 Hook - 与 Designer 集成

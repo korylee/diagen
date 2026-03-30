@@ -1,11 +1,11 @@
 import { createInteractionMachine } from './createInteractionMachine'
-import { createLinkerDrag } from './createLinkerDrag'
-import { createPan } from './createPan'
-import { createResize } from './createResize'
-import { createRotate } from './createRotate'
-import { createSelection } from './createSelection'
-import { createShapeDrag } from './createShapeDrag'
-import { CoordinateService } from './createCoordinateService'
+import { createLinkerDrag } from './interactions/createLinkerDrag'
+import { createPan } from './interactions/createPan'
+import { createResize } from './interactions/createResize'
+import { createRotate } from './interactions/createRotate'
+import { createSelection } from './interactions/createSelection'
+import { createShapeDrag } from './interactions/createShapeDrag'
+import type { CoordinateService } from '../createCoordinateService'
 
 export interface CreatePointerInteractionOptions {
   coordinate: CoordinateService

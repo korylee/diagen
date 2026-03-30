@@ -14,7 +14,7 @@ const testContext = vi.hoisted(() => ({
   designer: null as ReturnType<typeof createDesigner> | null,
 }))
 
-vi.mock('../../components', () => ({
+vi.mock('../../../../components', () => ({
   useDesigner: () => {
     if (!testContext.designer) {
       throw new Error('designer context is not ready')
@@ -122,7 +122,9 @@ describe('createLinkerDrag', () => {
 
       expect(started).toBe(true)
       expect(linkerDrag.state()?.mode).toBe('control')
-      expect(Array.from(designer.element.getElementById<LinkerElement>(linker.id)?.points ?? [])).toEqual([{ x: 50, y: 0 }])
+      expect(Array.from(designer.element.getElementById<LinkerElement>(linker.id)?.points ?? [])).toEqual([
+        { x: 50, y: 0 },
+      ])
 
       linkerDrag.end()
 

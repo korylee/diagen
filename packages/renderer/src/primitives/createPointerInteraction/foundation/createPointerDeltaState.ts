@@ -1,15 +1,12 @@
 import type { Point } from '@diagen/shared'
-import type { EventToCanvas } from './createCoordinateService'
 import type { PointerDragMoveState } from './createPointerDragTracker'
-
-interface PointerEventLike {
-  clientX: number
-  clientY: number
-}
+import type { EventToCanvas } from '../../createCoordinateService'
 
 export interface CreatePointerDeltaStateOptions {
   eventToCanvas?: EventToCanvas
 }
+
+type PointerEventLike = Parameters<EventToCanvas>[0]
 
 export function createPointerDeltaState(options: CreatePointerDeltaStateOptions = {}) {
   const { eventToCanvas } = options

@@ -1,7 +1,6 @@
 import { createSignal, onCleanup } from 'solid-js'
 import {
   getShapeAnchorInfo,
-  getShapeAnchorInfoById,
   getShapePerimeterInfo,
   isLinker,
   resolvePreferredCreateAnchor,
@@ -10,15 +9,16 @@ import {
   type LinkerEndpointBinding,
   type LinkerEndpoint,
   type LinkerRoute,
+  type ShapeElement,
 } from '@diagen/core'
 import type { Point } from '@diagen/shared'
 import { getDistance } from '@diagen/shared'
-import { useDesigner } from '../components'
-import { hitTestLinker, type LinkerHit } from '../utils'
-import { type EventToCanvas } from './createCoordinateService'
-import { createDragSession } from './createDragSession'
-import type { CreatePointerDragTrackerOptions } from './createPointerDragTracker'
-import { createPointerDeltaState } from './pointerDeltaState'
+import { useDesigner } from '../../../components'
+import { hitTestLinker, type LinkerHit } from '../../../utils'
+import { type EventToCanvas } from '../../createCoordinateService'
+import { createDragSession } from '../foundation/createDragSession'
+import type { CreatePointerDragTrackerOptions } from '../foundation/createPointerDragTracker'
+import { createPointerDeltaState } from '../foundation/createPointerDeltaState'
 
 export type LinkerDragMode = 'from' | 'to' | 'control' | 'line'
 type LinkerEndpointMode = Extract<LinkerDragMode, 'from' | 'to'>
@@ -108,6 +108,29 @@ interface EndpointTarget {
   angle: number
 }
 
+interface FixedAnchorCandidate {
+  id: string
+  point: Point
+  angle: number
+}
+
+interface SnapShapeCandidate {
+  shape: ShapeElement
+  fixedAnchors: FixedAnchorCandidate[]
+}
+
+interface SnapCandidateCollection {
+  list: SnapShapeCandidate[]
+  byId: Map<string, SnapShapeCandidate>
+}
+
+function createEmptySnapCandidates(): SnapCandidateCollection {
+  return {
+    list: [],
+    byId: new Map(),
+  }
+}
+
 function normalizeAngleDiff(a: number, b: number): number {
   let diff = Math.abs(a - b)
   while (diff > Math.PI) diff = Math.abs(diff - Math.PI * 2)
@@ -137,6 +160,7 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
 
   const [snapTarget, setSnapTarget] = createSignal<AnchorHit | null>(null)
   const [createContext, setCreateContext] = createSignal<CreateContext | null>(null)
+  let snapCandidates: SnapCandidateCollection = createEmptySnapCandidates()
   let session!: ReturnType<typeof createDragSession<LinkerDragStartInput, DragState>>
   session = createDragSession({
     threshold,
@@ -147,6 +171,7 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
       input.prepare?.()
       setSnapTarget(null)
       setCreateContext(input.createContext ?? null)
+      snapCandidates = buildSnapCandidates(input.state)
       pointerDelta.begin(input.event)
       return input.state
     },
@@ -188,6 +213,7 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     reset: () => {
       setSnapTarget(null)
       setCreateContext(null)
+      snapCandidates = createEmptySnapCandidates()
       pointerDelta.reset()
     },
     onCommit: () => {
@@ -200,34 +226,73 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     },
   })
 
-  function isShapeLinkable(shapeId: string, state?: DragState): boolean {
-    const shape = element.getElementById(shapeId)
-    if (!shape || shape.type !== 'shape') return false
+  function isShapeLinkableShape(shape: ShapeElement, state?: DragState): boolean {
     if (!shape.visible || shape.locked) return false
     if (shape.attribute?.visible === false || shape.attribute?.linkable === false) return false
     if (!allowSelfConnect && state?.oppositeShapeId && shape.id === state.oppositeShapeId) return false
     return true
   }
 
-  function resolveAnchorHit(shapeId: string, hit: AnchorHit): AnchorHit | null {
-    const target = element.getElementById(shapeId)
-    if (!target || target.type !== 'shape') return null
+  function isShapeLinkable(shapeId: string, state?: DragState): boolean {
+    const shape = element.getElementById(shapeId)
+    return !!shape && shape.type === 'shape' && isShapeLinkableShape(shape, state)
+  }
+
+  function buildSnapCandidates(state?: DragState): SnapCandidateCollection {
+    const list: SnapShapeCandidate[] = []
+    const byId = new Map<string, SnapShapeCandidate>()
+
+    for (const shape of element.shapes()) {
+      if (!isShapeLinkableShape(shape, state)) continue
+
+      const fixedAnchors: FixedAnchorCandidate[] = []
+      for (let index = 0; index < shape.anchors.length; index++) {
+        const info = getShapeAnchorInfo(shape, index)
+        if (!info) continue
+        fixedAnchors.push({
+          id: info.id,
+          point: info.point,
+          angle: info.angle,
+        })
+      }
+
+      const candidate: SnapShapeCandidate = {
+        shape,
+        fixedAnchors,
+      }
+      list.push(candidate)
+      byId.set(shape.id, candidate)
+    }
+
+    return {
+      list,
+      byId,
+    }
+  }
+
+  function resolveAnchorHit(hit: AnchorHit): AnchorHit | null {
+    const candidate = snapCandidates.byId.get(hit.shapeId)
+    if (!candidate) return null
+    const { shape } = candidate
+
     if (hit.binding.type === 'fixed') {
-      const info = getShapeAnchorInfoById(target, hit.binding.anchorId)
+      const binding = hit.binding as Extract<LinkerEndpointBinding, { type: 'fixed' }>
+      const info = candidate.fixedAnchors.find(anchor => anchor.id === binding.anchorId)
       if (!info) return null
       return {
-        shapeId: target.id,
+        shapeId: shape.id,
         binding: { type: 'fixed', anchorId: info.id },
         anchorId: info.id,
         point: info.point,
         angle: info.angle,
       }
     }
+
     if (hit.binding.type === 'perimeter') {
-      const info = resolveShapePerimeterInfo(target, hit.binding)
+      const info = resolveShapePerimeterInfo(shape, hit.binding)
       if (!info) return null
       return {
-        shapeId: target.id,
+        shapeId: shape.id,
         binding: {
           type: 'perimeter',
           pathIndex: info.pathIndex,
@@ -525,7 +590,6 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     const nextSnapTarget = findNearestAnchor(target, {
       maxDistance,
       stickDistance,
-      state,
       preferred: snapTarget(),
       oppositePoint,
     })
@@ -564,7 +628,6 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
       findNearestAnchor(currentPoint, {
         maxDistance,
         stickDistance,
-        state,
         oppositePoint,
       })
     if (!target) return
@@ -633,15 +696,14 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     options: {
       maxDistance: number
       stickDistance: number
-      state?: DragState
       preferred?: AnchorHit | null
       oppositePoint?: Point
     },
   ): AnchorHit | null {
-    const { maxDistance, stickDistance, state, preferred, oppositePoint } = options
+    const { maxDistance, stickDistance, preferred, oppositePoint } = options
 
-    if (preferred && isShapeLinkable(preferred.shapeId, state)) {
-      const resolved = resolveAnchorHit(preferred.shapeId, preferred)
+    if (preferred) {
+      const resolved = resolveAnchorHit(preferred)
       if (resolved && getDistance(point, resolved.point) <= maxDistance + stickDistance) {
         return resolved
       }
@@ -651,20 +713,17 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     let bestScore = Infinity
     const weight = Math.max(0, directionBias)
 
-    for (const shape of element.shapes()) {
-      if (!isShapeLinkable(shape.id, state)) continue
+    for (const candidate of snapCandidates.list) {
+      const { shape, fixedAnchors } = candidate
 
-      for (let i = 0; i < shape.anchors.length; i++) {
-        const info = getShapeAnchorInfo(shape, i)
-        if (!info) continue
-
-        const distance = getDistance(point, info.point)
+      for (const anchor of fixedAnchors) {
+        const distance = getDistance(point, anchor.point)
         if (distance > maxDistance) continue
 
         let score = distance
         if (oppositePoint && weight > 0) {
-          const desiredAngle = Math.atan2(oppositePoint.y - info.point.y, oppositePoint.x - info.point.x)
-          const diff = normalizeAngleDiff(desiredAngle, info.angle)
+          const desiredAngle = Math.atan2(oppositePoint.y - anchor.point.y, oppositePoint.x - anchor.point.x)
+          const diff = normalizeAngleDiff(desiredAngle, anchor.angle)
           // 角度差越大惩罚越高，避免临近锚点间频繁抖动。
           score += (diff / Math.PI) * weight * maxDistance
         }
@@ -675,10 +734,10 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
           bestScore = score
           best = {
             shapeId: shape.id,
-            binding: { type: 'fixed', anchorId: info.id },
-            anchorId: info.id,
-            point: info.point,
-            angle: info.angle,
+            binding: { type: 'fixed', anchorId: anchor.id },
+            anchorId: anchor.id,
+            point: anchor.point,
+            angle: anchor.angle,
           }
         }
       }
