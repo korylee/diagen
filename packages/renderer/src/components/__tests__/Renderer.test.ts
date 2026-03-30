@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createRendererTestHarness } from './rendererTestHarness'
 
 function rotateVector(point: { x: number; y: number }, center: { x: number; y: number }) {
@@ -14,6 +14,24 @@ function pointByAngle(center: { x: number; y: number }, angle: number, radius: n
     x: center.x + Math.cos(rad) * radius,
     y: center.y + Math.sin(rad) * radius,
   }
+}
+
+function isMacPlatform() {
+  return /Mac|iPod|iPhone|iPad/.test(window.navigator.platform ?? '')
+}
+
+async function dispatchModShortcut(key: string): Promise<KeyboardEvent> {
+  const event = new KeyboardEvent('keydown', {
+    bubbles: true,
+    cancelable: true,
+    key,
+    code: `Key${key.toUpperCase()}`,
+    ctrlKey: !isMacPlatform(),
+    metaKey: isMacPlatform(),
+  })
+  window.dispatchEvent(event)
+  await Promise.resolve()
+  return event
 }
 
 describe('Renderer', () => {
@@ -316,6 +334,51 @@ describe('Renderer', () => {
       )
       expect(sourceHighlight).toBeTruthy()
     } finally {
+      harness.dispose()
+    }
+  })
+
+  it('键盘 clipboard 快捷键应调用对应的 clipboard 行为', async () => {
+    const harness = await createRendererTestHarness({
+      shapes: [{ id: 'shape_clipboard', x: 100, y: 100, w: 100, h: 80 }],
+    })
+
+    const copySpy = vi.spyOn(harness.designer.clipboard, 'copy').mockImplementation(() => undefined)
+    const pasteSpy = vi.spyOn(harness.designer.clipboard, 'paste').mockImplementation(() => [])
+    const cutSpy = vi.spyOn(harness.designer.clipboard, 'cut').mockImplementation(() => undefined)
+    const duplicateSpy = vi.spyOn(harness.designer.clipboard, 'duplicate').mockImplementation(() => [])
+
+    try {
+      await harness.dispatchSceneMouseDownAtCanvas({ x: 140, y: 140 })
+      await harness.dispatchWindowMouseUp()
+      expect(harness.designer.selection.selectedIds()).toEqual(['shape_clipboard'])
+
+      const copyEvent = await dispatchModShortcut('c')
+      const pasteEvent = await dispatchModShortcut('v')
+      const cutEvent = await dispatchModShortcut('x')
+      const duplicateEvent = await dispatchModShortcut('d')
+
+      expect(copyEvent.defaultPrevented).toBe(true)
+      expect(pasteEvent.defaultPrevented).toBe(true)
+      expect(cutEvent.defaultPrevented).toBe(true)
+      expect(duplicateEvent.defaultPrevented).toBe(true)
+
+      expect(copySpy).toHaveBeenCalledTimes(1)
+      expect(copySpy).toHaveBeenCalledWith(['shape_clipboard'])
+
+      expect(pasteSpy).toHaveBeenCalledTimes(1)
+      expect(pasteSpy).toHaveBeenCalledWith()
+
+      expect(cutSpy).toHaveBeenCalledTimes(1)
+      expect(cutSpy).toHaveBeenCalledWith(['shape_clipboard'])
+
+      expect(duplicateSpy).toHaveBeenCalledTimes(1)
+      expect(duplicateSpy).toHaveBeenCalledWith(['shape_clipboard'])
+    } finally {
+      copySpy.mockRestore()
+      pasteSpy.mockRestore()
+      cutSpy.mockRestore()
+      duplicateSpy.mockRestore()
       harness.dispose()
     }
   })

@@ -30,6 +30,7 @@ export default defineConfig({
         test: {
           name: 'unit',
           environment: 'jsdom',
+          setupFiles: [resolve(import.meta.dirname, 'packages/.test/setup.ts')],
           include: ['packages/**/*.{test,spec}.ts', 'test/*.{test,spec}.ts'],
           exclude: ['packages/**/*.{browser,server}.{test,spec}.ts'],
           server: {

@@ -100,6 +100,40 @@ describe('createKeyboard', () => {
     })
   })
 
+  it('unbind 后快捷键不应再触发', async () => {
+    const target = createKeyboardTarget('Win32')
+
+    await withKeyboard({ window: target }, async keyboard => {
+      const action = vi.fn()
+
+      const off = keyboard.bind('ctrl+k', action)
+
+      await dispatchKeyDown(target, { key: 'k', code: 'KeyK', ctrlKey: true })
+      expect(action).toHaveBeenCalledTimes(1)
+
+      off()
+      await dispatchKeyDown(target, { key: 'k', code: 'KeyK', ctrlKey: true })
+      expect(action).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it('trigger 与 reset 应分别执行触发与清空绑定', async () => {
+    const target = createKeyboardTarget('Win32')
+
+    await withKeyboard({ window: target }, async keyboard => {
+      const action = vi.fn()
+
+      keyboard.bind('ctrl+l', action)
+      keyboard.trigger('ctrl+l')
+      expect(action).toHaveBeenCalledTimes(1)
+
+      keyboard.reset()
+      keyboard.trigger('ctrl+l')
+      await dispatchKeyDown(target, { key: 'l', code: 'KeyL', ctrlKey: true })
+      expect(action).toHaveBeenCalledTimes(1)
+    })
+  })
+
   it('输入元素默认不应触发快捷键，mousetrap 类名可放行', async () => {
     await withKeyboard({}, async keyboard => {
       const action = vi.fn()
@@ -152,6 +186,22 @@ describe('createKeyboard', () => {
       await dispatchKeyDown(target, { key: 'g', code: 'KeyG' })
       await dispatchKeyDown(target, { key: 'i', code: 'KeyI' })
 
+      expect(action).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it('非 shift 必需字符不应容忍额外修饰键', async () => {
+    const target = createKeyboardTarget('Win32')
+
+    await withKeyboard({ window: target }, async keyboard => {
+      const action = vi.fn()
+
+      keyboard.bind('ctrl+a', action)
+
+      await dispatchKeyDown(target, { key: 'a', code: 'KeyA', ctrlKey: true, shiftKey: true })
+      expect(action).not.toHaveBeenCalled()
+
+      await dispatchKeyDown(target, { key: 'a', code: 'KeyA', ctrlKey: true })
       expect(action).toHaveBeenCalledTimes(1)
     })
   })
