@@ -2,6 +2,8 @@ export const isObject = (v: any): v is object => v !== null && typeof v === 'obj
 
 export const toTypeString = (val: unknown) => Object.prototype.toString.call(val)
 
+export const toRawType = (value: unknown): string => toTypeString(value).slice(8, -1)
+
 export const isPlainObject = (v: any): v is Record<string, any> => isObject(v) && toTypeString(v) === '[object Object]'
 
 export const isNil = (v: unknown) => v == null
@@ -17,3 +19,5 @@ export const isNumber = (val: unknown): val is number => typeof val === 'number'
 export const isNumString = (str: unknown): boolean => isString(str) && /^\d+(\.\d+)?$/.test(str)
 
 export const isNumeric = (val: unknown): val is string | number => isNumber(val) || isNumString(val)
+
+export const isMap = (value: unknown): value is Map<any, any> => toRawType(value) === 'Map'

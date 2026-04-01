@@ -1,7 +1,8 @@
-import { normalizeBounds, pick, type Bounds, type Size, unionBounds } from '@diagen/shared'
-import { isLinker, isShape, type DiagramElement, type LinkerElement, type ShapeElement } from '../../../model'
-import type { AutoGrowConfig } from '../../types'
+import { normalizeBounds, pick, unionBounds, type Bounds, type Size } from '@diagen/shared'
+import { type ShapeElement } from '../../../model'
 import type { LinkerRoute } from '../../../utils/router'
+import type { AutoGrowConfig } from '../../types'
+import { createRafLoop } from '@diagen/primitives'
 
 interface ContainerSizeResolverOptions {
   autoGrow: AutoGrowConfig
@@ -82,4 +83,45 @@ export function resolveContainerSizeForContent(options: ContainerSizeResolverOpt
 function ceilByStep(value: number, step: number): number {
   if (step <= 1) return Math.ceil(value)
   return Math.ceil(value / step) * step
+}
+
+export function createRafMergeQueue<T, R>(options: { merge: (prev: T, next: T) => T; run: (payload?: T) => R }) {
+  let pending: T | undefined
+
+  const mergePending = (payload?: T) => {
+    if (payload == null) return
+    pending = pending == null ? payload : options.merge(pending, payload)
+  }
+
+  const consumePending = () => {
+    const queued = pending
+    pending = undefined
+    return queued
+  }
+
+  const loop = createRafLoop(
+    () => {
+      options.run(consumePending())
+      return false
+    },
+    {
+      immediate: false,
+    },
+  )
+
+  const enqueue = (payload?: T) => {
+    mergePending(payload)
+    loop.resume()
+  }
+
+  const flush = (payload?: T): R => {
+    mergePending(payload)
+    loop.pause()
+    return options.run(consumePending())
+  }
+
+  return {
+    enqueue,
+    flush,
+  }
 }

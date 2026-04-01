@@ -1,4 +1,4 @@
-import { type Bounds, createRafMergeQueue, normalizeBounds, type Point } from '@diagen/shared'
+import { type Bounds, DeepPartial, normalizeBounds, type Point } from '@diagen/shared'
 import { batch, createMemo, createSignal } from 'solid-js'
 import { isLinker, isShape, type DiagramElement, type LinkerElement } from '../../../model'
 import { canvasToScreen, clampZoom, screenToCanvas } from '../../../utils'
@@ -10,6 +10,7 @@ import { createLinkerLayoutController, type LinkerLayout } from './linkerLayout'
 import {
   areBoundsEqual,
   createPageBounds,
+  createRafMergeQueue,
   getShapeBounds,
   normalizeCanvasSize,
   resolveContainerSizeForContent,
@@ -30,14 +31,12 @@ export function createViewManager(
   const zoom = createMemo(() => viewport().zoom)
   const diagramPage = createMemo(() => state.diagram.page)
   const linkerRouteConfig = createMemo(() => state.config.linkerRoute)
-  const linkerRouteConfigKey = createMemo(() => JSON.stringify(linkerRouteConfig()))
   const linkerLayout = createLinkerLayoutController({
     element,
-    getRouteConfig: linkerRouteConfig,
-    getRouteConfigKey: linkerRouteConfigKey,
+    routeConfig: linkerRouteConfig,
     isLineJumpsEnabled: () => diagramPage().lineJumps,
   })
-  const [bounds, setBounds] = createSignal<Bounds>(createInitialBounds())
+  const [bounds, setBounds] = createSignal<Bounds>(getContentBounds())
   const selectionBounds = createMemo((): Bounds | null => {
     const ids = selection.selectedIds()
     return getElementsBounds(element.getElementsByIds(ids))
@@ -105,7 +104,7 @@ export function createViewManager(
   }
 
   function fitToContent(): void {
-    fitBounds(bounds())
+    fitBounds(getContentBounds())
   }
 
   function fitToSelection(): void {
@@ -113,10 +112,10 @@ export function createViewManager(
   }
 
   function zoomIn(): void {
-    setZoom(zoom() * 1.2)
+    setZoom(zoom() + 0.1)
   }
   function zoomOut(): void {
-    setZoom(zoom() / 1.2)
+    setZoom(zoom() - 0.1)
   }
 
   function setPageSize(width: number, height: number): void {
@@ -164,17 +163,13 @@ export function createViewManager(
     return merged
   }
 
-  function createInitialBounds(): Bounds {
+  /**
+   * 当前实时内容边界
+   */
+  function getContentBounds(): Bounds {
     const page = getPageBounds()
     const elementsBounds = getElementsBounds(element.elements())
     return elementsBounds ? unionNormalizedBounds(page, elementsBounds) : page
-  }
-
-  /**
-   * 当前内容边界（仅扩张）
-   */
-  function getContentBounds(extraBounds?: Bounds): Bounds {
-    return extraBounds ? unionNormalizedBounds(bounds(), extraBounds) : bounds()
   }
 
   /**
@@ -253,7 +248,7 @@ export function createViewManager(
     }, null)
   }
 
-  function setLinkerRouteConfig(next: Partial<typeof state.config.linkerRoute>): void {
+  function setLinkerRouteConfig(next: DeepPartial<typeof state.config.linkerRoute>): void {
     batch(() => {
       if (next.strategies) {
         setState('config', 'linkerRoute', 'strategies', current => ({ ...current, ...next.strategies }))
@@ -273,22 +268,14 @@ export function createViewManager(
     })
   }
 
-  const mergeBoundsFromEvent = ({ elements }: { elements: Array<DiagramElement | null | undefined> }) =>
-    mergeBounds(getElementsBounds(elements))
-  const markLayoutDirtyFromEvent = ({ elements }: { elements: Array<DiagramElement | null | undefined> }) =>
-    linkerLayout.markDirty(elements)
-  const clearLayoutCacheFromEvent = () => linkerLayout.clear()
-  const removeLayoutCacheFromEvent = ({ elements }: { elements: Array<DiagramElement | null | undefined> }) =>
-    linkerLayout.removeEntries(elements)
-
-  for (const eventName of ['element:updated', 'element:added', 'element:removed'] as const) {
-    emitter.on(eventName, markLayoutDirtyFromEvent)
-  }
-  for (const eventName of ['element:updated', 'element:added'] as const) {
-    emitter.on(eventName, mergeBoundsFromEvent)
-  }
-  emitter.on('element:removed', removeLayoutCacheFromEvent)
-  emitter.on('element:cleared', clearLayoutCacheFromEvent)
+  ;(['element:updated', 'element:added', 'element:removed'] as const).forEach(event => {
+    emitter.on(event, ({ elements }) => linkerLayout.markDirty(elements))
+  })
+  ;(['element:updated', 'element:added'] as const).forEach(event => {
+    emitter.on(event, ({ elements }) => mergeBounds(getElementsBounds(elements)))
+  })
+  emitter.on('element:removed', ({ elements }) => linkerLayout.removeEntries(elements))
+  emitter.on('element:cleared', () => linkerLayout.clear())
 
   return {
     page: diagramPage,

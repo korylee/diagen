@@ -27,13 +27,36 @@ interface LinkerLayoutCacheEntry {
 
 interface CreateLinkerLayoutControllerOptions {
   element: ElementManager
-  getRouteConfig: () => LinkerRouteConfig
-  getRouteConfigKey: () => string
+  routeConfig: () => LinkerRouteConfig
   isLineJumpsEnabled: () => boolean | undefined
 }
 
+function createMemory<K, V>() {
+  const cache = new Map<K, V>()
+
+  const get = (key: K, load: () => V): V => {
+    const cached = cache.get(key)
+    if (cached !== undefined) return cached
+
+    const next = load()
+    cache.set(key, next)
+    return next
+  }
+
+  const clear = () => {
+    cache.clear()
+  }
+
+  return {
+    get,
+    clear,
+  }
+}
+
 export function createLinkerLayoutController(options: CreateLinkerLayoutControllerOptions) {
+  const { element, routeConfig, isLineJumpsEnabled } = options
   const linkerLayoutCache = new Map<string, LinkerLayoutCacheEntry>()
+  const routeJumpsMemory = createMemory<string, LinkerRoute['jumps']>()
   const [linkerLayoutStampMap, setLinkerLayoutStampMap] = createStore<Record<string, number>>({})
   const [linkerSceneStamp, setLinkerSceneStamp] = createSignal<number>(0)
 
@@ -56,42 +79,40 @@ export function createLinkerLayoutController(options: CreateLinkerLayoutControll
   }
 
   function markDirty(elements: Array<DiagramElement | null | undefined>): void {
-    const dirtyLinkerIds = collectDirtyLinkerIds(elements)
-    if (dirtyLinkerIds.size === 0) return
+    invalidateLayouts(collectDirtyLinkerIds(elements))
+  }
 
+  function clear(): void {
     batch(() => {
-      for (const id of dirtyLinkerIds) {
-        linkerLayoutCache.delete(id)
-        setLinkerLayoutStampMap(id, value => (value ?? 0) + 1)
-      }
+      linkerLayoutCache.clear()
+      setLinkerLayoutStampMap({})
       bumpSceneStamp()
     })
   }
 
-  function clear(): void {
-    linkerLayoutCache.clear()
-    setLinkerLayoutStampMap({})
-    bumpSceneStamp()
-  }
-
   function removeEntries(elements: Array<DiagramElement | null | undefined>): void {
-    let removed = false
+    const ids = collectLinkerIds(elements)
+    const removedIds = Array.from(ids)
+    if (removedIds.length === 0) return
 
-    for (const element of elements) {
-      if (!element || !isLinker(element)) continue
-      linkerLayoutCache.delete(element.id)
-      setLinkerLayoutStampMap(element.id, 0)
-      removed = true
-    }
-
-    if (removed) {
+    batch(() => {
+      for (const id of removedIds) {
+        linkerLayoutCache.delete(id)
+      }
+      setLinkerLayoutStampMap(current => {
+        const next = { ...current }
+        for (const id of removedIds) {
+          delete next[id]
+        }
+        return next
+      })
       bumpSceneStamp()
-    }
+    })
   }
 
   function getBaseLayout(linker: LinkerElement): LinkerLayout {
     const stamp = linkerLayoutStampMap[linker.id] ?? 0
-    const configKey = options.getRouteConfigKey()
+    const configKey = getRouteConfigKey()
     const cached = linkerLayoutCache.get(linker.id)
 
     if (cached && cached.stamp === stamp && cached.configKey === configKey) {
@@ -114,14 +135,18 @@ export function createLinkerLayoutController(options: CreateLinkerLayoutControll
     return { route, bounds }
   }
 
+  function getRouteConfigKey(): string {
+    return JSON.stringify(routeConfig())
+  }
+
   function getShapeById(id: string): ShapeElement | null {
-    const element = options.element.getElementById(id)
-    return element && isShape(element) ? element : null
+    const el = element.getElementById(id)
+    return el && isShape(el) ? el : null
   }
 
   function resolveRouteOptions(linker: LinkerElement): LinkerRouteOptions {
-    const routeConfig = options.getRouteConfig()
-    const strategy = routeConfig.strategies[linker.linkerType] ?? 'basic'
+    const config = routeConfig()
+    const strategy = config.strategies[linker.linkerType] ?? 'basic'
 
     if (strategy === 'basic') {
       return { strategy }
@@ -129,27 +154,31 @@ export function createLinkerLayoutController(options: CreateLinkerLayoutControll
 
     return {
       strategy,
-      obstacleElements: options.element.elements(),
-      obstacleConfig: routeConfig.obstacleConfig,
-      obstacleOptions: routeConfig.obstacleOptions,
+      obstacleElements: element.elements(),
+      obstacleConfig: config.obstacleConfig,
+      obstacleOptions: config.obstacleOptions,
     }
   }
 
   function resolveRouteJumps(linker: LinkerElement, route: LinkerRoute): LinkerRoute['jumps'] {
-    if (!options.isLineJumpsEnabled()) return []
-    if (options.element.linkers().length > DEFAULTS.DISABLE_LINE_JUMPS_THRESHOLD) return []
+    if (!isLineJumpsEnabled()) return []
+    if (element.linkers().length > DEFAULTS.DISABLE_LINE_JUMPS_THRESHOLD) return []
 
     // 依赖全局连线场景版本，确保任意相关布局变化都能刷新跳线。
-    linkerSceneStamp()
+    const sceneStamp = linkerSceneStamp()
 
-    const routeConfig = options.getRouteConfig()
-    const linkers = options.element.linkers()
+    const linkers = element.linkers()
     const currentIndex = linkers.findIndex(item => item.id === linker.id)
     if (currentIndex <= 0) return []
 
-    const priorRoutes = linkers.slice(0, currentIndex).map(item => getBaseLayout(item).route)
-    return calculateLineJumps(route, priorRoutes, {
-      radius: routeConfig.lineJumpRadius,
+    const radius = routeConfig().lineJumpRadius
+    const memoryKey = [linker.id, sceneStamp, currentIndex, radius, getRouteConfigKey()].join(':')
+
+    return routeJumpsMemory.get(memoryKey, () => {
+      const priorRoutes = linkers.slice(0, currentIndex).map(item => getBaseLayout(item).route)
+      return calculateLineJumps(route, priorRoutes, {
+        radius,
+      })
     })
   }
 
@@ -157,25 +186,26 @@ export function createLinkerLayoutController(options: CreateLinkerLayoutControll
     const dirtyLinkerIds = new Set<string>()
     let shouldInvalidateObstacleRoutes = false
 
-    for (const element of elements) {
-      if (!element) continue
+    for (const el of elements) {
+      if (!el) continue
 
-      if (isLinker(element)) {
-        dirtyLinkerIds.add(element.id)
+      if (isLinker(el)) {
+        dirtyLinkerIds.add(el.id)
         continue
       }
 
-      if (isShape(element)) {
+      if (isShape(el)) {
         shouldInvalidateObstacleRoutes = true
-        for (const linker of options.element.getRelatedLinkers(element.id)) {
+        for (const linker of element.getRelatedLinkers(el.id)) {
           dirtyLinkerIds.add(linker.id)
         }
       }
     }
 
     if (shouldInvalidateObstacleRoutes) {
-      for (const linker of options.element.linkers()) {
-        if (usesSharedObstacleScene(linker)) {
+      for (const linker of element.linkers()) {
+        const strategy = routeConfig().strategies[linker.linkerType] ?? 'basic'
+        if (strategy === 'obstacle') {
           dirtyLinkerIds.add(linker.id)
         }
       }
@@ -184,12 +214,32 @@ export function createLinkerLayoutController(options: CreateLinkerLayoutControll
     return dirtyLinkerIds
   }
 
-  function usesSharedObstacleScene(linker: LinkerElement): boolean {
-    const strategy = options.getRouteConfig().strategies[linker.linkerType] ?? 'basic'
-    return strategy === 'obstacle'
+  function collectLinkerIds(elements: Array<DiagramElement | null | undefined>): string[] {
+    const ids: string[] = []
+
+    for (const el of elements) {
+      if (!el || !isLinker(el)) continue
+      ids.push(el.id)
+    }
+
+    return ids
+  }
+
+  function invalidateLayouts(ids: Iterable<string>): void {
+    const nextIds = Array.from(ids)
+    if (nextIds.length === 0) return
+
+    batch(() => {
+      for (const id of nextIds) {
+        linkerLayoutCache.delete(id)
+        setLinkerLayoutStampMap(id, value => (value ?? 0) + 1)
+      }
+      bumpSceneStamp()
+    })
   }
 
   function bumpSceneStamp(): void {
+    routeJumpsMemory.clear()
     setLinkerSceneStamp(value => value + 1)
   }
 
