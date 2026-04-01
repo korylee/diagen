@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createRendererTestHarness } from './rendererTestHarness'
+import { createRendererTestHarness } from '../../.test/createRendererTestHarness'
 
 function rotateVector(point: { x: number; y: number }, center: { x: number; y: number }) {
   return {
@@ -32,6 +32,21 @@ async function dispatchModShortcut(key: string): Promise<KeyboardEvent> {
   window.dispatchEvent(event)
   await Promise.resolve()
   return event
+}
+
+async function dispatchKeyDown(init: KeyboardEventInit): Promise<KeyboardEvent> {
+  const event = new KeyboardEvent('keydown', {
+    bubbles: true,
+    cancelable: true,
+    ...init,
+  })
+  window.dispatchEvent(event)
+  await Promise.resolve()
+  return event
+}
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, ms))
 }
 
 describe('Renderer', () => {
@@ -92,6 +107,34 @@ describe('Renderer', () => {
       await harness.dispatchWindowMouseUp()
 
       expect(harness.designer.selection.selectedIds()).toEqual(['shape_scroll_a', 'shape_scroll_b'])
+      expect(harness.getInteraction().pointer.machine.mode()).toBe('idle')
+    } finally {
+      harness.dispose()
+    }
+  })
+
+  it('拖拽触边后即使指针停留，auto-scroll 也应持续推进直到 mouseup', async () => {
+    const harness = await createRendererTestHarness({
+      shapes: [{ id: 'shape_auto_scroll', x: 100, y: 100, w: 100, h: 80 }],
+    })
+
+    try {
+      await harness.dispatchSceneMouseDownAtCanvas({ x: 140, y: 140 })
+      expect(harness.getInteraction().pointer.machine.mode()).toBe('draggingShape')
+
+      const stickyEdgeClient = { x: 1018, y: 220 }
+      await harness.dispatchWindowMouseMoveAtClient(stickyEdgeClient)
+      const afterFirstMove = harness.viewport.scrollLeft
+      expect(afterFirstMove).toBeGreaterThan(0)
+
+      await sleep(50)
+      const afterHold = harness.viewport.scrollLeft
+      expect(afterHold).toBeGreaterThan(afterFirstMove)
+
+      await harness.dispatchWindowMouseUp()
+      const afterUp = harness.viewport.scrollLeft
+      await sleep(40)
+      expect(harness.viewport.scrollLeft).toBe(afterUp)
       expect(harness.getInteraction().pointer.machine.mode()).toBe('idle')
     } finally {
       harness.dispose()
@@ -261,6 +304,88 @@ describe('Renderer', () => {
     }
   })
 
+  it('create-linker 非连续模式下从空白起链后应回到 idle 并提交新连线', async () => {
+    const harness = await createRendererTestHarness()
+
+    try {
+      const interaction = harness.getInteraction()
+      harness.designer.tool.setCreateLinker('linker', { continuous: false })
+
+      expect(harness.designer.tool.toolState()).toEqual({
+        type: 'create-linker',
+        linkerId: 'linker',
+        continuous: false,
+      })
+
+      await harness.dispatchSceneMouseDownAtCanvas({ x: 220, y: 180 })
+
+      expect(interaction.pointer.machine.mode()).toBe('draggingLinker')
+      expect(harness.designer.tool.toolState().type).toBe('idle')
+
+      await harness.dispatchWindowMouseMoveAtCanvas({ x: 320, y: 240 })
+      await harness.dispatchWindowMouseUp()
+
+      const linkers = harness.designer.element.linkers()
+      const createdLinker = linkers[0]
+
+      expect(interaction.pointer.machine.mode()).toBe('idle')
+      expect(linkers).toHaveLength(1)
+      expect(createdLinker.from.id).toBeNull()
+      expect(createdLinker.from.binding.type).toBe('free')
+      expect(createdLinker.to.binding.type).toBe('free')
+      expect(harness.designer.selection.selectedIds()).toEqual([createdLinker.id])
+    } finally {
+      harness.dispose()
+    }
+  })
+
+  it('create-linker 连续模式下从图形起链应保持工具态并以图形端点作为 from', async () => {
+    const harness = await createRendererTestHarness({
+      shapes: [
+        { id: 'shape_linker_source', x: 100, y: 100, w: 100, h: 80 },
+        { id: 'shape_linker_target', x: 340, y: 100, w: 100, h: 80 },
+      ],
+    })
+
+    try {
+      const interaction = harness.getInteraction()
+      harness.designer.tool.setCreateLinker('linker', { continuous: true })
+
+      expect(harness.designer.tool.toolState()).toEqual({
+        type: 'create-linker',
+        linkerId: 'linker',
+        continuous: true,
+      })
+
+      await harness.dispatchSceneMouseDownAtCanvas({ x: 140, y: 140 })
+
+      expect(interaction.pointer.machine.mode()).toBe('draggingLinker')
+      expect(harness.designer.tool.toolState()).toEqual({
+        type: 'create-linker',
+        linkerId: 'linker',
+        continuous: true,
+      })
+
+      await harness.dispatchWindowMouseMoveAtCanvas({ x: 380, y: 140 })
+      await harness.dispatchWindowMouseUp()
+
+      const linkers = harness.designer.element.linkers()
+      const createdLinker = linkers[0]
+
+      expect(interaction.pointer.machine.mode()).toBe('idle')
+      expect(linkers).toHaveLength(1)
+      expect(createdLinker.from.id).toBe('shape_linker_source')
+      expect(createdLinker.from.binding.type).not.toBe('free')
+      expect(harness.designer.tool.toolState()).toEqual({
+        type: 'create-linker',
+        linkerId: 'linker',
+        continuous: true,
+      })
+    } finally {
+      harness.dispose()
+    }
+  })
+
   it('连线拖拽时应按 shape 语义渲染目标高亮', async () => {
     const harness = await createRendererTestHarness({
       shapes: [
@@ -379,6 +504,94 @@ describe('Renderer', () => {
       pasteSpy.mockRestore()
       cutSpy.mockRestore()
       duplicateSpy.mockRestore()
+      harness.dispose()
+    }
+  })
+
+  it('escape 应取消当前交互并退出工具态', async () => {
+    const harness = await createRendererTestHarness({
+      shapes: [{ id: 'shape_escape', x: 100, y: 100, w: 100, h: 80 }],
+    })
+
+    try {
+      await harness.dispatchSceneMouseDownAtCanvas({ x: 80, y: 80 })
+      expect(harness.getInteraction().pointer.machine.mode()).toBe('boxSelecting')
+
+      let event = await dispatchKeyDown({
+        key: 'Escape',
+        code: 'Escape',
+      })
+
+      expect(event.defaultPrevented).toBe(true)
+      expect(harness.getInteraction().pointer.machine.mode()).toBe('idle')
+
+      harness.designer.tool.setCreateShape('rectangle', { continuous: true })
+      expect(harness.designer.tool.toolState()).toEqual({
+        type: 'create-shape',
+        shapeId: 'rectangle',
+        continuous: true,
+      })
+
+      event = await dispatchKeyDown({
+        key: 'Escape',
+        code: 'Escape',
+      })
+
+      expect(event.defaultPrevented).toBe(true)
+      expect(harness.designer.tool.toolState()).toEqual({ type: 'idle' })
+    } finally {
+      harness.dispose()
+    }
+  })
+
+  it('delete 应删除当前选中的图形', async () => {
+    const harness = await createRendererTestHarness({
+      shapes: [
+        { id: 'shape_delete_a', x: 100, y: 100, w: 100, h: 80 },
+        { id: 'shape_delete_b', x: 300, y: 100, w: 100, h: 80 },
+      ],
+    })
+
+    try {
+      await harness.dispatchSceneMouseDownAtCanvas({ x: 140, y: 140 })
+      await harness.dispatchWindowMouseUp()
+      expect(harness.designer.selection.selectedIds()).toEqual(['shape_delete_a'])
+
+      const event = await dispatchKeyDown({
+        key: 'Delete',
+        code: 'Delete',
+      })
+
+      expect(event.defaultPrevented).toBe(true)
+      expect(harness.designer.getElementById('shape_delete_a')).toBeUndefined()
+      expect(harness.designer.getElementById('shape_delete_b')).toBeTruthy()
+      expect(harness.designer.selection.selectedIds()).toEqual([])
+    } finally {
+      harness.dispose()
+    }
+  })
+
+  it('mod+a 应选中所有图形', async () => {
+    const harness = await createRendererTestHarness({
+      shapes: [
+        { id: 'shape_select_all_a', x: 100, y: 100, w: 100, h: 80 },
+        { id: 'shape_select_all_b', x: 280, y: 160, w: 100, h: 80 },
+        { id: 'shape_select_all_c', x: 500, y: 260, w: 100, h: 80 },
+      ],
+    })
+
+    try {
+      expect(harness.designer.selection.selectedIds()).toEqual([])
+
+      const event = await dispatchModShortcut('a')
+
+      expect(event.defaultPrevented).toBe(true)
+      expect(harness.designer.selection.selectedIds()).toEqual([
+        'shape_select_all_a',
+        'shape_select_all_b',
+        'shape_select_all_c',
+      ])
+    } finally {
       harness.dispose()
     }
   })

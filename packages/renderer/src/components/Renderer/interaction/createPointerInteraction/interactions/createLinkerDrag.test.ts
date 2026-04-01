@@ -8,13 +8,13 @@ import {
   resolvePreferredCreateAnchor,
   type LinkerElement,
 } from '@diagen/core'
-import { createLinkerDrag } from '../createLinkerDrag'
+import { createLinkerDrag } from './createLinkerDrag'
 
 const testContext = vi.hoisted(() => ({
   designer: null as ReturnType<typeof createDesigner> | null,
 }))
 
-vi.mock('../../../../components', () => ({
+vi.mock('../../../..', () => ({
   useDesigner: () => {
     if (!testContext.designer) {
       throw new Error('designer context is not ready')

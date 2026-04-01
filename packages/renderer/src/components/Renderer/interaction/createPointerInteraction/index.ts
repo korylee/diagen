@@ -5,7 +5,7 @@ import { createResize } from './interactions/createResize'
 import { createRotate } from './interactions/createRotate'
 import { createSelection } from './interactions/createSelection'
 import { createShapeDrag } from './interactions/createShapeDrag'
-import type { CoordinateService } from '../createCoordinateService'
+import type { CoordinateService } from '../../primitives/createCoordinateService'
 
 export interface CreatePointerInteractionOptions {
   coordinate: CoordinateService

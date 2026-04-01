@@ -1,13 +1,13 @@
 import { createRoot } from 'solid-js'
 import { describe, expect, it, vi } from 'vitest'
 import { createDesigner } from '@diagen/core'
-import { createPan } from '../createPan'
+import { createPan } from './createPan'
 
 const testContext = vi.hoisted(() => ({
   designer: null as ReturnType<typeof createDesigner> | null,
 }))
 
-vi.mock('../../../../components', () => ({
+vi.mock('../../../..', () => ({
   useDesigner: () => {
     if (!testContext.designer) {
       throw new Error('designer context is not ready')

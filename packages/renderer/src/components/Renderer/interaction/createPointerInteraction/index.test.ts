@@ -1,6 +1,6 @@
 import { createRoot } from 'solid-js'
 import { describe, expect, it, vi } from 'vitest'
-import { createInteractionMachine } from '../createInteractionMachine'
+import { createInteractionMachine } from './createInteractionMachine'
 
 function createMouseEvent(x: number, y: number): MouseEvent {
   return {

@@ -2,9 +2,9 @@ import { batch, createComponent, createEffect } from 'solid-js'
 import { render } from 'solid-js/web'
 import { createDesigner, createShape, type Designer, type ShapeElement } from '@diagen/core'
 import { createDgBem, type Point } from '@diagen/shared'
-import { DesignerProvider } from '../DesignerProvider'
-import { Renderer } from '../Renderer'
-import { useInteraction } from '../InteractionProvider'
+import { DesignerProvider } from '../components/DesignerProvider'
+import { Renderer } from '../components/Renderer'
+import { useInteraction } from '../components/InteractionProvider'
 
 interface RectLike {
   left: number

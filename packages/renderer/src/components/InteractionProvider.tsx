@@ -1,9 +1,9 @@
 import { createContext, JSX, useContext } from 'solid-js'
 import { CreateKeyboard } from '@diagen/primitives'
-import type { CoordinateService } from '../primitives/createCoordinateService'
-import type { CreatePointerInteraction } from '../primitives/createPointerInteraction'
+import type { CoordinateService } from './Renderer/primitives/createCoordinateService'
+import type { CreatePointerInteraction } from './Renderer/interaction/createPointerInteraction'
 
-type Interaction = {
+export type Interaction = {
   pointer: CreatePointerInteraction
   coordinate: CoordinateService
   keyboard: CreateKeyboard

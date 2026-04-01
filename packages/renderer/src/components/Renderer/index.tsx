@@ -1,21 +1,19 @@
-import { DesignerToolState, Schema } from '@diagen/core'
-import { createEventListener, createKeyboard, createScroll } from '@diagen/primitives'
-import { createDgBem, type Point } from '@diagen/shared'
-import { createEffect, createMemo, createSignal, JSX, onMount } from 'solid-js'
+import { DesignerToolState } from '@diagen/core'
+import { createEventListener, createKeyboard } from '@diagen/primitives'
+import { createDgBem } from '@diagen/shared'
+import { createEffect, createMemo, createSignal, JSX, onCleanup, onMount } from 'solid-js'
 import { CanvasRenderer } from '../../canvas'
-import { createCoordinateService } from '../../primitives/createCoordinateService'
-import { createPointerInteraction } from '../../primitives/createPointerInteraction'
-import { hitTestScene, type SceneHit, type SceneLinkerHit } from '../../utils'
 import { DesignerGrids } from '../DesignerGrids'
 import { useDesigner } from '../DesignerProvider'
 import { InteractionOverlay } from '../InteractionOverlay'
 import { InteractionProvider } from '../InteractionProvider'
+import { createSceneDown } from './handlers/sceneMouseDown'
+import { createPointerInteraction } from './interaction/createPointerInteraction'
+import { createAutoScroll } from './primitives/createAutoScroll'
+import { createCoordinateService } from './primitives/createCoordinateService'
 
-import './index.scss'
 import { isServer } from 'solid-js/web'
-
-const EDGE_AUTO_SCROLL_GAP = 28
-const EDGE_AUTO_SCROLL_MAX_STEP = 26
+import './index.scss'
 
 function getCursor(params: { isGrabbing: boolean; toolType: DesignerToolState['type'] }) {
   const { isGrabbing, toolType } = params
@@ -27,49 +25,6 @@ function getCursor(params: { isGrabbing: boolean; toolType: DesignerToolState['t
 
   return 'default'
 }
-
-function resolveScenePrimaryIntent(params: { tool: DesignerToolState; point: Point; sceneHit: SceneHit | null }) {
-  const { tool, point, sceneHit } = params
-
-  if (tool.type === 'create-shape') {
-    return {
-      type: 'create-shape',
-      point,
-      shapeId: tool.shapeId,
-      continuous: tool.continuous,
-    } as const
-  }
-
-  if (tool.type === 'create-linker') {
-    return {
-      type: 'create-linker',
-      point,
-      linkerId: tool.linkerId,
-      continuous: tool.continuous,
-      sceneHit,
-    } as const
-  }
-
-  if (sceneHit?.type === 'linker') {
-    return {
-      type: 'edit-linker',
-      point,
-      sceneHit,
-    } as const
-  }
-
-  if (sceneHit?.type === 'shape') {
-    return {
-      type: 'interact-shape',
-      point,
-      shapeId: sceneHit.element.id,
-    } as const
-  }
-
-  return { type: 'blank' } as const
-}
-
-type ScenePrimaryIntent = ReturnType<typeof resolveScenePrimaryIntent>
 
 const bem = createDgBem('renderer')
 
@@ -104,7 +59,6 @@ export function Renderer(props: {
     boxSelectMinSize: 5,
   })
   const keyboard = createKeyboard()
-  const scroll = createScroll(viewportRef)
 
   keyboard.bind('delete', () => edit.remove(selection.selectedIds()))
   keyboard.bind('mod+a', () => selection.selectAll())
@@ -138,9 +92,11 @@ export function Renderer(props: {
   const interaction = {
     pointer,
     keyboard,
-    scroll,
     coordinate,
   }
+
+  const autoScroll = createAutoScroll(viewportRef, interaction)
+  const onSceneDown = createSceneDown(interaction)
 
   const containerStyle = createMemo(() => {
     const { containerSize, config } = state
@@ -201,203 +157,11 @@ export function Renderer(props: {
     }
   }
 
-  const applySelection = (id: string, event: MouseEvent): void => {
-    if (event.ctrlKey || event.metaKey) {
-      selection.isSelected(id) ? selection.deselect(id) : selection.select(id)
-    } else {
-      selection.replace([id])
-    }
-  }
-
-  const handleCreateShapeDown = (
-    e: MouseEvent,
-    intent: Extract<ScenePrimaryIntent, { type: 'create-shape' }>,
-  ): boolean => {
-    const { shapeId, continuous, point } = intent
-    const definition = Schema.getShape(shapeId)
-    if (!definition) return false
-
-    const width = definition.props.w
-    const height = definition.props.h
-    const shape = Schema.createShape(shapeId, {
-      x: Math.round(point.x - width / 2),
-      y: Math.round(point.y - height / 2),
-      w: width,
-      h: height,
-      angle: 0,
-    })
-    if (!shape) return false
-
-    e.stopPropagation()
-    e.preventDefault()
-
-    edit.add([shape])
-    selection.replace([shape.id])
-    view.scheduleAutoGrow(view.getShapeBounds(shape))
-    view.flushAutoGrow()
-
-    if (!continuous) {
-      tool.setIdle()
-    }
-
-    return true
-  }
-
-  const handleCreateLinkerDown = (
-    e: MouseEvent,
-    intent: Extract<ScenePrimaryIntent, { type: 'create-linker' }>,
-  ): boolean => {
-    const { point, linkerId, continuous, sceneHit } = intent
-    e.stopPropagation()
-    e.preventDefault()
-
-    const started =
-      sceneHit?.type === 'shape'
-        ? pointer.machine.beginLinkerCreate(e, {
-            linkerId,
-            from: {
-              type: 'shape',
-              shapeId: sceneHit.element.id,
-            },
-          })
-        : pointer.machine.beginLinkerCreate(e, {
-            linkerId,
-            from: {
-              type: 'point',
-              point,
-            },
-          })
-
-    if (started && !continuous) {
-      tool.setIdle()
-    }
-
-    return started
-  }
-
-  const handleLinkerPrimaryDown = (
-    e: MouseEvent,
-    intent: Extract<ScenePrimaryIntent, { type: 'edit-linker' }>,
-  ): boolean => {
-    const { point, sceneHit } = intent
-    e.stopPropagation()
-    e.preventDefault()
-    applySelection(sceneHit.element.id, e)
-    return pointer.machine.beginLinkerEdit(e, {
-      linkerId: sceneHit.element.id,
-      point,
-      hit: sceneHit.hit,
-      route: sceneHit.route,
-    })
-  }
-
-  const handleShapePrimaryDown = (
-    e: MouseEvent,
-    intent: Extract<ScenePrimaryIntent, { type: 'interact-shape' }>,
-  ): boolean => {
-    const { point, shapeId } = intent
-    e.stopPropagation()
-    e.preventDefault()
-
-    const resizeHit = pointer.resize.hitTest(point)
-    if (resizeHit) {
-      return pointer.machine.startResize(resizeHit.id, resizeHit.dir, e)
-    }
-
-    applySelection(shapeId, e)
-    return pointer.machine.startShapeDrag(e)
-  }
-
-  const handleBlankPrimaryDown = (e: MouseEvent): boolean => {
-    e.stopPropagation()
-    e.preventDefault()
-    selection.clear()
-    return pointer.machine.startBoxSelect(e)
-  }
-
-  const getSceneHit = (point: Point): SceneHit | null =>
-    hitTestScene(element.elements(), point, {
-      zoom: view.viewport().zoom,
-      getLinkerLayout: linker => view.getLinkerLayout(linker),
-    })
-
-  const PrimaryDownMap = {
-    'create-shape': handleCreateShapeDown,
-    'create-linker': handleCreateLinkerDown,
-    'edit-linker': handleLinkerPrimaryDown,
-    'interact-shape': handleShapePrimaryDown,
-    blank: handleBlankPrimaryDown,
-  } as const
-
-  const handleSceneMouseDown = (e: MouseEvent): boolean => {
-    if (e.button !== 0) return false
-    if (!pointer.machine.isIdle()) return false
-
-    const currentTool = tool.toolState()
-    const point = coordinate.eventToCanvas(e)
-    const sceneHit = currentTool.type === 'create-shape' ? null : getSceneHit(point)
-    const intent = resolveScenePrimaryIntent({
-      tool: currentTool,
-      point,
-      sceneHit,
-    })
-
-    const handle = PrimaryDownMap[intent.type]
-    if (!handle) return false
-    return handle(e, intent as any)
-  }
-
-  const calcEdgeStep = (distanceToEdge: number): number => {
-    const distance = Math.max(0, distanceToEdge)
-    const ratio = Math.max(0, Math.min(1, (EDGE_AUTO_SCROLL_GAP - distance) / EDGE_AUTO_SCROLL_GAP))
-    return Math.ceil(ratio * EDGE_AUTO_SCROLL_MAX_STEP)
-  }
-
-  const autoScrollOnEdge = (e: MouseEvent) => {
-    const el = viewportRef()
-    if (!el) return
-
-    const rect = coordinate.viewportRect()
-    if (!rect) return
-    const leftDistance = e.clientX - rect.left
-    const rightDistance = rect.right - e.clientX
-    const topDistance = e.clientY - rect.top
-    const bottomDistance = rect.bottom - e.clientY
-
-    let dx = 0
-    let dy = 0
-
-    if (leftDistance < EDGE_AUTO_SCROLL_GAP) {
-      dx = -calcEdgeStep(leftDistance)
-    } else if (rightDistance < EDGE_AUTO_SCROLL_GAP) {
-      dx = calcEdgeStep(rightDistance)
-    }
-
-    if (topDistance < EDGE_AUTO_SCROLL_GAP) {
-      dy = -calcEdgeStep(topDistance)
-    } else if (bottomDistance < EDGE_AUTO_SCROLL_GAP) {
-      dy = calcEdgeStep(bottomDistance)
-    }
-
-    if (dx === 0 && dy === 0) return
-
-    const maxLeft = Math.max(0, el.scrollWidth - el.clientWidth)
-    const maxTop = Math.max(0, el.scrollHeight - el.clientHeight)
-    const nextLeft = Math.max(0, Math.min(maxLeft, el.scrollLeft + dx))
-    const nextTop = Math.max(0, Math.min(maxTop, el.scrollTop + dy))
-
-    if (nextLeft === el.scrollLeft && nextTop === el.scrollTop) return
-    el.scrollLeft = nextLeft
-    el.scrollTop = nextTop
-  }
-
   const onMouseMove = (e: MouseEvent) => {
-    pointer.machine.move(e)
-    if (pointer.machine.shouldAutoScroll()) {
-      autoScrollOnEdge(e)
-    }
+    autoScroll.move(e)
   }
   const onMouseUp = () => {
+    autoScroll.reset()
     pointer.machine.end()
   }
 
@@ -425,11 +189,22 @@ export function Renderer(props: {
   })
 
   onMount(() => {
-    const val = Math.max(0, state.config.containerInset - 10)
     const el = viewportRef()
     if (!el) return
-    el.scrollLeft = val
-    el.scrollTop = val
+    const viewport = view.viewport()
+    const containerInset = state.config.containerInset
+    const padding = 10
+    const initialScroll = {
+      left: Math.max(0, Math.round(containerInset + viewport.x - padding)),
+      top: Math.max(0, Math.round(containerInset + viewport.y - padding)),
+    }
+
+    el.scrollLeft = initialScroll.left
+    el.scrollTop = initialScroll.top
+  })
+
+  onCleanup(() => {
+    autoScroll.reset()
   })
 
   return (
@@ -453,7 +228,7 @@ export function Renderer(props: {
             class={bem('scene')}
             style={sceneStyle()}
             on:mousedown={e => {
-              handleSceneMouseDown(e)
+              onSceneDown(e)
             }}
           >
             <CanvasRenderer />

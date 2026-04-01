@@ -1,13 +1,13 @@
 import { createRoot } from 'solid-js'
 import { describe, expect, it, vi } from 'vitest'
 import { createDesigner, createLinker, createShape, type LinkerElement, type ShapeElement } from '@diagen/core'
-import { createShapeDrag } from '../createShapeDrag'
+import { createShapeDrag } from './createShapeDrag'
 
 const testContext = vi.hoisted(() => ({
   designer: null as ReturnType<typeof createDesigner> | null,
 }))
 
-vi.mock('../../../../components', () => ({
+vi.mock('../../../..', () => ({
   useDesigner: () => {
     if (!testContext.designer) {
       throw new Error('designer context is not ready')

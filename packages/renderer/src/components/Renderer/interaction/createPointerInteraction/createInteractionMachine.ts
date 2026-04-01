@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js'
-import type { EventToCanvas } from '../createCoordinateService'
+import type { EventToCanvas } from '../../primitives/createCoordinateService'
 import type {
   BeginLinkerCreateOptions,
   BeginLinkerEditOptions,

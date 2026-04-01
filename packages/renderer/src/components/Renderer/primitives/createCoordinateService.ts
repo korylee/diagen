@@ -1,7 +1,7 @@
 import { createElementRect } from '@diagen/primitives'
 import type { Point } from '@diagen/shared'
 import type { Accessor } from 'solid-js'
-import { useDesigner } from '../components'
+import { useDesigner } from '../..'
 
 export type EventToCanvas = (event: { clientX: number; clientY: number }) => Point
 

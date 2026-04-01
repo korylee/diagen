@@ -1,6 +1,6 @@
 import type { Point } from '@diagen/shared'
 import type { PointerDragMoveState } from './createPointerDragTracker'
-import type { EventToCanvas } from '../../createCoordinateService'
+import type { EventToCanvas } from '../../../primitives/createCoordinateService'
 
 export interface CreatePointerDeltaStateOptions {
   eventToCanvas?: EventToCanvas

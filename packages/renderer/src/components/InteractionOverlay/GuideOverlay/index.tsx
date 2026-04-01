@@ -1,5 +1,5 @@
 import { GuideLine } from '@diagen/core'
-import { useInteraction } from '../InteractionProvider'
+import { useInteraction } from '../../InteractionProvider'
 import { For, Show, createMemo } from 'solid-js'
 
 export function GuideOverlay() {
