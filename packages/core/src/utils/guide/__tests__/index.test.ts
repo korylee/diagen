@@ -36,6 +36,23 @@ describe('guide', () => {
       expect(result.guides.some(line => line.axis === 'x' && line.pos === 100)).toBe(true)
     })
 
+    it('应为垂直 guide line 计算对象间净间距', () => {
+      const movingBounds: Bounds = { x: 10, y: 10, w: 40, h: 30 }
+      const candidates: Bounds[] = [{ x: 100, y: 80, w: 60, h: 40 }]
+
+      const result = calculateMoveGuideSnap({
+        movingBounds,
+        delta: { x: 87, y: 0 },
+        candidates,
+        tolerance: 4,
+      })
+
+      const guide = result.guides.find(line => line.axis === 'x')
+      expect(guide?.distance).toBe(40)
+      expect(guide?.distanceFrom).toBe(40)
+      expect(guide?.distanceTo).toBe(80)
+    })
+
     it('超出容差时不吸附', () => {
       const movingBounds: Bounds = { x: 0, y: 0, w: 20, h: 20 }
       const candidates: Bounds[] = [{ x: 100, y: 100, w: 30, h: 30 }]
@@ -84,6 +101,20 @@ describe('guide', () => {
       expect(result.bounds.x).toBe(10)
       expect(result.bounds.w).toBe(43)
       expect(result.guides.some(line => line.axis === 'x' && line.pos === 53)).toBe(true)
+    })
+
+    it('应为 resize guide line 计算对象间净间距', () => {
+      const result = calculateResizeGuideSnap({
+        draftBounds: { x: 100, y: 100, w: 130, h: 80 },
+        direction: 'e',
+        candidates: [{ x: 230, y: 240, w: 80, h: 80 }],
+        tolerance: 4,
+      })
+
+      const guide = result.guides.find(line => line.axis === 'x')
+      expect(guide?.distance).toBe(60)
+      expect(guide?.distanceFrom).toBe(180)
+      expect(guide?.distanceTo).toBe(240)
     })
 
     it('应在向西缩放时吸附左边线并更新宽度', () => {

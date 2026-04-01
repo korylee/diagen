@@ -16,6 +16,9 @@ export interface GuideLine {
   pos: number
   from: number
   to: number
+  distance?: number
+  distanceFrom?: number
+  distanceTo?: number
 }
 
 interface GuideLineRef {
@@ -82,16 +85,16 @@ export function calculateMoveGuideSnap(input: MoveGuideInput): MoveGuideResult {
     w: movingBounds.w,
     h: movingBounds.h,
   }
-  const candidates = normalizeCandidateBounds(input.candidates)
+  const candidates = normalizeCandidates(input.candidates)
 
-  const xSnap = findBestAxisSnap({
+  const xSnap = findBestSnap({
     axis: 'x',
     sourceBounds: movedBounds,
     candidateBounds: candidates,
     tolerance,
     includeCenter,
   })
-  const ySnap = findBestAxisSnap({
+  const ySnap = findBestSnap({
     axis: 'y',
     sourceBounds: movedBounds,
     candidateBounds: candidates,
@@ -128,15 +131,15 @@ export function calculateResizeGuideSnap(input: ResizeGuideInput): ResizeGuideRe
   const includeCenter = input.includeCenter ?? true
   const minWidth = input.minWidth ?? DEFAULT_MIN_SIZE
   const minHeight = input.minHeight ?? DEFAULT_MIN_SIZE
-  const candidates = normalizeCandidateBounds(input.candidates)
+  const candidates = normalizeCandidates(input.candidates)
 
   let nextBounds = normalizeBounds(input.draftBounds)
   let xSnapApplied: AxisSnapCandidate | null = null
   let ySnapApplied: AxisSnapCandidate | null = null
 
   if (isHorizontalResizable(input.direction)) {
-    const sourceValue = getResizableAxisValue(nextBounds, 'x', input.direction)
-    const xSnap = findBestAxisSnapByValue({
+    const sourceValue = getResizeEdgeValue(nextBounds, 'x', input.direction)
+    const xSnap = findBestSnapByValue({
       axis: 'x',
       sourceValue,
       candidateBounds: candidates,
@@ -153,8 +156,8 @@ export function calculateResizeGuideSnap(input: ResizeGuideInput): ResizeGuideRe
   }
 
   if (isVerticalResizable(input.direction)) {
-    const sourceValue = getResizableAxisValue(nextBounds, 'y', input.direction)
-    const ySnap = findBestAxisSnapByValue({
+    const sourceValue = getResizeEdgeValue(nextBounds, 'y', input.direction)
+    const ySnap = findBestSnapByValue({
       axis: 'y',
       sourceValue,
       candidateBounds: candidates,
@@ -186,31 +189,68 @@ function buildGuideLines(
   const lines: GuideLine[] = []
 
   if (xSnap) {
+    const distanceRange = getAxisDistanceRange(sourceBounds, xSnap.targetBounds, 'y')
     lines.push({
       axis: 'x',
       pos: xSnap.target.value,
       from: Math.min(sourceBounds.y, xSnap.targetBounds.y),
       to: Math.max(sourceBounds.y + sourceBounds.h, xSnap.targetBounds.y + xSnap.targetBounds.h),
+      distance: distanceRange?.distance,
+      distanceFrom: distanceRange?.from,
+      distanceTo: distanceRange?.to,
     })
   }
 
   if (ySnap) {
+    const distanceRange = getAxisDistanceRange(sourceBounds, ySnap.targetBounds, 'x')
     lines.push({
       axis: 'y',
       pos: ySnap.target.value,
       from: Math.min(sourceBounds.x, ySnap.targetBounds.x),
       to: Math.max(sourceBounds.x + sourceBounds.w, ySnap.targetBounds.x + ySnap.targetBounds.w),
+      distance: distanceRange?.distance,
+      distanceFrom: distanceRange?.from,
+      distanceTo: distanceRange?.to,
     })
   }
 
   return lines
 }
 
-function normalizeCandidateBounds(candidates: Bounds[]): Bounds[] {
+function normalizeCandidates(candidates: Bounds[]): Bounds[] {
   return candidates.map(candidate => normalizeBounds(candidate)).filter(candidate => candidate.w > 0 && candidate.h > 0)
 }
 
-function getAxisGuideLines(bounds: Bounds, axis: GuideAxis, includeCenter: boolean): GuideLineRef[] {
+function getAxisDistanceRange(
+  sourceBounds: Bounds,
+  targetBounds: Bounds,
+  axis: GuideAxis,
+): { distance: number; from: number; to: number } | null {
+  const sourceStart = axis === 'x' ? sourceBounds.x : sourceBounds.y
+  const sourceEnd = axis === 'x' ? sourceBounds.x + sourceBounds.w : sourceBounds.y + sourceBounds.h
+  const targetStart = axis === 'x' ? targetBounds.x : targetBounds.y
+  const targetEnd = axis === 'x' ? targetBounds.x + targetBounds.w : targetBounds.y + targetBounds.h
+
+  if (sourceEnd <= targetStart) {
+    return {
+      distance: targetStart - sourceEnd,
+      from: sourceEnd,
+      to: targetStart,
+    }
+  }
+
+  if (targetEnd <= sourceStart) {
+    return {
+      distance: sourceStart - targetEnd,
+      from: targetEnd,
+      to: sourceStart,
+    }
+  }
+
+  return null
+}
+
+function getGuideRefs(bounds: Bounds, axis: GuideAxis, includeCenter: boolean): GuideLineRef[] {
   if (axis === 'x') {
     const lines: GuideLineRef[] = [
       { value: bounds.x, kind: 'start' },
@@ -232,18 +272,18 @@ function getAxisGuideLines(bounds: Bounds, axis: GuideAxis, includeCenter: boole
   return lines
 }
 
-function findBestAxisSnap(params: {
+function findBestSnap(params: {
   axis: GuideAxis
   sourceBounds: Bounds
   candidateBounds: Bounds[]
   tolerance: number
   includeCenter: boolean
 }): AxisSnapCandidate | null {
-  const sourceLines = getAxisGuideLines(params.sourceBounds, params.axis, params.includeCenter)
-  return findBestAxisSnapFromLines(sourceLines, params.axis, params.candidateBounds, params.tolerance, params.includeCenter)
+  const sourceLines = getGuideRefs(params.sourceBounds, params.axis, params.includeCenter)
+  return findBestSnapFromLines(sourceLines, params.axis, params.candidateBounds, params.tolerance, params.includeCenter)
 }
 
-function findBestAxisSnapByValue(params: {
+function findBestSnapByValue(params: {
   axis: GuideAxis
   sourceValue: number
   candidateBounds: Bounds[]
@@ -251,10 +291,10 @@ function findBestAxisSnapByValue(params: {
   includeCenter: boolean
 }): AxisSnapCandidate | null {
   const sourceLines: GuideLineRef[] = [{ value: params.sourceValue, kind: 'start' }]
-  return findBestAxisSnapFromLines(sourceLines, params.axis, params.candidateBounds, params.tolerance, params.includeCenter)
+  return findBestSnapFromLines(sourceLines, params.axis, params.candidateBounds, params.tolerance, params.includeCenter)
 }
 
-function findBestAxisSnapFromLines(
+function findBestSnapFromLines(
   sourceLines: GuideLineRef[],
   axis: GuideAxis,
   candidateBounds: Bounds[],
@@ -264,7 +304,7 @@ function findBestAxisSnapFromLines(
   let best: AxisSnapCandidate | null = null
 
   for (const candidateBound of candidateBounds) {
-    const targetLines = getAxisGuideLines(candidateBound, axis, includeCenter)
+    const targetLines = getGuideRefs(candidateBound, axis, includeCenter)
     for (const source of sourceLines) {
       for (const target of targetLines) {
         const delta = target.value - source.value
@@ -309,7 +349,7 @@ function isVerticalResizable(direction: ResizeDirection): boolean {
   return direction.includes('n') || direction.includes('s')
 }
 
-function getResizableAxisValue(bounds: Bounds, axis: GuideAxis, direction: ResizeDirection): number {
+function getResizeEdgeValue(bounds: Bounds, axis: GuideAxis, direction: ResizeDirection): number {
   if (axis === 'x') {
     return direction.includes('w') ? bounds.x : bounds.x + bounds.w
   }

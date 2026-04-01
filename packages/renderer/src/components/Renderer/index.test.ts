@@ -182,6 +182,37 @@ describe('Renderer', () => {
     }
   })
 
+  it('拖拽图形时应显示 move guide line 并按参考线吸附', async () => {
+    const harness = await createRendererTestHarness({
+      shapes: [
+        { id: 'shape_drag_guide_source', x: 10, y: 10, w: 40, h: 30 },
+        { id: 'shape_drag_guide_target', x: 100, y: 80, w: 60, h: 40 },
+      ],
+    })
+
+    try {
+      await harness.dispatchSceneMouseDownAtCanvas({ x: 20, y: 20 })
+      await harness.dispatchWindowMouseMoveAtCanvas({ x: 107, y: 20 })
+
+      const movedShape = harness.designer.getElementById('shape_drag_guide_source')
+      expect(movedShape?.type === 'shape' ? movedShape.props.x : null).toBe(100)
+
+      const guideOverlay = harness.overlayLayer.querySelector('[data-guide-overlay="true"]')
+      expect(guideOverlay).toBeTruthy()
+
+      const xGuide = harness.overlayLayer.querySelector('line[data-guide-axis="x"]')
+      expect(xGuide).toBeTruthy()
+
+      const distanceLabel = harness.overlayLayer.querySelector('[data-guide-distance="40px"]')
+      expect(distanceLabel?.textContent).toBe('40px')
+
+      await harness.dispatchWindowMouseUp()
+      expect(harness.getInteraction().pointer.machine.mode()).toBe('idle')
+    } finally {
+      harness.dispose()
+    }
+  })
+
   it('ctrl+wheel 缩放应以当前指针位置为中心更新 viewport', async () => {
     const harness = await createRendererTestHarness()
 
@@ -229,6 +260,40 @@ describe('Renderer', () => {
       harness.designer.redo()
       const redoneShape = harness.designer.getElementById('shape_resize')
       expect(redoneShape?.type === 'shape' ? redoneShape.props.w : null).toBe(130)
+    } finally {
+      harness.dispose()
+    }
+  })
+
+  it('resize 时应显示 guide line 并按参考线吸附', async () => {
+    const harness = await createRendererTestHarness({
+      shapes: [
+        { id: 'shape_resize_guide_source', x: 100, y: 100, w: 100, h: 80 },
+        { id: 'shape_resize_guide_target', x: 230, y: 240, w: 80, h: 80 },
+      ],
+    })
+
+    try {
+      await harness.dispatchSceneMouseDownAtCanvas({ x: 140, y: 140 })
+      await harness.dispatchWindowMouseUp()
+
+      await harness.dispatchSceneMouseDownAtCanvas({ x: 200, y: 140 })
+      await harness.dispatchWindowMouseMoveAtCanvas({ x: 227, y: 140 })
+
+      const resizedShape = harness.designer.getElementById('shape_resize_guide_source')
+      expect(resizedShape?.type === 'shape' ? resizedShape.props.w : null).toBe(130)
+
+      const guideOverlay = harness.overlayLayer.querySelector('[data-guide-overlay="true"]')
+      expect(guideOverlay).toBeTruthy()
+
+      const xGuide = harness.overlayLayer.querySelector('line[data-guide-axis="x"]')
+      expect(xGuide).toBeTruthy()
+
+      const distanceLabel = harness.overlayLayer.querySelector('[data-guide-distance="60px"]')
+      expect(distanceLabel?.textContent).toBe('60px')
+
+      await harness.dispatchWindowMouseUp()
+      expect(harness.getInteraction().pointer.machine.mode()).toBe('idle')
     } finally {
       harness.dispose()
     }
