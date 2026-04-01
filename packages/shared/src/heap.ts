@@ -1,11 +1,11 @@
-export interface MinHeap<T> {
+export interface Heap<T> {
   push: (item: T) => void
   pop: () => T | undefined
   peek: () => T | undefined
   readonly length: number
 }
 
-export function createMinHeap<T>(scoreFn: (item: T) => number): MinHeap<T> {
+export function createHeap<T>(scoreFn: (item: T) => number): Heap<T> {
   const heap: T[] = []
 
   const bubbleUp = (index: number): void => {

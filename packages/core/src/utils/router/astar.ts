@@ -1,5 +1,5 @@
 import type { Bounds, Point } from '@diagen/shared'
-import { createMinHeap, expandBounds } from '@diagen/shared'
+import { createHeap, expandBounds } from '@diagen/shared'
 import type { Obstacle, RouteResult, RouterConfig } from './types'
 import { calculateBounds, simplifyOrthogonalPath } from './utils'
 
@@ -45,7 +45,7 @@ export function aStarRoute(
   // 障碍预先离散成栅格集合，查询成本可降为 O(1)。
   const obstacleGrid = buildObstacleGrid(obstacles, bounds, gridSize)
 
-  const openHeap = createMinHeap<AStarNode>(n => n.f)
+  const openHeap = createHeap<AStarNode>(n => n.f)
   const allNodes = new Map<number, AStarNode>()
   const closedSet = new Set<number>()
 
