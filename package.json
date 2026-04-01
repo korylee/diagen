@@ -7,6 +7,7 @@
   "scripts": {
     "build:packages": "turbo run build",
     "test:unit": "vitest --project unit",
+    "test:cov": "vitest --project unit --coverage",
     "watch": "turbo watch build"
   },
   "keywords": [],
@@ -27,6 +28,7 @@
     "tsdown": "catalog:dev",
     "turbo": "catalog:dev",
     "typescript": "catalog:dev",
+    "unplugin-solid": "catalog:dev",
     "vite": "catalog:dev",
     "vite-plugin-solid": "catalog:dev",
     "vitest": "catalog:test"

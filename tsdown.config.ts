@@ -1,5 +1,6 @@
 import type { UserConfig } from 'tsdown'
-import solid from '@rolldown-plugin/solid'
+// import solid from '@rolldown-plugin/solid'
+import solid from 'unplugin-solid/rolldown'
 
 const externals = ['solid-js', /@diagen\/.*/]
 
