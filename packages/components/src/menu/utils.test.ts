@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import type { MenuDataItem } from '../types'
+import type { MenuDataItem } from './types'
 import {
   findMenuItemByKey,
   findMenuKeyPath,
@@ -13,7 +13,7 @@ import {
   isMenuItem,
   isMenuSubMenu,
   uniqueMenuKeys,
-} from '../utils'
+} from './utils'
 
 const items: readonly MenuDataItem[] = [
   {
