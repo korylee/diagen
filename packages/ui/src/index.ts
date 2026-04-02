@@ -1,3 +1,5 @@
 export * from './iconRegistry'
+export * from './actions'
 export * from './toolbar'
 export * from './sidebar'
+export * from './contextMenu'

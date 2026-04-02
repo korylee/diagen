@@ -19,7 +19,8 @@
   "dependencies": {
     "@diagen/core": "workspace:^",
     "@diagen/icons": "workspace:^",
-    "@diagen/components": "workspace:^"
+    "@diagen/components": "workspace:^",
+    "@diagen/renderer": "workspace:^"
   },
   "peerDependencies": {
     "solid-js": "^1.9.11"

@@ -3,7 +3,7 @@ import type { IconProps } from '@diagen/icons'
 import { Delete, Batch, Fit, Group, IconBase, Linker, Redo, Undo, Ungroup, ZoomIn, ZoomOut } from '@diagen/icons'
 import { keys, type KeyOf } from '@diagen/shared'
 
-interface Icon {
+export interface Icon {
   (props: IconProps): JSX.Element
 }
 
