@@ -1,6 +1,6 @@
-import type { PanelRailItem, PanelSectionData } from '@diagen/components'
+import type { SidebarRailItem, SidebarSectionData } from './types'
 
-function matchesPanelItem(
+function matchesSidebarItem(
   query: string,
   item: { label: string; description?: string; meta?: string; keywords?: readonly string[] },
 ): boolean {
@@ -12,10 +12,10 @@ function matchesPanelItem(
   return haystack.includes(query)
 }
 
-export function filterPanelSections(sections: readonly PanelSectionData[], query: string): PanelSectionData[] {
+export function filterSidebarSections(sections: readonly SidebarSectionData[], query: string): SidebarSectionData[] {
   return sections
     .map(section => {
-      const items = section.items.filter(item => matchesPanelItem(query, item))
+      const items = section.items.filter(item => matchesSidebarItem(query, item))
       return {
         ...section,
         items,
@@ -25,16 +25,16 @@ export function filterPanelSections(sections: readonly PanelSectionData[], query
     .filter(section => section.items.length > 0)
 }
 
-export function createPanelSearchSections(
-  librarySections: readonly PanelSectionData[],
-  actionSections: readonly PanelSectionData[],
+export function createSidebarSearchSections(
+  librarySections: readonly SidebarSectionData[],
+  actionSections: readonly SidebarSectionData[],
   query: string,
-): PanelSectionData[] {
+): SidebarSectionData[] {
   const items = [...librarySections, ...actionSections].flatMap(section => {
     const source = section.title ?? section.id ?? 'Section'
 
     return section.items
-      .filter(item => matchesPanelItem(query, item))
+      .filter(item => matchesSidebarItem(query, item))
       .map(item => ({
         ...item,
         meta: source,
@@ -55,7 +55,7 @@ export function createPanelSearchSections(
   ]
 }
 
-export function createPanelRailItems(sections: readonly PanelSectionData[]): PanelRailItem[] {
+export function createSidebarRailItems(sections: readonly SidebarSectionData[]): SidebarRailItem[] {
   return sections.map(section => ({
     id: section.id ?? section.title ?? 'category',
     label: section.title ?? 'Category',

@@ -1,4 +1,4 @@
-.dg-action-bar {
+.dg-toolbar {
   display: flex;
   align-items: center;
   gap: 0;
@@ -10,9 +10,7 @@
   border-bottom: 1px solid #ddd5c8;
 }
 
-.dg-action-bar__button,
-.dg-action-bar__link,
-.dg-action-bar__field {
+.dg-toolbar__button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -24,44 +22,36 @@
   background: transparent;
   color: #2f3742;
   white-space: nowrap;
-}
-
-.dg-action-bar__button,
-.dg-action-bar__link {
   cursor: pointer;
   transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 
-.dg-action-bar__button:hover,
-.dg-action-bar__link:hover {
+.dg-toolbar__button:hover {
   background: #f7f1e6;
   border-color: #ddd5c8;
 }
 
-.dg-action-bar__button:disabled,
-.dg-action-bar__button[aria-disabled='true'],
-.dg-action-bar__link[aria-disabled='true'] {
+.dg-toolbar__button:disabled,
+.dg-toolbar__button[aria-disabled='true'] {
   cursor: not-allowed;
   opacity: 0.48;
 }
 
-.dg-action-bar__button--active,
-.dg-action-bar__button--selected,
-.dg-action-bar__link--active,
-.dg-action-bar__link--selected {
+.dg-toolbar__button--active,
+.dg-toolbar__button--selected {
   background: #edf7f4;
   border-color: #9fc7be;
   color: #17453c;
 }
 
-.dg-action-bar__icon,
-.dg-action-bar__caret,
-.dg-action-bar__text,
-.dg-action-bar__color {
+.dg-toolbar__icon,
+.dg-toolbar__caret,
+.dg-toolbar__text,
+.dg-toolbar__color {
   flex-shrink: 0;
 }
 
-.dg-action-bar__icon {
+.dg-toolbar__icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -71,7 +61,7 @@
   line-height: 1;
 }
 
-.dg-action-bar__text {
+.dg-toolbar__text {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -79,14 +69,14 @@
   line-height: 1;
 }
 
-.dg-action-bar__color {
+.dg-toolbar__color {
   width: 12px;
   height: 12px;
   border: 1px solid rgba(47, 55, 66, 0.18);
   border-radius: 999px;
 }
 
-.dg-action-bar__caret {
+.dg-toolbar__caret {
   width: 0;
   height: 0;
   border-left: 4px solid transparent;
@@ -94,14 +84,7 @@
   border-top: 5px solid #7d7467;
 }
 
-.dg-action-bar__field {
-  justify-content: flex-start;
-  padding: 0 8px;
-  border-color: #ddd5c8;
-  background: #fff;
-}
-
-.dg-action-bar__divider {
+.dg-toolbar__divider {
   flex-shrink: 0;
   width: 1px;
   height: 22px;
@@ -109,13 +92,7 @@
   background: #ddd5c8;
 }
 
-.dg-action-bar__divider--small {
-  height: 16px;
-  margin: 0 4px;
-  opacity: 0.8;
-}
-
-.dg-action-bar__spacer {
+.dg-toolbar__spacer {
   flex: 1;
   min-width: 0;
 }

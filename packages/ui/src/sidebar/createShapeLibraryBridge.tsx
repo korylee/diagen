@@ -1,9 +1,9 @@
 import { createMemo, type Accessor } from 'solid-js'
 import { Schema, type Designer } from '@diagen/core'
-import type { PanelSectionData } from '@diagen/components'
 
 import { SidebarCanvasPreview } from './SidebarCanvasPreview'
 import { selectLinkerCreationTool, selectShapeCreationTool, type SidebarCreationMode } from './creationMode'
+import type { SidebarSectionData } from './types'
 
 function resolveActiveItemId(designer: Designer): string | undefined {
   const current = designer.tool.toolState()
@@ -38,7 +38,7 @@ function resolveCreationMode(creationMode?: Accessor<SidebarCreationMode>): Side
 export function createShapeLibraryBridge(designer: Designer, options: CreateShapeLibraryBridgeOptions = {}) {
   const activeItemId = createMemo<string | undefined>(() => resolveActiveItemId(designer))
 
-  const shapeSections = createMemo<PanelSectionData[]>(() =>
+  const shapeSections = createMemo<SidebarSectionData[]>(() =>
     Schema.getAllCategories().map(category => {
       const shapes = Schema.getShapesByCategory(category.id)
 
@@ -63,7 +63,7 @@ export function createShapeLibraryBridge(designer: Designer, options: CreateShap
     }),
   )
 
-  const linkerSection = createMemo<PanelSectionData>(() => ({
+  const linkerSection = createMemo<SidebarSectionData>(() => ({
     id: 'category:linkers',
     title: '连线',
     description: '选择连线类型后直接在画布发起创建',
@@ -82,7 +82,7 @@ export function createShapeLibraryBridge(designer: Designer, options: CreateShap
     })),
   }))
 
-  const sections = createMemo<readonly PanelSectionData[]>(() => [...shapeSections(), linkerSection()])
+  const sections = createMemo<readonly SidebarSectionData[]>(() => [...shapeSections(), linkerSection()])
 
   return {
     sections,

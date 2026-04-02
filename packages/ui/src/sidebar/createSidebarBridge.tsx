@@ -1,13 +1,12 @@
 import type { Designer } from '@diagen/core'
-import type { PanelItemData } from '@diagen/components'
 
 import { createShapeLibraryBridge } from './createShapeLibraryBridge'
-import type { SidebarBridge } from './types'
+import type { SidebarBridge, SidebarItemData } from './types'
 
 export function createSidebarBridge(designer: Designer): SidebarBridge {
   const shapeLibrary = createShapeLibraryBridge(designer)
 
-  function getItemById(id: string): PanelItemData | undefined {
+  function getItemById(id: string): SidebarItemData | undefined {
     for (const section of shapeLibrary.sections()) {
       const matched = section.items.find(item => item.id === id)
       if (matched) return matched

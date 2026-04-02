@@ -3,74 +3,33 @@ import { createMemo, createSignal, For, Show, splitProps } from 'solid-js'
 
 import { createDgBem, cx } from '@diagen/shared'
 import type {
-  PanelBodyProps,
-  PanelDensity,
-  PanelFrameProps,
-  PanelItemData,
-  PanelRailProps,
-  PanelSearchFieldProps,
-  PanelSectionData,
-  PanelSectionLayout,
-  PanelSectionProps,
+  SidebarBodyProps,
+  SidebarDensity,
+  SidebarFrameProps,
+  SidebarItemData,
+  SidebarRailProps,
+  SidebarSearchFieldProps,
+  SidebarSectionData,
+  SidebarSectionLayout,
 } from './types'
 
-export * from './types'
-
-import './index.css'
+import './panel.css'
 
 const bem = createDgBem('panel')
 
-export function getPanelSectionKey(section: PanelSectionData, index: number): string {
-  return section.id ?? `section-${index}`
-}
-
-export function createPanelSectionCollapse(onSectionToggle?: (section: PanelSectionData, collapsed: boolean) => void) {
-  const [collapsedMap, setCollapsedMap] = createSignal<Record<string, boolean>>({})
-
-  const isCollapsed = (section: PanelSectionData, index: number): boolean => {
-    if (!section.collapsible) return false
-    if (section.collapsed !== undefined) return section.collapsed
-
-    const key = getPanelSectionKey(section, index)
-    const cachedValue = collapsedMap()[key]
-    if (cachedValue !== undefined) {
-      return cachedValue
-    }
-
-    return section.defaultCollapsed ?? false
-  }
-
-  const toggleSection = (section: PanelSectionData, index: number): void => {
-    if (!section.collapsible) return
-
-    const nextCollapsed = !isCollapsed(section, index)
-    if (section.collapsed === undefined) {
-      const key = getPanelSectionKey(section, index)
-      setCollapsedMap(current => ({ ...current, [key]: nextCollapsed }))
-    }
-
-    onSectionToggle?.(section, nextCollapsed)
-  }
-
-  return {
-    isCollapsed,
-    toggleSection,
-  }
-}
-
-function resolveSectionLayout(section: PanelSectionData): PanelSectionLayout {
+function resolveSectionLayout(section: SidebarSectionData): SidebarSectionLayout {
   return section.layout ?? 'list'
 }
 
-function hasSectionHeader(section: PanelSectionData): boolean {
+function hasSectionHeader(section: SidebarSectionData): boolean {
   return Boolean(section.title || section.description || section.meta || section.headerAction)
 }
 
-function resolveItemVisual(item: PanelItemData, layout: PanelSectionLayout): JSX.Element | undefined {
+function resolveItemVisual(item: SidebarItemData, layout: SidebarSectionLayout): JSX.Element | undefined {
   return layout === 'grid' ? (item.preview ?? item.leading) : (item.leading ?? item.preview)
 }
 
-export function PanelFrame(props: PanelFrameProps): JSX.Element {
+export function SidebarFrame(props: SidebarFrameProps): JSX.Element {
   const [local, rest] = splitProps(props, ['readonly', 'class', 'children'])
 
   return (
@@ -80,7 +39,7 @@ export function PanelFrame(props: PanelFrameProps): JSX.Element {
   )
 }
 
-export function PanelHeader(props: JSX.HTMLAttributes<HTMLDivElement>): JSX.Element {
+export function SidebarHeader(props: JSX.HTMLAttributes<HTMLDivElement>): JSX.Element {
   const [local, rest] = splitProps(props, ['class', 'children'])
   return (
     <div {...rest} class={cx(bem('header'), local.class)}>
@@ -89,7 +48,7 @@ export function PanelHeader(props: JSX.HTMLAttributes<HTMLDivElement>): JSX.Elem
   )
 }
 
-export function PanelBody(props: PanelBodyProps): JSX.Element {
+export function SidebarBody(props: SidebarBodyProps): JSX.Element {
   const [local, rest] = splitProps(props, ['class', 'stacked', 'children'])
   return (
     <div {...rest} class={cx(bem('body', { stacked: local.stacked }), local.class)}>
@@ -98,7 +57,7 @@ export function PanelBody(props: PanelBodyProps): JSX.Element {
   )
 }
 
-export function PanelFooter(props: JSX.HTMLAttributes<HTMLDivElement>): JSX.Element {
+export function SidebarFooter(props: JSX.HTMLAttributes<HTMLDivElement>): JSX.Element {
   const [local, rest] = splitProps(props, ['class', 'children'])
   return (
     <div {...rest} class={cx(bem('footer'), local.class)}>
@@ -107,7 +66,7 @@ export function PanelFooter(props: JSX.HTMLAttributes<HTMLDivElement>): JSX.Elem
   )
 }
 
-export function PanelSearchField(props: PanelSearchFieldProps): JSX.Element {
+export function SidebarSearchField(props: SidebarSearchFieldProps): JSX.Element {
   const [local, rest] = splitProps(props, ['class', 'style', 'value', 'placeholder', 'onInput', 'onClear'])
 
   return (
@@ -136,9 +95,9 @@ export function PanelSearchField(props: PanelSearchFieldProps): JSX.Element {
   )
 }
 
-export function PanelSectionHeader(props: {
-  section: PanelSectionData
-  collapsed?: boolean
+function SidebarSectionHeader(props: {
+  section: SidebarSectionData
+  collapsed: boolean
   onToggle?: () => void
   class?: string
 }): JSX.Element {
@@ -183,13 +142,13 @@ export function PanelSectionHeader(props: {
   )
 }
 
-function PanelItemButton(props: {
-  item: PanelItemData
-  layout: PanelSectionLayout
+function SidebarItemButton(props: {
+  item: SidebarItemData
+  layout: SidebarSectionLayout
   activeItemId?: string
   readonly?: boolean
-  onItemSelect?: (item: PanelItemData) => void
-  density?: PanelDensity
+  onItemSelect?: (item: SidebarItemData) => void
+  density?: SidebarDensity
 }): JSX.Element {
   const isGrid = () => props.layout === 'grid'
   const isActive = () => props.item.active ?? props.item.id === props.activeItemId
@@ -239,17 +198,33 @@ function PanelItemButton(props: {
   )
 }
 
-export function PanelSection(props: PanelSectionProps): JSX.Element {
-  const layout = createMemo<PanelSectionLayout>(() => resolveSectionLayout(props.section))
-  const collapsed = createMemo<boolean>(() => props.isCollapsed(props.section, props.index))
+export function SidebarSection(props: {
+  section: SidebarSectionData
+  activeItemId?: string
+  readonly?: boolean
+  emptyState?: JSX.Element
+  density?: SidebarDensity
+  onCollapsedChange?: (collapsed: boolean) => void
+  onItemSelect?: (item: SidebarItemData, section: SidebarSectionData) => void
+}): JSX.Element {
+  const layout = createMemo<SidebarSectionLayout>(() => resolveSectionLayout(props.section))
+  const [internalCollapsed, setInternalCollapsed] = createSignal(props.section.defaultCollapsed ?? false)
+  const collapsed = createMemo<boolean>(() => {
+    if (!props.section.collapsible) return false
+    return props.section.collapsed ?? internalCollapsed()
+  })
+
+  const toggleSection = () => {
+    if (!props.section.collapsible || props.section.collapsed !== undefined) return
+
+    const nextCollapsed = !collapsed()
+    setInternalCollapsed(nextCollapsed)
+    props.onCollapsedChange?.(nextCollapsed)
+  }
 
   return (
     <section class={bem('section')} data-layout={layout()}>
-      <PanelSectionHeader
-        section={props.section}
-        collapsed={collapsed()}
-        onToggle={() => props.onToggleSection(props.section, props.index)}
-      />
+      <SidebarSectionHeader section={props.section} collapsed={collapsed()} onToggle={toggleSection} />
 
       <Show when={!collapsed()}>
         <Show
@@ -259,7 +234,7 @@ export function PanelSection(props: PanelSectionProps): JSX.Element {
           <div class={bem('section-content', [layout() === 'grid' ? 'grid' : 'list'])} role="list">
             <For each={props.section.items}>
               {item => (
-                <PanelItemButton
+                <SidebarItemButton
                   item={item}
                   layout={layout()}
                   activeItemId={props.activeItemId}
@@ -276,7 +251,7 @@ export function PanelSection(props: PanelSectionProps): JSX.Element {
   )
 }
 
-export function PanelRail(props: PanelRailProps): JSX.Element {
+export function SidebarRail(props: SidebarRailProps): JSX.Element {
   const [local, rest] = splitProps(props, ['items', 'activeItemId', 'readonly', 'onItemSelect', 'class'])
 
   return (

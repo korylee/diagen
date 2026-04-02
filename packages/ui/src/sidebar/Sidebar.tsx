@@ -2,18 +2,15 @@ import { createEffect, createMemo, createSignal, For, Show, splitProps, type JSX
 import type { Designer } from '@diagen/core'
 import { createDgBem, cx, ensureArray } from '@diagen/shared'
 import {
-  PanelBody,
-  PanelFooter,
-  PanelFrame,
-  PanelHeader,
-  PanelRail,
-  PanelSearchField,
-  PanelSection,
-  type PanelFrameProps,
-  type PanelItemData,
-  type PanelRailItem,
-  type PanelSectionData,
-} from '@diagen/components'
+  SidebarBody,
+  SidebarFooter,
+  SidebarFrame,
+  SidebarHeader,
+  SidebarRail,
+  SidebarSearchField,
+  SidebarSection,
+} from './panel'
+import type { SidebarFrameProps, SidebarItemData, SidebarRailItem, SidebarSectionData } from './types'
 
 import {
   createIconRegistry,
@@ -22,11 +19,11 @@ import {
 } from '../iconRegistry'
 import { syncCreationModeForActiveTool, type SidebarCreationMode } from './creationMode'
 import { createShapeLibraryBridge } from './createShapeLibraryBridge'
-import { createPanelRailItems, createPanelSearchSections, filterPanelSections } from './search'
+import { createSidebarRailItems, createSidebarSearchSections, filterSidebarSections } from './search'
 
 import './sidebar.css'
 
-export interface SidebarProps extends Omit<PanelFrameProps, 'children'> {
+export interface SidebarProps extends Omit<SidebarFrameProps, 'children'> {
   designer: Designer
   searchable?: boolean
   searchPlaceholder?: string
@@ -34,8 +31,8 @@ export interface SidebarProps extends Omit<PanelFrameProps, 'children'> {
   header?: JSX.Element
   footer?: JSX.Element
   emptyState?: JSX.Element
-  onItemSelect?: (item: PanelItemData, section: PanelSectionData) => void
-  onSectionToggle?: (section: PanelSectionData, collapsed: boolean) => void
+  onItemSelect?: (item: SidebarItemData, section: SidebarSectionData) => void
+  onSectionToggle?: (section: SidebarSectionData, collapsed: boolean) => void
 }
 
 const bem = createDgBem('sidebar')
@@ -66,14 +63,14 @@ export function Sidebar(props: SidebarProps): JSX.Element {
 
   const normalizedQuery = createMemo<string>(() => searchValue().trim().toLowerCase())
   const isSearching = createMemo<boolean>(() => normalizedQuery().length > 0)
-  const librarySections = createMemo<readonly PanelSectionData[]>(() => shapeLibrary.sections())
-  const librarySearchSections = createMemo<PanelSectionData[]>(() =>
-    isSearching() ? filterPanelSections(librarySections(), normalizedQuery()) : [...librarySections()],
+  const librarySections = createMemo<readonly SidebarSectionData[]>(() => shapeLibrary.sections())
+  const librarySearchSections = createMemo<SidebarSectionData[]>(() =>
+    isSearching() ? filterSidebarSections(librarySections(), normalizedQuery()) : [...librarySections()],
   )
-  const searchSections = createMemo<PanelSectionData[]>(() =>
-    isSearching() ? createPanelSearchSections(librarySections(), [], normalizedQuery()) : [],
+  const searchSections = createMemo<SidebarSectionData[]>(() =>
+    isSearching() ? createSidebarSearchSections(librarySections(), [], normalizedQuery()) : [],
   )
-  const railItems = createMemo<PanelRailItem[]>(() => createPanelRailItems(librarySearchSections()))
+  const railItems = createMemo<SidebarRailItem[]>(() => createSidebarRailItems(librarySearchSections()))
 
   const resolvedActiveCategoryId = createMemo<string | undefined>(() => {
     const categories = railItems()
@@ -97,11 +94,11 @@ export function Sidebar(props: SidebarProps): JSX.Element {
     return categories[0]?.id
   })
 
-  const activeLibrarySection = createMemo<PanelSectionData | undefined>(() => {
+  const activeLibrarySection = createMemo<SidebarSectionData | undefined>(() => {
     const targetId = resolvedActiveCategoryId()
     return librarySearchSections().find(section => section.id === targetId) ?? librarySearchSections()[0]
   })
-  const visibleLibrarySections = createMemo<PanelSectionData[]>(() => {
+  const visibleLibrarySections = createMemo<SidebarSectionData[]>(() => {
     if (isSearching()) return []
     return ensureArray(activeLibrarySection())
   })
@@ -115,14 +112,14 @@ export function Sidebar(props: SidebarProps): JSX.Element {
   })
 
   return (
-    <PanelFrame
+    <SidebarFrame
       {...rest}
       readonly={local.readonly}
       class={cx(bem(), local.class)}
       data-searching={isSearching() ? 'true' : undefined}
       aria-label={rest['aria-label'] ?? 'Sidebar'}
     >
-      <PanelHeader class={bem('topbar')}>
+      <SidebarHeader class={bem('topbar')}>
         <Show when={local.header}>
           <div class={bem('header-slot')}>{local.header}</div>
         </Show>
@@ -158,10 +155,10 @@ export function Sidebar(props: SidebarProps): JSX.Element {
             })}
           </button>
         </div>
-      </PanelHeader>
+      </SidebarHeader>
 
       <Show when={local.searchable !== false}>
-        <PanelSearchField
+        <SidebarSearchField
           value={searchValue()}
           placeholder={local.searchPlaceholder ?? 'Search'}
           onInput={setSearchValue}
@@ -169,18 +166,16 @@ export function Sidebar(props: SidebarProps): JSX.Element {
         />
       </Show>
 
-      <PanelBody stacked class={bem('body')}>
+      <SidebarBody stacked class={bem('body')}>
         <Show when={hasSearchSections()}>
           <div class={bem('stack')}>
             <For each={searchSections()}>
-              {(section, index) => (
-                <PanelSection
+              {section => (
+                <SidebarSection
                   section={section}
-                  index={index()}
                   readonly={local.readonly}
                   emptyState={local.emptyState}
-                  isCollapsed={() => false}
-                  onToggleSection={() => {}}
+                  onCollapsedChange={collapsed => local.onSectionToggle?.(section, collapsed)}
                   onItemSelect={local.onItemSelect}
                 />
               )}
@@ -194,16 +189,14 @@ export function Sidebar(props: SidebarProps): JSX.Element {
             fallback={
               <div class={bem('stack')}>
                 <For each={visibleLibrarySections()}>
-                  {(section, index) => (
-                    <PanelSection
+                  {section => (
+                    <SidebarSection
                       section={section}
-                      index={index()}
                       activeItemId={shapeLibrary.activeItemId()}
                       readonly={local.readonly}
                       emptyState={local.emptyState}
                       density="compact"
-                      isCollapsed={() => false}
-                      onToggleSection={() => {}}
+                      onCollapsedChange={collapsed => local.onSectionToggle?.(section, collapsed)}
                       onItemSelect={local.onItemSelect}
                     />
                   )}
@@ -212,7 +205,7 @@ export function Sidebar(props: SidebarProps): JSX.Element {
             }
           >
             <div class={bem('library-shell')}>
-              <PanelRail
+              <SidebarRail
                 class={bem('rail')}
                 items={railItems()}
                 activeItemId={resolvedActiveCategoryId()}
@@ -222,16 +215,14 @@ export function Sidebar(props: SidebarProps): JSX.Element {
 
               <div class={bem('library-panel')}>
                 <For each={visibleLibrarySections()}>
-                  {(section, index) => (
-                    <PanelSection
+                  {section => (
+                    <SidebarSection
                       section={section}
-                      index={index()}
                       activeItemId={shapeLibrary.activeItemId()}
                       readonly={local.readonly}
                       emptyState={local.emptyState}
                       density="compact"
-                      isCollapsed={() => false}
-                      onToggleSection={() => {}}
+                      onCollapsedChange={collapsed => local.onSectionToggle?.(section, collapsed)}
                       onItemSelect={local.onItemSelect}
                     />
                   )}
@@ -244,11 +235,11 @@ export function Sidebar(props: SidebarProps): JSX.Element {
         <Show when={!hasSearchSections() && !hasVisibleLibrarySections()}>
           <div class={bem('empty')}>{local.emptyState ?? 'No items'}</div>
         </Show>
-      </PanelBody>
+      </SidebarBody>
 
       <Show when={local.footer}>
-        <PanelFooter>{local.footer}</PanelFooter>
+        <SidebarFooter>{local.footer}</SidebarFooter>
       </Show>
-    </PanelFrame>
+    </SidebarFrame>
   )
 }
