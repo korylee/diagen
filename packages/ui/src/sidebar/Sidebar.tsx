@@ -13,10 +13,11 @@ import {
 import type { SidebarFrameProps, SidebarItemData, SidebarRailItem, SidebarSectionData } from './types'
 
 import {
-  createIconRegistry,
+  mergeIconRegistry,
   renderIcon,
   type IconRegistryOverrides,
 } from '../iconRegistry'
+import { useUIIconRegistry } from '../config'
 import { syncCreationModeForActiveTool, type SidebarCreationMode } from './creationMode'
 import { createShapeLibraryBridge } from './createShapeLibraryBridge'
 import { createSidebarRailItems, createSidebarSearchSections, filterSidebarSections } from './search'
@@ -53,7 +54,10 @@ export function Sidebar(props: SidebarProps): JSX.Element {
   ])
 
   const [creationMode, setCreationMode] = createSignal<SidebarCreationMode>('batch')
-  const iconRegistry = createIconRegistry(local.iconRegistry)
+  const globalIconRegistry = useUIIconRegistry()
+  const iconRegistry = createMemo(() =>
+    local.iconRegistry ? mergeIconRegistry(globalIconRegistry(), local.iconRegistry) : globalIconRegistry(),
+  )
   const shapeLibrary = createShapeLibraryBridge(local.designer, {
     creationMode,
   })
@@ -134,7 +138,7 @@ export function Sidebar(props: SidebarProps): JSX.Element {
             title="单个创建"
             onClick={() => setCreationMode('single')}
           >
-            {renderIcon('create-single', iconRegistry, {
+            {renderIcon('create-single', iconRegistry(), {
               size: 16,
               class: bem('mode-icon'),
             })}
@@ -149,7 +153,7 @@ export function Sidebar(props: SidebarProps): JSX.Element {
             title="批量创建"
             onClick={() => setCreationMode('batch')}
           >
-            {renderIcon('create-batch', iconRegistry, {
+            {renderIcon('create-batch', iconRegistry(), {
               size: 16,
               class: bem('mode-icon'),
             })}

@@ -1,7 +1,8 @@
-import { For, Show, splitProps } from 'solid-js'
+import { createMemo, For, Show, splitProps } from 'solid-js'
 import type { JSX } from 'solid-js'
 
-import { createIconRegistry, renderIcon, type IconRegistryOverrides } from '../iconRegistry'
+import { mergeIconRegistry, renderIcon, type IconRegistryOverrides } from '../iconRegistry'
+import { useUIIconRegistry } from '../config'
 import { createToolbarBridge } from './createToolbarBridge'
 import type { ToolbarBridgeItem, ToolbarEntries, ToolbarItem } from './types'
 import { createDgBem, cx, pick, toUnit } from '@diagen/shared'
@@ -130,12 +131,15 @@ function ToolbarBridgeItemView(props: {
 export function Toolbar(props: ToolbarProps) {
   const [local, rest] = splitProps(props, ['class', 'style', 'width', 'rightSlot', 'renderIcon', 'iconRegistry', 'entries'])
   const bridge = createToolbarBridge(local.entries)
-  const iconRegistry = createIconRegistry(local.iconRegistry)
+  const globalIconRegistry = useUIIconRegistry()
+  const iconRegistry = createMemo(() =>
+    local.iconRegistry ? mergeIconRegistry(globalIconRegistry(), local.iconRegistry) : globalIconRegistry(),
+  )
   const renderToolbarIcon: ToolbarProps['renderIcon'] = (iconKey, item) => {
     return local.renderIcon
       ? local.renderIcon(iconKey, item)
       : typeof iconKey === 'string'
-        ? (renderIcon(iconKey as any, iconRegistry, { size: 16 }) ?? <span>•</span>)
+        ? (renderIcon(iconKey as any, iconRegistry(), { size: 16 }) ?? <span>•</span>)
         : iconKey?.({ size: 16 })
   }
 

@@ -16,6 +16,7 @@ vi.mock('@diagen/renderer', () => ({
     }
     return testContext.designer
   },
+  useDesignerContext: () => testContext.designer,
 }))
 
 function createShapeById(id: string, x: number, y: number) {

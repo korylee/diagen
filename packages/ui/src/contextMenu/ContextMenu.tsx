@@ -3,7 +3,8 @@ import { createEventListener } from '@diagen/primitives'
 import type { JSX } from 'solid-js'
 import { createMemo, Show, splitProps } from 'solid-js'
 import { Portal } from 'solid-js/web'
-import { createIconRegistry, renderIcon, type IconRegistryOverrides } from '../iconRegistry'
+import { mergeIconRegistry, renderIcon, type IconRegistryOverrides } from '../iconRegistry'
+import { useUIIconRegistry } from '../config'
 import { createContextMenuBridge } from './createContextMenuBridge'
 import type { ContextMenuEntries, ContextMenuItem, ContextMenuPosition } from './types'
 
@@ -29,12 +30,15 @@ export function ContextMenu(props: ContextMenuProps) {
     'style',
   ])
   const bridge = createContextMenuBridge(local.entries)
-  const iconRegistry = createIconRegistry(local.iconRegistry)
+  const globalIconRegistry = useUIIconRegistry()
+  const iconRegistry = createMemo(() =>
+    local.iconRegistry ? mergeIconRegistry(globalIconRegistry(), local.iconRegistry) : globalIconRegistry(),
+  )
   const _renderIcon = (icon: ContextMenuItem['icon'], item: ContextMenuItem) => {
     return typeof icon === 'string'
       ? local.renderIcon
         ? local.renderIcon(icon, item)
-        : renderIcon(icon as any, iconRegistry)
+        : renderIcon(icon as any, iconRegistry())
       : icon?.({})
   }
   const items = createMemo(() =>

@@ -38,8 +38,11 @@ export type IconRegistry = Record<IconKey, Icon>
 
 export type IconRegistryOverrides = Partial<IconRegistry>
 
-export function createIconRegistry(overrides: IconRegistryOverrides = {}): IconRegistry {
-  const next: IconRegistry = { ...defaultIconRegistry }
+export function mergeIconRegistry(
+  base: IconRegistry = defaultIconRegistry,
+  overrides: IconRegistryOverrides = {},
+): IconRegistry {
+  const next: IconRegistry = { ...base }
 
   for (const key of keys(overrides)) {
     const override = overrides[key]
@@ -51,6 +54,10 @@ export function createIconRegistry(overrides: IconRegistryOverrides = {}): IconR
   }
 
   return next
+}
+
+export function createIconRegistry(overrides: IconRegistryOverrides = {}): IconRegistry {
+  return mergeIconRegistry(defaultIconRegistry, overrides)
 }
 
 export function renderIcon(
