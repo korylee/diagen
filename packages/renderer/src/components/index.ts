@@ -1,5 +1,4 @@
 export * from './DesignerProvider'
-export * from './ThemeProvider'
 export * from './InteractionOverlay'
 export * from './InteractionProvider'
 export * from './Renderer'

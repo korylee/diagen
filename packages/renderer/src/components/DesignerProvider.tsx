@@ -25,12 +25,16 @@ export function DesignerProvider(props: DesignerProviderProps) {
   )
 }
 
+export function useDesignerContext(): Designer | undefined {
+  return useContext(DesignerContext)
+}
+
 /**
  * Hook to access the Designer from context
  * Must be used within a DesignerProvider
  */
 export function useDesigner(): Designer {
-  const designer = useContext(DesignerContext)
+  const designer = useDesignerContext()
   if (!designer) {
     throw new Error('useDesignerFromContext must be used within a DesignerProvider')
   }
