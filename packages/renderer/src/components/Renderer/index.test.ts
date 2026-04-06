@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
+import { createLinker } from '@diagen/core'
 import { createRendererTestHarness } from '../../.test/createRendererTestHarness'
+
+type RendererHarness = Awaited<ReturnType<typeof createRendererTestHarness>>
 
 function rotateVector(point: { x: number; y: number }, center: { x: number; y: number }) {
   return {
@@ -47,6 +50,76 @@ async function dispatchKeyDown(init: KeyboardEventInit): Promise<KeyboardEvent> 
 
 async function sleep(ms: number): Promise<void> {
   await new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function selectSingleShape(
+  harness: RendererHarness,
+  point: { x: number; y: number },
+  expectedId?: string,
+): Promise<void> {
+  await harness.dispatchSceneMouseDownAtCanvas(point)
+  await harness.dispatchWindowMouseUp()
+
+  if (expectedId) {
+    expect(harness.designer.selection.selectedIds()).toEqual([expectedId])
+  }
+}
+
+function getShapeProps(harness: RendererHarness, id: string) {
+  const shape = harness.designer.getElementById(id)
+  expect(shape?.type).toBe('shape')
+  if (!shape || shape.type !== 'shape') {
+    throw new Error(`shape ${id} 未找到`)
+  }
+  return shape.props
+}
+
+function expectShapeProps(
+  harness: RendererHarness,
+  id: string,
+  expected: Partial<{
+    x: number
+    y: number
+    w: number
+    h: number
+    angle: number
+  }>,
+): void {
+  const props = getShapeProps(harness, id)
+  for (const [key, value] of Object.entries(expected) as Array<[keyof typeof expected, number]>) {
+    expect(props[key]).toBe(value)
+  }
+}
+
+function getLinkerOrThrow(harness: RendererHarness, id: string) {
+  const linker = harness.designer.getElementById(id)
+  expect(linker?.type).toBe('linker')
+  if (!linker || linker.type !== 'linker') {
+    throw new Error(`linker ${id} 未找到`)
+  }
+  return linker
+}
+
+function expectLinkerEndpoint(
+  harness: RendererHarness,
+  id: string,
+  endpoint: 'from' | 'to',
+  expected: Partial<{
+    id: string | null
+    x: number
+    y: number
+  }>,
+): void {
+  const target = getLinkerOrThrow(harness, id)[endpoint]
+  for (const [key, value] of Object.entries(expected) as Array<[keyof typeof expected, string | number | null]>) {
+    expect(target[key]).toBe(value)
+  }
+}
+
+function getRotateHandle(harness: RendererHarness): HTMLElement {
+  const handle = harness.getOverlayElementsByCursor('grab')[0]
+  expect(handle).toBeTruthy()
+  return handle
 }
 
 describe('Renderer', () => {
@@ -161,22 +234,24 @@ describe('Renderer', () => {
       })
       await harness.dispatchWindowMouseUp()
 
-      const movedShape = harness.designer.getElementById('shape_drag')
       expect(interaction.pointer.machine.mode()).toBe('idle')
-      expect(movedShape?.type).toBe('shape')
-      expect(movedShape?.type === 'shape' ? movedShape.props.x : null).toBe(120)
-      expect(movedShape?.type === 'shape' ? movedShape.props.y : null).toBe(110)
+      expectShapeProps(harness, 'shape_drag', {
+        x: 120,
+        y: 110,
+      })
       expect(harness.designer.history.undoStack()).toHaveLength(1)
 
       harness.designer.undo()
-      const restoredShape = harness.designer.getElementById('shape_drag')
-      expect(restoredShape?.type === 'shape' ? restoredShape.props.x : null).toBe(100)
-      expect(restoredShape?.type === 'shape' ? restoredShape.props.y : null).toBe(100)
+      expectShapeProps(harness, 'shape_drag', {
+        x: 100,
+        y: 100,
+      })
 
       harness.designer.redo()
-      const redoneShape = harness.designer.getElementById('shape_drag')
-      expect(redoneShape?.type === 'shape' ? redoneShape.props.x : null).toBe(120)
-      expect(redoneShape?.type === 'shape' ? redoneShape.props.y : null).toBe(110)
+      expectShapeProps(harness, 'shape_drag', {
+        x: 120,
+        y: 110,
+      })
     } finally {
       harness.dispose()
     }
@@ -194,8 +269,9 @@ describe('Renderer', () => {
       await harness.dispatchSceneMouseDownAtCanvas({ x: 20, y: 20 })
       await harness.dispatchWindowMouseMoveAtCanvas({ x: 107, y: 20 })
 
-      const movedShape = harness.designer.getElementById('shape_drag_guide_source')
-      expect(movedShape?.type === 'shape' ? movedShape.props.x : null).toBe(100)
+      expectShapeProps(harness, 'shape_drag_guide_source', {
+        x: 100,
+      })
 
       const guideOverlay = harness.overlayLayer.querySelector('[data-guide-overlay="true"]')
       expect(guideOverlay).toBeTruthy()
@@ -237,8 +313,7 @@ describe('Renderer', () => {
     try {
       const interaction = harness.getInteraction()
 
-      await harness.dispatchSceneMouseDownAtCanvas({ x: 140, y: 140 })
-      await harness.dispatchWindowMouseUp()
+      await selectSingleShape(harness, { x: 140, y: 140 }, 'shape_resize')
 
       await harness.dispatchSceneMouseDownAtCanvas({ x: 200, y: 140 })
 
@@ -247,19 +322,22 @@ describe('Renderer', () => {
       await harness.dispatchWindowMouseMoveAtCanvas({ x: 230, y: 140 })
       await harness.dispatchWindowMouseUp()
 
-      const resizedShape = harness.designer.getElementById('shape_resize')
       expect(interaction.pointer.machine.mode()).toBe('idle')
-      expect(resizedShape?.type === 'shape' ? resizedShape.props.w : null).toBe(130)
-      expect(resizedShape?.type === 'shape' ? resizedShape.props.h : null).toBe(80)
+      expectShapeProps(harness, 'shape_resize', {
+        w: 130,
+        h: 80,
+      })
       expect(harness.designer.history.undoStack()).toHaveLength(1)
 
       harness.designer.undo()
-      const restoredShape = harness.designer.getElementById('shape_resize')
-      expect(restoredShape?.type === 'shape' ? restoredShape.props.w : null).toBe(100)
+      expectShapeProps(harness, 'shape_resize', {
+        w: 100,
+      })
 
       harness.designer.redo()
-      const redoneShape = harness.designer.getElementById('shape_resize')
-      expect(redoneShape?.type === 'shape' ? redoneShape.props.w : null).toBe(130)
+      expectShapeProps(harness, 'shape_resize', {
+        w: 130,
+      })
     } finally {
       harness.dispose()
     }
@@ -274,14 +352,14 @@ describe('Renderer', () => {
     })
 
     try {
-      await harness.dispatchSceneMouseDownAtCanvas({ x: 140, y: 140 })
-      await harness.dispatchWindowMouseUp()
+      await selectSingleShape(harness, { x: 140, y: 140 }, 'shape_resize_guide_source')
 
       await harness.dispatchSceneMouseDownAtCanvas({ x: 200, y: 140 })
       await harness.dispatchWindowMouseMoveAtCanvas({ x: 227, y: 140 })
 
-      const resizedShape = harness.designer.getElementById('shape_resize_guide_source')
-      expect(resizedShape?.type === 'shape' ? resizedShape.props.w : null).toBe(130)
+      expectShapeProps(harness, 'shape_resize_guide_source', {
+        w: 130,
+      })
 
       const guideOverlay = harness.overlayLayer.querySelector('[data-guide-overlay="true"]')
       expect(guideOverlay).toBeTruthy()
@@ -299,6 +377,50 @@ describe('Renderer', () => {
     }
   })
 
+  it('缩放并滚动后 resize 应按画布坐标归一化尺寸，并保持单个 undo 单元', async () => {
+    const harness = await createRendererTestHarness({
+      shapes: [{ id: 'shape_resize_zoom_scroll', x: 100, y: 100, w: 100, h: 80 }],
+    })
+
+    try {
+      const interaction = harness.getInteraction()
+      harness.designer.view.setZoom(2)
+      await harness.setScroll(48, 36)
+
+      await selectSingleShape(harness, { x: 140, y: 140 }, 'shape_resize_zoom_scroll')
+
+      await harness.dispatchSceneMouseDownAtCanvas({ x: 200, y: 140 })
+
+      expect(interaction.pointer.machine.mode()).toBe('resizing')
+
+      const startClient = harness.canvasToClient({ x: 200, y: 140 })
+      await harness.dispatchWindowMouseMoveAtClient({
+        x: startClient.x + 60,
+        y: startClient.y,
+      })
+      await harness.dispatchWindowMouseUp()
+
+      expect(interaction.pointer.machine.mode()).toBe('idle')
+      expectShapeProps(harness, 'shape_resize_zoom_scroll', {
+        w: 130,
+        h: 80,
+      })
+      expect(harness.designer.history.undoStack()).toHaveLength(1)
+
+      harness.designer.undo()
+      expectShapeProps(harness, 'shape_resize_zoom_scroll', {
+        w: 100,
+      })
+
+      harness.designer.redo()
+      expectShapeProps(harness, 'shape_resize_zoom_scroll', {
+        w: 130,
+      })
+    } finally {
+      harness.dispose()
+    }
+  })
+
   it('选中图形后通过旋转手柄 rotate 应更新角度并支持 undo/redo', async () => {
     const harness = await createRendererTestHarness({
       shapes: [{ id: 'shape_rotate', x: 100, y: 100, w: 100, h: 100 }],
@@ -307,11 +429,9 @@ describe('Renderer', () => {
     try {
       const interaction = harness.getInteraction()
 
-      await harness.dispatchSceneMouseDownAtCanvas({ x: 140, y: 140 })
-      await harness.dispatchWindowMouseUp()
+      await selectSingleShape(harness, { x: 140, y: 140 }, 'shape_rotate')
 
-      const rotateHandle = harness.getOverlayElementsByCursor('grab')[0]
-      expect(rotateHandle).toBeTruthy()
+      const rotateHandle = getRotateHandle(harness)
 
       const centerClient = harness.canvasToClient({ x: 150, y: 150 })
       const startClient = harness.canvasToClient({ x: 150, y: 75 })
@@ -324,18 +444,17 @@ describe('Renderer', () => {
       await harness.dispatchWindowMouseMoveAtClient(targetClient)
       await harness.dispatchWindowMouseUp()
 
-      const rotatedShape = harness.designer.getElementById('shape_rotate')
       expect(interaction.pointer.machine.mode()).toBe('idle')
-      expect(rotatedShape?.type === 'shape' ? rotatedShape.props.angle : null).toBeCloseTo(90)
+      expect(getShapeProps(harness, 'shape_rotate').angle).toBeCloseTo(90)
       expect(harness.designer.history.undoStack()).toHaveLength(1)
 
       harness.designer.undo()
-      const restoredShape = harness.designer.getElementById('shape_rotate')
-      expect(restoredShape?.type === 'shape' ? restoredShape.props.angle : null).toBe(0)
+      expectShapeProps(harness, 'shape_rotate', {
+        angle: 0,
+      })
 
       harness.designer.redo()
-      const redoneShape = harness.designer.getElementById('shape_rotate')
-      expect(redoneShape?.type === 'shape' ? redoneShape.props.angle : null).toBeCloseTo(90)
+      expect(getShapeProps(harness, 'shape_rotate').angle).toBeCloseTo(90)
     } finally {
       harness.dispose()
     }
@@ -347,11 +466,9 @@ describe('Renderer', () => {
     })
 
     try {
-      await harness.dispatchSceneMouseDownAtCanvas({ x: 140, y: 140 })
-      await harness.dispatchWindowMouseUp()
+      await selectSingleShape(harness, { x: 140, y: 140 }, 'shape_rotate_snap')
 
-      const rotateHandle = harness.getOverlayElementsByCursor('grab')[0]
-      expect(rotateHandle).toBeTruthy()
+      const rotateHandle = getRotateHandle(harness)
 
       const targetCanvas = pointByAngle({ x: 150, y: 150 }, -53, 90)
       const startClient = harness.canvasToClient({ x: 150, y: 75 })
@@ -362,8 +479,50 @@ describe('Renderer', () => {
       })
       await harness.dispatchWindowMouseUp()
 
-      const rotatedShape = harness.designer.getElementById('shape_rotate_snap')
-      expect(rotatedShape?.type === 'shape' ? rotatedShape.props.angle : null).toBe(30)
+      expectShapeProps(harness, 'shape_rotate_snap', {
+        angle: 30,
+      })
+    } finally {
+      harness.dispose()
+    }
+  })
+
+  it('缩放并滚动后 rotate 应按画布坐标计算角度，并保持单个 undo 单元', async () => {
+    const harness = await createRendererTestHarness({
+      shapes: [{ id: 'shape_rotate_zoom_scroll', x: 100, y: 100, w: 100, h: 100 }],
+    })
+
+    try {
+      const interaction = harness.getInteraction()
+      harness.designer.view.setZoom(2)
+      await harness.setScroll(64, 28)
+
+      await selectSingleShape(harness, { x: 140, y: 140 }, 'shape_rotate_zoom_scroll')
+
+      const rotateHandle = getRotateHandle(harness)
+
+      const centerClient = harness.canvasToClient({ x: 150, y: 150 })
+      const startClient = harness.canvasToClient({ x: 150, y: 75 })
+      const targetClient = rotateVector(startClient, centerClient)
+
+      await harness.dispatchElementMouseDownAtClient(rotateHandle, startClient)
+
+      expect(interaction.pointer.machine.mode()).toBe('rotatingShape')
+
+      await harness.dispatchWindowMouseMoveAtClient(targetClient)
+      await harness.dispatchWindowMouseUp()
+
+      expect(interaction.pointer.machine.mode()).toBe('idle')
+      expect(getShapeProps(harness, 'shape_rotate_zoom_scroll').angle).toBeCloseTo(90)
+      expect(harness.designer.history.undoStack()).toHaveLength(1)
+
+      harness.designer.undo()
+      expectShapeProps(harness, 'shape_rotate_zoom_scroll', {
+        angle: 0,
+      })
+
+      harness.designer.redo()
+      expect(getShapeProps(harness, 'shape_rotate_zoom_scroll').angle).toBeCloseTo(90)
     } finally {
       harness.dispose()
     }
@@ -451,6 +610,198 @@ describe('Renderer', () => {
     }
   })
 
+  it('缩放并滚动后 quick-create 发起连线应保持连续，并形成单个 undo 单元', async () => {
+    const harness = await createRendererTestHarness({
+      shapes: [
+        { id: 'shape_quick_create_source', x: 100, y: 100, w: 100, h: 80 },
+        { id: 'shape_quick_create_target', x: 340, y: 100, w: 100, h: 80 },
+      ],
+    })
+
+    try {
+      const interaction = harness.getInteraction()
+      harness.designer.view.setZoom(1.5)
+      await harness.setScroll(72, 24)
+
+      await harness.dispatchSceneMouseDownAtCanvas({ x: 140, y: 140 })
+      await harness.dispatchWindowMouseUp()
+
+      const panel = harness.overlayLayer.querySelector('[data-linker-create-panel="true"]')
+      expect(panel).toBeTruthy()
+
+      const button = panel?.querySelector('button') as HTMLElement | null
+      expect(button).toBeTruthy()
+
+      await harness.dispatchElementMouseDown(button!)
+
+      expect(interaction.pointer.machine.mode()).toBe('draggingLinker')
+
+      const buttonRect = button!.getBoundingClientRect()
+      const buttonCenter = {
+        x: buttonRect.left + buttonRect.width / 2,
+        y: buttonRect.top + buttonRect.height / 2,
+      }
+      const draftLinker = harness.designer.element.linkers()[0]
+      const zoom = harness.designer.view.viewport().zoom
+
+      await harness.dispatchWindowMouseMoveAtClient({
+        x: buttonCenter.x + (340 - draftLinker.to.x) * zoom,
+        y: buttonCenter.y + (140 - draftLinker.to.y) * zoom,
+      })
+      await harness.dispatchWindowMouseUp()
+
+      const linkers = harness.designer.element.linkers()
+      const createdLinker = linkers[0]
+
+      expect(interaction.pointer.machine.mode()).toBe('idle')
+      expect(linkers).toHaveLength(1)
+      expect(createdLinker.from.id).toBe('shape_quick_create_source')
+      expect(createdLinker.to.id).toBe('shape_quick_create_target')
+      expect(harness.designer.history.undoStack()).toHaveLength(1)
+
+      harness.designer.undo()
+      expect(harness.designer.element.linkers()).toHaveLength(0)
+
+      harness.designer.redo()
+      const redoneLinker = harness.designer.element.linkers()[0]
+      expect(redoneLinker?.from.id).toBe('shape_quick_create_source')
+      expect(redoneLinker?.to.id).toBe('shape_quick_create_target')
+    } finally {
+      harness.dispose()
+    }
+  })
+
+  it('缩放并滚动后拖拽连线端点应保持吸附结果，并形成单个 undo 单元', async () => {
+    const harness = await createRendererTestHarness({
+      shapes: [
+        { id: 'shape_linker_edit_source', x: 100, y: 100, w: 100, h: 80 },
+        { id: 'shape_linker_edit_target', x: 340, y: 100, w: 100, h: 80 },
+      ],
+    })
+
+    try {
+      harness.designer.edit.add([
+        createLinker({
+          id: 'linker_edit_zoom_scroll',
+          name: 'linker_edit_zoom_scroll',
+          from: {
+            id: 'shape_linker_edit_source',
+            x: 200,
+            y: 140,
+            binding: { type: 'free' },
+          },
+          to: {
+            id: null,
+            x: 260,
+            y: 140,
+            binding: { type: 'free' },
+          },
+        }),
+      ], {
+        record: false,
+        select: false,
+      })
+      harness.designer.selection.replace(['linker_edit_zoom_scroll'])
+      await Promise.resolve()
+
+      harness.designer.view.setZoom(2)
+      await harness.setScroll(56, 18)
+
+      const endpoint = harness.overlayLayer.querySelector('.dg-linker-overlay__to-endpoint') as HTMLElement | null
+      expect(endpoint).toBeTruthy()
+
+      const startClient = harness.canvasToClient({ x: 260, y: 140 })
+      await harness.dispatchElementMouseDownAtClient(endpoint!, startClient)
+      await harness.dispatchWindowMouseMoveAtCanvas({ x: 340, y: 140 })
+      await harness.dispatchWindowMouseUp()
+
+      expectLinkerEndpoint(harness, 'linker_edit_zoom_scroll', 'to', {
+        id: 'shape_linker_edit_target',
+      })
+      expect(harness.designer.history.undoStack()).toHaveLength(1)
+
+      harness.designer.undo()
+      expectLinkerEndpoint(harness, 'linker_edit_zoom_scroll', 'to', {
+        id: null,
+        x: 260,
+      })
+
+      harness.designer.redo()
+      expectLinkerEndpoint(harness, 'linker_edit_zoom_scroll', 'to', {
+        id: 'shape_linker_edit_target',
+      })
+    } finally {
+      harness.dispose()
+    }
+  })
+
+  it('连续执行 drag / resize / rotate 后，undo/redo 应按动作粒度逐步回退', async () => {
+    const harness = await createRendererTestHarness({
+      shapes: [{ id: 'shape_history_sequence', x: 100, y: 100, w: 100, h: 100 }],
+    })
+
+    try {
+      await harness.dispatchSceneMouseDownAtCanvas({ x: 140, y: 140 })
+      await harness.dispatchWindowMouseMoveAtCanvas({ x: 180, y: 160 })
+      await harness.dispatchWindowMouseUp()
+
+      await harness.dispatchSceneMouseDownAtCanvas({ x: 180, y: 160 })
+      await harness.dispatchWindowMouseUp()
+
+      await harness.dispatchSceneMouseDownAtCanvas({ x: 240, y: 170 })
+      await harness.dispatchWindowMouseMoveAtCanvas({ x: 270, y: 170 })
+      await harness.dispatchWindowMouseUp()
+
+      const rotateHandle = getRotateHandle(harness)
+
+      const centerClient = harness.canvasToClient({ x: 205, y: 170 })
+      const startClient = harness.canvasToClient({ x: 205, y: 95 })
+      const targetClient = rotateVector(startClient, centerClient)
+
+      await harness.dispatchElementMouseDownAtClient(rotateHandle, startClient)
+      await harness.dispatchWindowMouseMoveAtClient(targetClient)
+      await harness.dispatchWindowMouseUp()
+
+      expectShapeProps(harness, 'shape_history_sequence', {
+        x: 140,
+        y: 120,
+        w: 130,
+      })
+      expect(getShapeProps(harness, 'shape_history_sequence').angle).toBeCloseTo(90)
+      expect(harness.designer.history.undoStack()).toHaveLength(3)
+
+      harness.designer.undo()
+      expectShapeProps(harness, 'shape_history_sequence', {
+        angle: 0,
+        w: 130,
+      })
+
+      harness.designer.undo()
+      expectShapeProps(harness, 'shape_history_sequence', {
+        w: 100,
+        x: 140,
+      })
+
+      harness.designer.undo()
+      expectShapeProps(harness, 'shape_history_sequence', {
+        x: 100,
+        y: 100,
+      })
+
+      harness.designer.redo()
+      harness.designer.redo()
+      harness.designer.redo()
+      expectShapeProps(harness, 'shape_history_sequence', {
+        x: 140,
+        y: 120,
+        w: 130,
+      })
+      expect(getShapeProps(harness, 'shape_history_sequence').angle).toBeCloseTo(90)
+    } finally {
+      harness.dispose()
+    }
+  })
+
   it('连线拖拽时应按 shape 语义渲染目标高亮', async () => {
     const harness = await createRendererTestHarness({
       shapes: [
@@ -508,10 +859,7 @@ describe('Renderer', () => {
     })
 
     try {
-      await harness.dispatchSceneMouseDownAtCanvas({ x: 140, y: 140 })
-      await harness.dispatchWindowMouseUp()
-
-      expect(harness.designer.selection.selectedIds()).toEqual(['shape_source_panel'])
+      await selectSingleShape(harness, { x: 140, y: 140 }, 'shape_source_panel')
 
       const panel = harness.overlayLayer.querySelector('[data-linker-create-panel="true"]')
       expect(panel).toBeTruthy()
