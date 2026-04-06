@@ -1,115 +1,169 @@
+import { Point } from '@diagen/shared'
 import type { LinkerRoute, LinkerRouteJump } from './linkerRoute'
 
 const DEFAULT_LINE_JUMP_RADIUS = 10
 const DEFAULT_ENDPOINT_PADDING = 14
+const DEFAULT_JUMP_GAP = 4
+const MIN_VISIBLE_JUMP_RADIUS = 2
 const EPSILON = 0.001
 
 export interface CalculateLineJumpsOptions {
   radius?: number
   endpointPadding?: number
+  jumpGap?: number
 }
 
 type SegmentOrientation = 'horizontal' | 'vertical'
+
+interface OrthogonalSegment {
+  index: number
+  from: Point
+  to: Point
+  orientation: SegmentOrientation
+  min: number
+  max: number
+  fixed: number
+}
 
 export function calculateLineJumps(
   route: LinkerRoute,
   otherRoutes: LinkerRoute[],
   options: CalculateLineJumpsOptions = {},
 ): LinkerRouteJump[] {
-  const radius = Math.max(2, options.radius ?? DEFAULT_LINE_JUMP_RADIUS)
+  const radius = Math.max(MIN_VISIBLE_JUMP_RADIUS, options.radius ?? DEFAULT_LINE_JUMP_RADIUS)
   const endpointPadding = Math.max(radius, options.endpointPadding ?? DEFAULT_ENDPOINT_PADDING)
-  const jumps: LinkerRouteJump[] = []
-  const seen = new Set<string>()
+  const jumpGap = Math.max(0, options.jumpGap ?? DEFAULT_JUMP_GAP)
+  const routeSegments = collectOrthogonalSegments(route)
+  const otherSegments = otherRoutes.flatMap(otherRoute => collectOrthogonalSegments(otherRoute))
 
-  for (let i = 0; i < route.points.length - 1; i++) {
-    const from = route.points[i]
-    const to = route.points[i + 1]
-    const orientation = getSegmentOrientation(from, to)
-    if (!orientation) continue
+  return routeSegments.flatMap(segment => {
+    const jumps: LinkerRouteJump[] = []
+    const seen = new Set<string>()
 
-    for (const otherRoute of otherRoutes) {
-      for (let j = 0; j < otherRoute.points.length - 1; j++) {
-        const otherFrom = otherRoute.points[j]
-        const otherTo = otherRoute.points[j + 1]
-        const otherOrientation = getSegmentOrientation(otherFrom, otherTo)
-        if (!otherOrientation || otherOrientation === orientation) continue
+    for (const otherSegment of otherSegments) {
+      if (otherSegment.orientation === segment.orientation) continue
 
-        const center = getOrthogonalIntersection(from, to, otherFrom, otherTo)
-        if (!center) continue
-        if (!isJumpSafeDistance(center, from, to, orientation, endpointPadding)) continue
-        if (!isJumpSafeDistance(center, otherFrom, otherTo, otherOrientation, endpointPadding)) continue
+      const center = getOrthogonalIntersection(segment, otherSegment)
+      if (!center) continue
+      if (!isJumpSafeDistance(center, segment, endpointPadding)) continue
+      if (!isJumpSafeDistance(center, otherSegment, endpointPadding)) continue
 
-        const key = `${i}:${center.x.toFixed(3)}:${center.y.toFixed(3)}`
-        if (seen.has(key)) continue
-        seen.add(key)
+      const key = `${center.x}:${center.y}`
+      if (seen.has(key)) continue
+      seen.add(key)
 
-        jumps.push({
-          segmentIndex: i,
-          center,
-          orientation,
-          radius,
-        })
-      }
+      jumps.push({
+        segmentIndex: segment.index,
+        center,
+        orientation: segment.orientation,
+        radius,
+      })
     }
-  }
 
-  return jumps.sort((a, b) => {
-    if (a.segmentIndex !== b.segmentIndex) return a.segmentIndex - b.segmentIndex
-    return a.orientation === 'horizontal' ? a.center.x - b.center.x : a.center.y - b.center.y
+    if (jumps.length <= 1) return jumps
+
+    jumps.sort((a, b) => {
+      return segment.orientation === 'horizontal' ? a.center.x - b.center.x : a.center.y - b.center.y
+    })
+
+    return normalizeSegmentJumps(segment, jumps, jumpGap)
   })
 }
 
-function getSegmentOrientation(
-  from: LinkerRoute['points'][number],
-  to: LinkerRoute['points'][number],
-): SegmentOrientation | null {
+function getSegmentOrientation(from: Point, to: Point): SegmentOrientation | null {
   if (Math.abs(from.y - to.y) <= EPSILON && Math.abs(from.x - to.x) > EPSILON) return 'horizontal'
   if (Math.abs(from.x - to.x) <= EPSILON && Math.abs(from.y - to.y) > EPSILON) return 'vertical'
   return null
 }
 
-function getOrthogonalIntersection(
-  from: LinkerRoute['points'][number],
-  to: LinkerRoute['points'][number],
-  otherFrom: LinkerRoute['points'][number],
-  otherTo: LinkerRoute['points'][number],
-) {
-  const orientation = getSegmentOrientation(from, to)
-  const otherOrientation = getSegmentOrientation(otherFrom, otherTo)
-  if (!orientation || !otherOrientation || orientation === otherOrientation) return null
+function collectOrthogonalSegments(route: LinkerRoute): OrthogonalSegment[] {
+  const segments: OrthogonalSegment[] = []
 
-  const horizontal = orientation === 'horizontal' ? { from, to } : { from: otherFrom, to: otherTo }
-  const vertical = orientation === 'vertical' ? { from, to } : { from: otherFrom, to: otherTo }
-  const center = {
-    x: vertical.from.x,
-    y: horizontal.from.y,
+  for (let index = 0; index < route.points.length - 1; index++) {
+    const from = route.points[index]
+    const to = route.points[index + 1]
+    const orientation = getSegmentOrientation(from, to)
+    if (!orientation) continue
+
+    const start = orientation === 'horizontal' ? from.x : from.y
+    const end = orientation === 'horizontal' ? to.x : to.y
+
+    segments.push({
+      index,
+      from,
+      to,
+      orientation,
+      min: Math.min(start, end),
+      max: Math.max(start, end),
+      fixed: orientation === 'horizontal' ? from.y : from.x,
+    })
   }
 
-  if (!isCoordinateInside(center.x, horizontal.from.x, horizontal.to.x)) return null
-  if (!isCoordinateInside(center.y, vertical.from.y, vertical.to.y)) return null
+  return segments
+}
+
+function getOrthogonalIntersection(segment: OrthogonalSegment, otherSegment: OrthogonalSegment) {
+  if (segment.orientation === otherSegment.orientation) return null
+
+  const horizontal = segment.orientation === 'horizontal' ? segment : otherSegment
+  const vertical = segment.orientation === 'vertical' ? segment : otherSegment
+  const center = {
+    x: vertical.fixed,
+    y: horizontal.fixed,
+  }
+
+  if (!isCoordinateInside(center.x, horizontal.min, horizontal.max)) return null
+  if (!isCoordinateInside(center.y, vertical.min, vertical.max)) return null
   return center
 }
 
-function isCoordinateInside(value: number, start: number, end: number): boolean {
-  const min = Math.min(start, end)
-  const max = Math.max(start, end)
+function isCoordinateInside(value: number, min: number, max: number): boolean {
   return value > min + EPSILON && value < max - EPSILON
 }
 
-function isSegmentIntersectionEligible(value: number, start: number, end: number, padding: number): boolean {
-  const min = Math.min(start, end)
-  const max = Math.max(start, end)
+function isSegmentIntersectionEligible(value: number, min: number, max: number, padding: number): boolean {
   return value >= min + padding && value <= max - padding
 }
 
-function isJumpSafeDistance(
-  center: LinkerRouteJump['center'],
-  from: LinkerRoute['points'][number],
-  to: LinkerRoute['points'][number],
-  orientation: SegmentOrientation,
-  padding: number,
-): boolean {
-  return orientation === 'horizontal'
-    ? isSegmentIntersectionEligible(center.x, from.x, to.x, padding)
-    : isSegmentIntersectionEligible(center.y, from.y, to.y, padding)
+function isJumpSafeDistance(center: LinkerRouteJump['center'], segment: OrthogonalSegment, padding: number): boolean {
+  const position = segment.orientation === 'horizontal' ? center.x : center.y
+  return isSegmentIntersectionEligible(position, segment.min, segment.max, padding)
+}
+
+function normalizeSegmentJumps(
+  segment: OrthogonalSegment,
+  jumps: LinkerRouteJump[],
+  jumpGap: number,
+): LinkerRouteJump[] {
+  if (jumps.length === 0) return []
+
+  const positions = jumps.map(jump => (segment.orientation === 'horizontal' ? jump.center.x : jump.center.y))
+
+  return jumps.flatMap((jump, index) => {
+    const pos = positions[index]
+    const prev = positions[index - 1]
+    const next = positions[index + 1]
+    let maxRadius = jump.radius
+
+    maxRadius = Math.min(maxRadius, Math.max(0, pos - segment.min - jumpGap))
+    maxRadius = Math.min(maxRadius, Math.max(0, segment.max - pos - jumpGap))
+
+    if (prev !== undefined) {
+      maxRadius = Math.min(maxRadius, Math.max(0, (pos - prev - jumpGap) / 2))
+    }
+    if (next !== undefined) {
+      maxRadius = Math.min(maxRadius, Math.max(0, (next - pos - jumpGap) / 2))
+    }
+
+    if (maxRadius < MIN_VISIBLE_JUMP_RADIUS) {
+      return []
+    }
+
+    return [
+      {
+        ...jump,
+        radius: maxRadius,
+      },
+    ]
+  })
 }

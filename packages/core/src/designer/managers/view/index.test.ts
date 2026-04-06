@@ -25,6 +25,39 @@ function createShapeById(id: string, x: number, y: number, w = 100, h = 80) {
   })
 }
 
+function createStraightLinkerById(id: string, from: { x: number; y: number }, to: { x: number; y: number }) {
+  return createLinker({
+    id,
+    name: id,
+    linkerType: 'straight',
+    from: { id: null, x: from.x, y: from.y, binding: { type: 'free' } },
+    to: { id: null, x: to.x, y: to.y, binding: { type: 'free' } },
+  })
+}
+
+function createDenseJumpLinkers(crossXs: number[]) {
+  return {
+    verticals: crossXs.map((x, index) => createStraightLinkerById(`jump_vertical_${index}`, { x, y: 0 }, { x, y: 100 })),
+    horizontal: createStraightLinkerById('jump_horizontal', { x: 0, y: 50 }, { x: 100, y: 50 }),
+  }
+}
+
+function withLineJumpDesigner(run: (designer: ReturnType<typeof createDesigner>) => void) {
+  createRoot(dispose => {
+    const designer = createDesigner({
+      page: {
+        lineJumps: true,
+      },
+    })
+
+    try {
+      run(designer)
+    } finally {
+      dispose()
+    }
+  })
+}
+
 describe('view manager', () => {
   it('toScreen/toCanvas 应互为逆变换', () => {
     withDesigner(designer => {
@@ -251,28 +284,10 @@ describe('view manager', () => {
   })
 
   it('开启 lineJumps 后绘制连线应生成跳线几何', () => {
-    createRoot(dispose => {
-      const designer = createDesigner({
-        page: {
-          lineJumps: true,
-        },
-      })
-
+    withLineJumpDesigner(designer => {
       try {
-        const horizontal = createLinker({
-          id: 'jump_horizontal',
-          name: 'jump_horizontal',
-          linkerType: 'straight',
-          from: { id: null, x: 0, y: 50, binding: { type: 'free' } },
-          to: { id: null, x: 100, y: 50, binding: { type: 'free' } },
-        })
-        const vertical = createLinker({
-          id: 'jump_vertical',
-          name: 'jump_vertical',
-          linkerType: 'straight',
-          from: { id: null, x: 50, y: 0, binding: { type: 'free' } },
-          to: { id: null, x: 50, y: 100, binding: { type: 'free' } },
-        })
+        const { verticals, horizontal } = createDenseJumpLinkers([50])
+        const vertical = verticals[0]
         designer.edit.add([horizontal, vertical], { record: false, select: false })
 
         expect(designer.view.getLinkerLayout(horizontal).route.jumps ?? []).toHaveLength(0)
@@ -284,36 +299,17 @@ describe('view manager', () => {
             radius: designer.view.linkerRouteConfig().lineJumpRadius,
           },
         ])
-      } finally {
-        dispose()
-      }
+      } finally {}
     })
   })
 
   it('重复读取同一连线布局时应复用跳线缓存', () => {
-    createRoot(dispose => {
+    withLineJumpDesigner(designer => {
       const jumpsSpy = vi.spyOn(routerUtils, 'calculateLineJumps')
-      const designer = createDesigner({
-        page: {
-          lineJumps: true,
-        },
-      })
 
       try {
-        const horizontal = createLinker({
-          id: 'jump_cache_horizontal',
-          name: 'jump_cache_horizontal',
-          linkerType: 'straight',
-          from: { id: null, x: 0, y: 50, binding: { type: 'free' } },
-          to: { id: null, x: 100, y: 50, binding: { type: 'free' } },
-        })
-        const vertical = createLinker({
-          id: 'jump_cache_vertical',
-          name: 'jump_cache_vertical',
-          linkerType: 'straight',
-          from: { id: null, x: 50, y: 0, binding: { type: 'free' } },
-          to: { id: null, x: 50, y: 100, binding: { type: 'free' } },
-        })
+        const { verticals, horizontal } = createDenseJumpLinkers([50])
+        const vertical = verticals[0]
         designer.edit.add([horizontal, vertical], { record: false, select: false })
 
         designer.view.getLinkerLayout(vertical)
@@ -322,8 +318,42 @@ describe('view manager', () => {
         expect(jumpsSpy).toHaveBeenCalledTimes(1)
       } finally {
         jumpsSpy.mockRestore()
-        dispose()
       }
+    })
+  })
+
+  it('同一 segment 上交叉点过近时应输出收敛后的 jump 半径', () => {
+    withLineJumpDesigner(designer => {
+      try {
+        const { verticals, horizontal } = createDenseJumpLinkers([40, 52])
+        designer.edit.add([...verticals, horizontal], { record: false, select: false })
+
+        expect(designer.view.getLinkerLayout(horizontal).route.jumps).toEqual([
+          {
+            segmentIndex: 0,
+            center: { x: 40, y: 50 },
+            orientation: 'horizontal',
+            radius: 4,
+          },
+          {
+            segmentIndex: 0,
+            center: { x: 52, y: 50 },
+            orientation: 'horizontal',
+            radius: 4,
+          },
+        ])
+      } finally {}
+    })
+  })
+
+  it('同一 segment 上交叉点过密时应跳过不可稳定绘制的 jump', () => {
+    withLineJumpDesigner(designer => {
+      try {
+        const { verticals, horizontal } = createDenseJumpLinkers([40, 45])
+        designer.edit.add([...verticals, horizontal], { record: false, select: false })
+
+        expect(designer.view.getLinkerLayout(horizontal).route.jumps ?? []).toEqual([])
+      } finally {}
     })
   })
 })

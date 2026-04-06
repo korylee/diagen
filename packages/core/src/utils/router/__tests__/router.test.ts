@@ -1,7 +1,7 @@
 import type { Bounds, Point } from '@diagen/shared'
 import { describe, expect, it } from 'vitest'
 import { aStarRoute, createObstacleFromBounds } from '../astar'
-import { calculateObstacleRoute, calculateRoutePoints, createObstaclesFromElements } from '../index'
+import { calculateLineJumps, calculateObstacleRoute, calculateRoutePoints, createObstaclesFromElements } from '../index'
 import { orthogonalRoute } from '../orthogonal'
 import type { Obstacle, RouterConfig } from '../types'
 import { calculateRouteCost, euclideanDistance, isRouteValid, simplifyOrthogonalPath } from '../utils'
@@ -12,6 +12,29 @@ const defaultConfig: RouterConfig = {
   maxIterations: 5000,
   diagonalCost: 1.414,
   orthogonalCost: 1,
+}
+
+function createStraightRoute(from: Point, to: Point) {
+  return {
+    points: [from, to],
+    fromAngle: 0,
+    toAngle: 0,
+  }
+}
+
+function createVerticalStraightRoute(x: number, fromY = 0, toY = 100) {
+  return createStraightRoute({ x, y: fromY }, { x, y: toY })
+}
+
+function createHorizontalStraightRoute(y: number, fromX = 0, toX = 100) {
+  return createStraightRoute({ x: fromX, y }, { x: toX, y })
+}
+
+function createDenseJumpRouteFixture(crossXs: number[]) {
+  return {
+    route: createHorizontalStraightRoute(50),
+    otherRoutes: crossXs.map(x => createVerticalStraightRoute(x)),
+  }
 }
 
 function createObstacle(x: number, y: number, w: number, h: number, padding = 10): Obstacle {
@@ -173,6 +196,45 @@ describe('orthogonal', () => {
 })
 
 describe('router index', () => {
+  describe('calculateLineJumps', () => {
+    it('同一 segment 上多个交叉点过近时应收敛 jump 半径', () => {
+      const { route, otherRoutes } = createDenseJumpRouteFixture([40, 52])
+
+      const jumps = calculateLineJumps(route, otherRoutes, {
+        radius: 10,
+        endpointPadding: 10,
+        jumpGap: 4,
+      })
+
+      expect(jumps).toEqual([
+        {
+          segmentIndex: 0,
+          center: { x: 40, y: 50 },
+          orientation: 'horizontal',
+          radius: 4,
+        },
+        {
+          segmentIndex: 0,
+          center: { x: 52, y: 50 },
+          orientation: 'horizontal',
+          radius: 4,
+        },
+      ])
+    })
+
+    it('交叉点过于密集时应跳过不可稳定绘制的 jump', () => {
+      const { route, otherRoutes } = createDenseJumpRouteFixture([40, 45])
+
+      const jumps = calculateLineJumps(route, otherRoutes, {
+        radius: 10,
+        endpointPadding: 10,
+        jumpGap: 4,
+      })
+
+      expect(jumps).toEqual([])
+    })
+  })
+
   describe('calculateObstacleRoute', () => {
     it('默认应使用混合算法', () => {
       const from: Point = { x: 0, y: 0 }
