@@ -12,6 +12,9 @@
       "solid": "./src/index.ts"
     }
   },
+  "sideEffects": [
+    "*.css"
+  ],
   "scripts": {
     "build": "tsdown"
   },

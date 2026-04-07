@@ -1,12 +1,13 @@
 import { DesignerToolState } from '@diagen/core'
 import { createEventListener, createKeyboard } from '@diagen/primitives'
-import { createDgBem } from '@diagen/shared'
+import { createDgBem, type Point } from '@diagen/shared'
 import { createEffect, createMemo, createSignal, JSX, onCleanup, onMount } from 'solid-js'
 import { CanvasRenderer } from '../../canvas'
 import { DesignerGrids } from '../DesignerGrids'
 import { useDesigner } from '../DesignerProvider'
 import { InteractionOverlay } from '../InteractionOverlay'
 import { InteractionProvider } from '../InteractionProvider'
+import { createSceneContextMenu } from './handlers/sceneContextMenu'
 import { createSceneDown } from './handlers/sceneMouseDown'
 import { createPointerInteraction } from './interaction/createPointerInteraction'
 import { createAutoScroll } from './primitives/createAutoScroll'
@@ -28,6 +29,17 @@ function getCursor(params: { isGrabbing: boolean; toolType: DesignerToolState['t
 
 const bem = createDgBem('renderer')
 
+export type RendererContextMenuTargetType = 'canvas' | 'shape' | 'linker' | 'selection'
+
+export interface RendererContextMenuRequest {
+  event: MouseEvent
+  clientPosition: Point
+  canvasPosition: Point
+  targetType: RendererContextMenuTargetType
+  targetId: string | null
+  selectionIds: string[]
+}
+
 export function Renderer(props: {
   children?: JSX.Element
   /** Optional class name for styling */
@@ -38,8 +50,10 @@ export function Renderer(props: {
   shapeGuideTolerance?: number
   /** resize 吸附容差（画布坐标） */
   resizeGuideTolerance?: number
+  /** 右键菜单上下文请求 */
+  onContextMenu?: (request: RendererContextMenuRequest) => void
 }) {
-  const { element, selection, edit, view, state, history, tool, clipboard } = useDesigner()
+  const { selection, edit, view, state, history, tool, clipboard } = useDesigner()
 
   const [viewportRef, setViewportRef] = createSignal<HTMLDivElement | null>(null)
   const [sceneRef, setSceneRef] = createSignal<HTMLDivElement | null>(null)
@@ -97,6 +111,10 @@ export function Renderer(props: {
 
   const autoScroll = createAutoScroll(viewportRef, interaction)
   const onSceneDown = createSceneDown(interaction)
+  const onContextMenu = createSceneContextMenu({
+    interaction,
+    onRequest: props.onContextMenu,
+  })
 
   const containerStyle = createMemo(() => {
     const { containerSize, config } = state
@@ -215,6 +233,7 @@ export function Renderer(props: {
           style={containerStyle()}
           class={bem('container')}
           onMouseDown={onMouseDown}
+          onContextMenu={onContextMenu}
           on:wheel={{ passive: false, handleEvent: onWheel }}
         >
           {/*世界层（canvas 坐标，交给 transform 处理）*/}

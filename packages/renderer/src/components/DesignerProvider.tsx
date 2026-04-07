@@ -1,8 +1,3 @@
-/**
- * Store Provider
- * Provides Designer instance to the component tree via SolidJS Context
- */
-
 import { createContext, useContext, type JSX } from 'solid-js'
 import type { Designer } from '@diagen/core'
 
@@ -18,11 +13,7 @@ export interface DesignerProviderProps {
  * Wraps the application to provide Designer access to all child components
  */
 export function DesignerProvider(props: DesignerProviderProps) {
-  return (
-    <DesignerContext.Provider value={props.designer}>
-      {props.children}
-    </DesignerContext.Provider>
-  )
+  return <DesignerContext.Provider value={props.designer}>{props.children}</DesignerContext.Provider>
 }
 
 export function useDesignerContext(): Designer | undefined {

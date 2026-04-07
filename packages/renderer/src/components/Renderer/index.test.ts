@@ -1008,4 +1008,88 @@ describe('Renderer', () => {
       harness.dispose()
     }
   })
+
+  it('右键时应根据命中目标输出 context menu 上下文', async () => {
+    const requests: Array<{
+      targetType: string
+      targetId: string | null
+      selectionIds: string[]
+    }> = []
+    const harness = await createRendererTestHarness({
+      shapes: [
+        { id: 'shape_context_a', x: 100, y: 100, w: 100, h: 80 },
+        { id: 'shape_context_b', x: 320, y: 100, w: 100, h: 80 },
+      ],
+      rendererProps: {
+        onContextMenu: request => {
+          requests.push({
+            targetType: request.targetType,
+            targetId: request.targetId,
+            selectionIds: request.selectionIds,
+          })
+        },
+      },
+    })
+
+    try {
+      harness.designer.edit.add(
+        [
+          createLinker({
+            id: 'linker_context',
+            name: 'linker_context',
+            linkerType: 'straight',
+            from: {
+              id: 'shape_context_a',
+              x: 200,
+              y: 140,
+              binding: { type: 'free' },
+            },
+            to: {
+              id: 'shape_context_b',
+              x: 320,
+              y: 140,
+              binding: { type: 'free' },
+            },
+          }),
+        ],
+        {
+          record: false,
+          select: false,
+        },
+      )
+
+      await harness.dispatchSceneContextMenuAtCanvas({ x: 140, y: 140 })
+      expect(requests[0]).toEqual({
+        targetType: 'shape',
+        targetId: 'shape_context_a',
+        selectionIds: ['shape_context_a'],
+      })
+
+      harness.designer.selection.replace(['shape_context_a', 'shape_context_b'])
+      await Promise.resolve()
+
+      await harness.dispatchSceneContextMenuAtCanvas({ x: 140, y: 140 })
+      expect(requests[1]).toEqual({
+        targetType: 'selection',
+        targetId: 'shape_context_a',
+        selectionIds: ['shape_context_a', 'shape_context_b'],
+      })
+
+      await harness.dispatchSceneContextMenuAtCanvas({ x: 260, y: 140 })
+      expect(requests[2]).toEqual({
+        targetType: 'linker',
+        targetId: 'linker_context',
+        selectionIds: ['linker_context'],
+      })
+
+      await harness.dispatchSceneContextMenuAtCanvas({ x: 20, y: 20 })
+      expect(requests[3]).toEqual({
+        targetType: 'canvas',
+        targetId: null,
+        selectionIds: ['linker_context'],
+      })
+    } finally {
+      harness.dispose()
+    }
+  })
 })

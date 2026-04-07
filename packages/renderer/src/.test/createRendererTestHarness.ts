@@ -26,6 +26,7 @@ export interface CreateRendererTestHarnessOptions {
   pageWidth?: number
   pageHeight?: number
   shapes?: HarnessShapeInput[]
+  rendererProps?: Omit<Parameters<typeof Renderer>[0], 'children'>
 }
 
 type CapturedInteraction = ReturnType<typeof useInteraction>
@@ -109,6 +110,7 @@ function HarnessApp(props: {
   pageWidth: number
   pageHeight: number
   shapes: HarnessShapeInput[]
+  rendererProps?: Omit<Parameters<typeof Renderer>[0], 'children'>
   onReady: (payload: { designer: Designer; interaction: CapturedInteraction }) => void
 }) {
   const designer = createDesigner({
@@ -136,6 +138,7 @@ function HarnessApp(props: {
     designer,
     get children() {
       return createComponent(Renderer, {
+        ...props.rendererProps,
         get children() {
           return createComponent(InteractionProbe, {
             onReady: interaction => {
@@ -163,6 +166,7 @@ export async function createRendererTestHarness(options: CreateRendererTestHarne
   canvasToClient: (point: Point) => Point
   getOverlayElementsByCursor: (cursor: string) => HTMLElement[]
   dispatchSceneMouseDownAtCanvas: (point: Point, init?: MouseEventInit) => Promise<MouseEvent>
+  dispatchSceneContextMenuAtCanvas: (point: Point, init?: MouseEventInit) => Promise<MouseEvent>
   dispatchElementMouseDownAtClient: (element: HTMLElement, point: Point, init?: MouseEventInit) => Promise<MouseEvent>
   dispatchElementMouseDown: (element: HTMLElement, init?: MouseEventInit) => Promise<MouseEvent>
   dispatchWindowMouseMoveAtCanvas: (point: Point, init?: MouseEventInit) => Promise<MouseEvent>
@@ -187,6 +191,7 @@ export async function createRendererTestHarness(options: CreateRendererTestHarne
         pageWidth,
         pageHeight,
         shapes,
+        rendererProps: options.rendererProps,
         onReady: payload => {
           capturedDesigner = payload.designer
           capturedInteraction = payload.interaction
@@ -275,7 +280,7 @@ export async function createRendererTestHarness(options: CreateRendererTestHarne
 
   async function dispatchMouseEvent(
     target: EventTarget,
-    type: 'mousedown' | 'mousemove' | 'mouseup',
+    type: 'mousedown' | 'mousemove' | 'mouseup' | 'contextmenu',
     point: Point,
     init: MouseEventInit = {},
   ): Promise<MouseEvent> {
@@ -284,8 +289,8 @@ export async function createRendererTestHarness(options: CreateRendererTestHarne
       cancelable: true,
       clientX: point.x,
       clientY: point.y,
-      button: init.button ?? 0,
-      buttons: init.buttons ?? (type === 'mouseup' ? 0 : 1),
+      button: init.button ?? (type === 'contextmenu' ? 2 : 0),
+      buttons: init.buttons ?? (type === 'mouseup' || type === 'contextmenu' ? 0 : 1),
       ctrlKey: init.ctrlKey ?? false,
       altKey: init.altKey ?? false,
       shiftKey: init.shiftKey ?? false,
@@ -298,6 +303,10 @@ export async function createRendererTestHarness(options: CreateRendererTestHarne
 
   async function dispatchSceneMouseDownAtCanvas(point: Point, init: MouseEventInit = {}): Promise<MouseEvent> {
     return dispatchMouseEvent(sceneLayer, 'mousedown', canvasToClient(point), init)
+  }
+
+  async function dispatchSceneContextMenuAtCanvas(point: Point, init: MouseEventInit = {}): Promise<MouseEvent> {
+    return dispatchMouseEvent(container, 'contextmenu', canvasToClient(point), init)
   }
 
   async function dispatchElementMouseDownAtClient(
@@ -365,6 +374,7 @@ export async function createRendererTestHarness(options: CreateRendererTestHarne
     canvasToClient,
     getOverlayElementsByCursor,
     dispatchSceneMouseDownAtCanvas,
+    dispatchSceneContextMenuAtCanvas,
     dispatchElementMouseDownAtClient,
     dispatchElementMouseDown,
     dispatchWindowMouseMoveAtCanvas,
