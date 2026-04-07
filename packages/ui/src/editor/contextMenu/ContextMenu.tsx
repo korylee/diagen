@@ -3,42 +3,37 @@ import { createEventListener } from '@diagen/primitives'
 import type { JSX } from 'solid-js'
 import { createMemo, Show, splitProps } from 'solid-js'
 import { Portal } from 'solid-js/web'
-import { mergeIconRegistry, renderIcon, type IconRegistryOverrides } from '../iconRegistry'
-import { useUIIconRegistry } from '../config'
+import { renderIcon } from '../../iconRegistry'
+import { useUIIconRegistry } from '../../config'
 import { createContextMenuBridge } from './createContextMenuBridge'
-import type { ContextMenuEntries, ContextMenuItem, ContextMenuPosition } from './types'
+import type { ContextMenuEntries, ContextMenuItem, ContextMenuState } from './types'
+import { createDgBem } from '@diagen/shared'
+
+import "./index.scss"
 
 export interface ContextMenuProps extends Omit<JSX.HTMLAttributes<HTMLDivElement>, 'style' | 'onSelect'> {
-  open: boolean
-  position: ContextMenuPosition
+  state: ContextMenuState
   onClose?: () => void
-  iconRegistry?: IconRegistryOverrides
   entries?: ContextMenuEntries
   style?: JSX.CSSProperties
   renderIcon?: (icon: string, item: ContextMenuItem) => JSX.Element | undefined
 }
 
+const bem = createDgBem('context-menu')
 
 export function ContextMenu(props: ContextMenuProps) {
-  const [local, rest] = splitProps(props, [
-    'open',
-    'position',
-    'onClose',
-    'renderIcon',
-    'iconRegistry',
-    'entries',
-    'style',
-  ])
-  const bridge = createContextMenuBridge(local.entries)
+  const [local, rest] = splitProps(props, ['state', 'onClose', 'renderIcon', 'entries', 'style'])
+  // Keep menu item resolution bound to a single state object so
+  // open/position/context always move together from the caller side.
+  const bridge = createContextMenuBridge(() => local.state.context, local.entries)
   const globalIconRegistry = useUIIconRegistry()
-  const iconRegistry = createMemo(() =>
-    local.iconRegistry ? mergeIconRegistry(globalIconRegistry(), local.iconRegistry) : globalIconRegistry(),
-  )
-  const _renderIcon = (icon: ContextMenuItem['icon'], item: ContextMenuItem) => {
+  const renderMenuIcon = (icon: ContextMenuItem['icon'], item: ContextMenuItem) => {
+    // Let provider-level icons stay the default source,
+    // while renderIcon remains the final escape hatch for callers.
     return typeof icon === 'string'
       ? local.renderIcon
         ? local.renderIcon(icon, item)
-        : renderIcon(icon as any, iconRegistry())
+        : renderIcon(icon as any, globalIconRegistry())
       : icon?.({})
   }
   const items = createMemo(() =>
@@ -56,7 +51,7 @@ export function ContextMenu(props: ContextMenuProps) {
         extra: item.shortcut,
         danger: item.danger,
         'data-menu-id': item.id,
-        icon: _renderIcon(item.icon, item),
+        icon: renderMenuIcon(item.icon, item),
       }
     }),
   )
@@ -64,7 +59,7 @@ export function ContextMenu(props: ContextMenuProps) {
   let rootRef: HTMLDivElement | undefined
 
   const handleDocumentPointerDown = (event: MouseEvent) => {
-    if (!local.open) return
+    if (!local.state.open) return
     const target = event.target as Node | null
     if (rootRef && target && !rootRef.contains(target)) {
       local.onClose?.()
@@ -72,7 +67,7 @@ export function ContextMenu(props: ContextMenuProps) {
   }
 
   const handleDocumentKeyDown = (event: KeyboardEvent) => {
-    if (!local.open) return
+    if (!local.state.open) return
     if (event.key === 'Escape') {
       local.onClose?.()
     }
@@ -88,22 +83,17 @@ export function ContextMenu(props: ContextMenuProps) {
   }
 
   return (
-    <Show when={local.open}>
+    <Show when={local.state.open}>
       <Portal>
         <div
           {...rest}
           ref={rootRef}
+          class={bem()}
           style={{
             position: 'fixed',
-            left: `${local.position.x}px`,
-            top: `${local.position.y}px`,
+            left: `${local.state.position.x}px`,
+            top: `${local.state.position.y}px`,
             'z-index': 2000,
-            padding: '6px',
-            'min-width': '220px',
-            border: '1px solid rgba(148, 163, 184, 0.24)',
-            'border-radius': '14px',
-            background: '#fff',
-            'box-shadow': '0 18px 40px rgba(15, 23, 42, 0.16)',
             ...local.style,
           }}
           onContextMenu={event => {
