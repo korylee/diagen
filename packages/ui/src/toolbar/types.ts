@@ -6,16 +6,13 @@ export interface ToolbarBridgeBaseItem {
 }
 
 export type ToolbarItem = UIAction
-export type ToolbarBridgeItem = ToolbarItem | '|'
+export type ToolbarExtraEntry = 'spacer'
+export type ToolbarBridgeItem = ToolbarItem | '|' | ToolbarExtraEntry
 
 export interface ToolbarBridge {
-  leftItems: Accessor<readonly ToolbarBridgeItem[]>
-  rightItems: Accessor<readonly ToolbarBridgeItem[]>
+  items: Accessor<readonly ToolbarBridgeItem[]>
   getAction: (id: string) => ToolbarItem | undefined
   execute: (id: string) => boolean
 }
 
-export interface ToolbarEntries {
-  left?: ResolveActionEntries<ToolbarItem>
-  right?: ResolveActionEntries<ToolbarItem>
-}
+export type ToolbarEntries = ResolveActionEntries<ToolbarItem, ToolbarExtraEntry>

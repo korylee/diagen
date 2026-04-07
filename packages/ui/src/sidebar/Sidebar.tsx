@@ -12,20 +12,16 @@ import {
 } from './panel'
 import type { SidebarFrameProps, SidebarItemData, SidebarRailItem, SidebarSectionData } from './types'
 
-import {
-  mergeIconRegistry,
-  renderIcon,
-  type IconRegistryOverrides,
-} from '../iconRegistry'
+import { mergeIconRegistry, renderIcon, type IconRegistryOverrides } from '../iconRegistry'
 import { useUIIconRegistry } from '../config'
 import { syncCreationModeForActiveTool, type SidebarCreationMode } from './creationMode'
 import { createShapeLibraryBridge } from './createShapeLibraryBridge'
 import { createSidebarRailItems, createSidebarSearchSections, filterSidebarSections } from './search'
 
 import './sidebar.css'
+import { useDesigner } from '@diagen/renderer'
 
 export interface SidebarProps extends Omit<SidebarFrameProps, 'children'> {
-  designer: Designer
   searchable?: boolean
   searchPlaceholder?: string
   iconRegistry?: IconRegistryOverrides
@@ -39,8 +35,8 @@ export interface SidebarProps extends Omit<SidebarFrameProps, 'children'> {
 const bem = createDgBem('sidebar')
 
 export function Sidebar(props: SidebarProps): JSX.Element {
+  const designer = useDesigner()
   const [local, rest] = splitProps(props, [
-    'designer',
     'searchable',
     'searchPlaceholder',
     'iconRegistry',
@@ -58,7 +54,7 @@ export function Sidebar(props: SidebarProps): JSX.Element {
   const iconRegistry = createMemo(() =>
     local.iconRegistry ? mergeIconRegistry(globalIconRegistry(), local.iconRegistry) : globalIconRegistry(),
   )
-  const shapeLibrary = createShapeLibraryBridge(local.designer, {
+  const shapeLibrary = createShapeLibraryBridge(designer, {
     creationMode,
   })
 
@@ -112,7 +108,7 @@ export function Sidebar(props: SidebarProps): JSX.Element {
   const showRail = createMemo<boolean>(() => !isSearching() && railItems().length > 1)
 
   createEffect(() => {
-    syncCreationModeForActiveTool(local.designer, creationMode())
+    syncCreationModeForActiveTool(designer, creationMode())
   })
 
   return (

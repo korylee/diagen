@@ -26,6 +26,6 @@ export interface UIActions {
 
 export type ActionEntry = string | '|'
 
-export type ResolveActionEntries<T extends UIAction = UIAction> =
-  | readonly (ActionEntry | T)[]
-  | (() => readonly (ActionEntry | T)[])
+export type ResolveActionEntries<T extends UIAction = UIAction, TExtra extends string = never> =
+  | readonly (ActionEntry | T | TExtra)[]
+  | (() => readonly (ActionEntry | T | TExtra)[])

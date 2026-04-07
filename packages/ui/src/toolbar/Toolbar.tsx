@@ -99,7 +99,7 @@ export interface ToolbarProps extends Omit<JSX.HTMLAttributes<HTMLDivElement>, '
   class?: string
   style?: string
   width?: number | string
-  rightSlot?: JSX.Element
+  endSlot?: JSX.Element
   iconRegistry?: IconRegistryOverrides
   entries?: ToolbarEntries
   renderIcon?: (icon: ToolbarItem['icon'], item: ToolbarItem) => JSX.Element | undefined
@@ -111,6 +111,9 @@ function ToolbarBridgeItemView(props: {
 }) {
   if (props.item === '|') {
     return <ToolbarDivider />
+  }
+  if (props.item === 'spacer') {
+    return <ToolbarSpacer />
   }
 
   const button = props.item
@@ -129,7 +132,7 @@ function ToolbarBridgeItemView(props: {
 }
 
 export function Toolbar(props: ToolbarProps) {
-  const [local, rest] = splitProps(props, ['class', 'style', 'width', 'rightSlot', 'renderIcon', 'iconRegistry', 'entries'])
+  const [local, rest] = splitProps(props, ['class', 'style', 'width', 'endSlot', 'renderIcon', 'iconRegistry', 'entries'])
   const bridge = createToolbarBridge(local.entries)
   const globalIconRegistry = useUIIconRegistry()
   const iconRegistry = createMemo(() =>
@@ -151,15 +154,12 @@ export function Toolbar(props: ToolbarProps) {
       style={mergeStyle(local.width, local.style)}
       aria-label={rest['aria-label'] ?? 'Toolbar'}
     >
-      <For each={bridge.leftItems()}>
+      <For each={bridge.items()}>
         {item => <ToolbarBridgeItemView item={item} renderIcon={renderToolbarIcon} />}
       </For>
-      <Show when={bridge.rightItems().length > 0 || local.rightSlot}>
+      <Show when={local.endSlot}>
         <ToolbarSpacer />
-        <For each={bridge.rightItems()}>
-          {item => <ToolbarBridgeItemView item={item} renderIcon={renderToolbarIcon} />}
-        </For>
-        {local.rightSlot}
+        {local.endSlot}
       </Show>
     </div>
   )

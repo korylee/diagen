@@ -3,13 +3,13 @@
  * Demonstrates the usage of Designer with DesignerProvider and CanvasRenderer
  */
 
-import { batch, createMemo, onMount } from 'solid-js'
-import type { Accessor, JSX } from 'solid-js'
-import type { Designer, LinkerElement, ShapeElement } from '@diagen/core'
+import type { LinkerElement, ShapeElement } from '@diagen/core'
 import { createDesigner, Schema } from '@diagen/core'
-import { Sidebar, Toolbar } from '@diagen/ui'
-import { DesignerProvider, Renderer, useDesigner } from '@diagen/renderer'
+import { DesignerProvider, useDesigner } from '@diagen/renderer'
 import { generateId } from '@diagen/shared'
+import { Editor, Sidebar, Toolbar } from '@diagen/ui'
+import type { Accessor, JSX } from 'solid-js'
+import { batch, createMemo, onMount } from 'solid-js'
 
 interface EditorStatus {
   zoomDisplay: Accessor<string>
@@ -34,21 +34,9 @@ function useEditorStatus(): EditorStatus {
   }
 }
 
-function ToolbarStatus(props: { status: EditorStatus }): JSX.Element {
-  return (
-    <div class="toolbar-status">
-      <span class="zoom-display">{props.status.zoomDisplay()}%</span>
-      <span class="status-text">
-        Selected: {props.status.selectionCount()} | Total: {props.status.elementCount()}
-      </span>
-    </div>
-  )
-}
-
-function SidebarPanel(props: { designer: Designer; status: EditorStatus }): JSX.Element {
+function SidebarPanel(props: { status: EditorStatus }): JSX.Element {
   return (
     <Sidebar
-      designer={props.designer}
       class="app-sidebar"
       searchPlaceholder="Search shapes or actions"
       emptyState="没有匹配的图元或动作"
@@ -70,25 +58,24 @@ function SidebarPanel(props: { designer: Designer; status: EditorStatus }): JSX.
   )
 }
 
-function Editor(): JSX.Element {
+function EditorCanvas(): JSX.Element {
   return (
     <div class="editor-container">
-      <Renderer />
+      <Editor />
     </div>
   )
 }
 
 function EditorShell(): JSX.Element {
-  const designer = useDesigner()
   const status = useEditorStatus()
 
   return (
     <div class="app">
       <SampleDataLoader />
-      <Toolbar designer={designer} rightSlot={<ToolbarStatus status={status} />} />
+      <Toolbar />
       <div class="app-body">
-        <SidebarPanel designer={designer} status={status} />
-        <Editor />
+        <SidebarPanel status={status} />
+        <EditorCanvas />
       </div>
     </div>
   )
@@ -137,8 +124,16 @@ function SampleDataLoader() {
       )!,
     ]
     const linkers: LinkerElement[] = [
-      Schema.createLinker('linker', { id: shape1Id, x: 250, y: 200 }, { id: shape2Id, x: 400, y: 200 })!,
-      Schema.createLinker('linker', { id: shape2Id, x: 550, y: 200 }, { id: shape3Id, x: 700, y: 200 })!,
+      Schema.createLinker(
+        'linker',
+        { id: shape1Id, x: 250, y: 200, binding: { type: 'free' } },
+        { id: shape2Id, x: 400, y: 200, binding: { type: 'free' } },
+      )!,
+      Schema.createLinker(
+        'linker',
+        { id: shape2Id, x: 550, y: 200, binding: { type: 'free' } },
+        { id: shape3Id, x: 700, y: 200, binding: { type: 'free' } },
+      )!,
     ]
 
     batch(() => {
