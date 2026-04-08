@@ -1,62 +1,160 @@
 # 领域模型与状态边界
 
-## 1. 文档根模型：Diagram（持久化）
-- 文件：`packages/core/src/model/diagram.ts`
-- 主要结构：
-  - `elements`：元素 map
-  - `orderList`：渲染顺序
-  - `page`：页面设置
-  - `theme`、元信息（createdAt/updatedAt 等）
-  - 不包含评论/批注；此类数据应位于应用层模型
-- 生命周期：
-  - 创建：`createDiagram`
-  - 持久化：`serialize()` / `loadFromJSON()`（通过 designer 暴露）
+## 1. `Diagram` 是当前唯一正式文档模型
+文件：`packages/core/src/model/diagram.ts`
 
-## 2. 页面模型：DiagramPage
-- 文件：`packages/core/src/model/page.ts`
-- 关键字段：
-  - 尺寸：`width`、`height`
-  - 布局：`padding`、`margin`
-  - 网格：`showGrid`、`gridSize`、`gridColor`、`gridStyle`
-  - 其他：`orientation`、`lineJumps`
+关键字段：
+- `id`
+- `name`
+- `version`
+- `elements`
+- `orderList`
+- `page`
+- `theme`
+- `createdAt`
+- `updatedAt`
+- `createdBy`
+- `properties`
 
-## 3. 元素模型
-- 基类：`packages/core/src/model/types.ts`
-  - `id`、`type`、`locked`、`visible`、`group`、`parent`、`children`
-- Shape：`packages/core/src/model/shape.ts`
-  - 几何：`props`（x/y/w/h/angle）
-  - 样式：`shapeStyle`、`lineStyle`、`fillStyle`、`fontStyle`
-  - 内容：`textBlock`、`anchors`、`path`
-  - 行为：`attribute`（可缩放/可连接等）
-- Linker：`packages/core/src/model/linker.ts`
-  - 端点：`from` / `to`（支持绑定 shape anchor）
-  - 控制点：`points`
-  - 样式：`lineStyle`、`fontStyle`
+当前判断：
+- `Diagram` 已足够表达当前正式导入导出的文件内容。
+- 若后续进入多 page，优先直接扩展 `Diagram`，而不是再包一层 `Document`。
 
-## 4. 编辑器运行态（非文档）
-文件：`packages/core/src/designer/index.ts`
+## 2. 导入导出与宿主快照分层
 
-- `viewport`：`x/y/zoom`
-- `viewportSize`：视口尺寸
-- `containerSize`：容器尺寸（可被 autoGrow 扩容）
-- `config.autoGrow`：扩容配置（padding/step/max 等）
+### 正式文件格式
+- `Diagram`
+
+### 宿主本地快照
+```ts
+interface LocalSnapshot {
+  diagram: Diagram
+  view?: {
+    x: number
+    y: number
+    zoom: number
+  }
+  activePageId?: string
+  savedAt: number
+}
+```
+
+理由：
+- 正式导入导出语义最自然的是“一张图文件”
+- `view / savedAt / activePageId` 属于宿主恢复需求，不属于正式交换格式
+- 这样可以同时保持 `core` 协议简洁和宿主恢复能力
+
+## 3. 页面模型 `DiagramPage`
+文件：`packages/core/src/model/page.ts`
+
+关键字段：
+- `width / height`
+- `padding / margin`
+- `backgroundColor`
+- `showGrid / gridSize / gridColor / gridStyle`
+- `orientation`
+- `lineJumps`
+
+说明：
+- 页面配置属于文档态，应参与导出与导入。
+
+## 4. 元素模型
+
+### 基类字段
+文件：`packages/core/src/model/types.ts`
+
+- `id`
+- `name`
+- `type`
+- `locked`
+- `visible`
+- `group`
+- `parent`
+- `children`
+
+### Shape
+文件：`packages/core/src/model/shape.ts`
+
+- `props`
+- `shapeStyle`
+- `lineStyle`
+- `fillStyle`
+- `fontStyle`
+- `textBlock`
+- `anchors`
+- `path`
+- `attribute`
+
+### Linker
+文件：`packages/core/src/model/linker.ts`
+
+- `from / to`
+- `points`
+- `routePoints`
+- `lineStyle`
+- `fontStyle`
+
+## 5. 不应持久化的状态
+文件：`packages/core/src/designer/types.ts`
+
+以下字段属于运行时状态：
+- `transform`
+- `viewportSize`
+- `worldSize`
+- `originOffset`
+- `config`
+- `tool`
 
 注意：
-- 这些状态不属于 Diagram 文档语义，不建议写入导出的 diagram JSON。
-- DOM 几何（如 viewportRect）属于更短生命周期状态，应留在 renderer 层。
+- 其中 `transform` 是否保留到宿主级 `LocalSnapshot.view` 是宿主决策，不是 `Diagram` 基础语义。
+- `tool / originOffset / viewportSize` 明确不应进入导出文件。
 
-## 5. 交互会话态（renderer 临时态）
-- 文件：`packages/renderer/src/primitives/`
-- 典型状态：
-  - `createDragSession`：start/last/isPending/isDragging
-  - `createSelection`：startPoint/endPoint/bounds
-  - `createResize`：targetId/direction/startBounds/startMouse
-- 特征：
-  - 仅服务当前交互过程
-  - 不进入 `diagram` 持久化结构
+## 6. 当前模型层缺口
+- 编辑链路没有系统维护 `diagram.updatedAt`
+- 缺少文档级 `schemaVersion`
+- 缺少文档合法性校验入口
+- 缺少脏状态与已保存文档状态表达
 
-## 6. 与 ProcessOn 数据差异（迁移时高频踩坑）
-- ProcessOn 的 `props.zindex` 常与渲染顺序耦合；
-  Diagen 以 `orderList` 为主。
-- ProcessOn 某些运行态字段混在 definition 语义中；
-  Diagen 更强调文档态与运行态分离。
+## 7. 后续建模约束
+1. 所有新文档字段先判断是否属于 `Diagram` 语义，而不是先塞到运行时 state。
+2. 评论、权限、协作用户态应放在应用层，不要直接加进 `Diagram`。
+3. 当前阶段不为旧格式做兼容建模，协议变更时直接重构到位。
+4. 正式导入导出优先保持 `Diagram` 作为文件根；宿主快照层不进入 `core` 正式协议。
+
+## 8. 分页建模计划
+若后续实现多 page，推荐模型方向：
+
+```ts
+interface Diagram {
+  id: string
+  name: string
+  version: string
+  pages: Record<string, DiagramPage>
+  pageOrder: string[]
+  createdAt: number
+  updatedAt: number
+  properties?: Record<string, unknown>
+}
+
+interface DiagramPage {
+  id: string
+  name: string
+  width: number
+  height: number
+  backgroundColor: string
+  elements: Record<string, DiagramElement>
+  orderList: string[]
+}
+```
+
+配套分层：
+- `core` 负责 page 语义、页内元素操作、跨页操作、导入导出
+- 应用层负责 page tabs、缩略图、排序交互、删除确认等 UI
+
+运行时建议：
+- `activePageId` 放在 `EditorState`
+- 是否持久化“上次打开页”由宿主层决定，不默认进入正式文件协议
+
+导入导出建议：
+- 默认导入导出整份多 page `Diagram`
+- 若后续支持“导出当前页”，作为衍生能力处理，不改变正式文件根模型

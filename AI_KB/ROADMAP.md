@@ -1,138 +1,207 @@
-# Diagen 近期计划
+# Diagen 后续开发计划
 
-日期：2026-03-27  
-范围：未来 2-4 周  
-目标：把现有核心交互从“已经可用”推进到“入口完整、可稳定回归”。
+日期：2026-04-08  
+范围：未来 4 到 8 周  
+目标：先补齐对标 `draw.io / ProcessOn` 的核心编辑能力，再进入 `page + 持久化 + 导入导出`。
+
+当前执行入口：
+- `Phase 1` 已可直接开工，实施指引见 `AI_KB/PHASE_1_TEXT_EDITING.md`
 
 ---
 
 ## 1. 当前判断
 
-已完成：
-- shape / linker 创建主链路已接入 `renderer`
-- `LinkCreateOverlay` 已可发起快捷建线
-- `clipboard manager` 已落地到 `core`
-- `rendererTestHarness` 已落地，`RendererContainer` 已有首批容器级测试
-- `edit manager` 的整对象字段回退问题已修复
+已具备：
+- 主要编辑交互主链路已经成立
+- keyboard clipboard 已接入 renderer
+- guide line、quick-create linker、context menu 已进入主渲染链
+- 基础文档协议方向已开始收口
 
-当前缺口：
-- `RendererContainer` 仍只绑定 `delete / ctrl+a / esc / ctrl+z / ctrl+y`，`Ctrl/Cmd+C/X/V/D` 尚未接上
-- `packages/ui/src/toolbar/createToolbarBridge.ts` 仍未暴露 clipboard 入口
-- `LinkCreateOverlay / create-linker / auto-scroll / 更多 zoom-scroll 组合` 的容器级回归仍不足
-- 连续操作场景还缺少更多组合验证
-- move/resize 通用吸附线仍是下一阶段最明显的体验缺口
+当前核心缺口：
+- 文本编辑尚未形成正式体验
+- 连线编辑成熟度不足
+- 容器与层级语义不足
+- 样式体系和导航能力不足
+- 多 page、持久化、导入导出尚未完成
 
-优先级：
-1. 先补输入入口闭环，再补容器级回归
-2. 再做连续编辑稳态化
-3. 再进入 move/resize guide line
-4. 外围 UI 与产品化扩展继续后置
+当前决策：
+- 项目未对外发布，不为旧 API 或旧文档格式做兼容设计。
+- 若后续协议需要调整，直接修改正式协议、测试和宿主接线，不保留兼容层。
+- 后续优先级按编辑生产力排，而不是按文件协议排。
 
 ---
 
-## 2. 近期阶段与建议顺序
+## 2. 目标拆分
 
-### Phase 1：输入入口闭环
-目标：把已经存在的 `core` 能力真正暴露到 `renderer + ui`。
-
-任务：
-- 在 `packages/renderer/src/components/RendererContainer.tsx` 接入 `Ctrl/Cmd+C/X/V/D`
-- 统一处理 `ctrlKey` 与 `metaKey`，避免 macOS 缺口
-- 在 `packages/ui/src/toolbar/createToolbarBridge.ts` 暴露 `copy / cut / paste / duplicate`
-- 用 `designer.clipboard.canPaste()`、选择数量、`canUndo/canRedo` 驱动 disabled 状态
-- 视需要补 `clipboardChanged / undoStackChanged` 一类 UI bridge 观察点，但不把 UI 状态反向塞回 `core`
-
-完成标志：
-- 复制粘贴不再只能靠直接调用 `designer.clipboard.*`
-- 键盘入口、toolbar 入口、事务粒度三者一致
-
-### Phase 2：补齐 `renderer` 主入口回归
-目标：让关键交互不再只靠 playground 手测。
+### Phase 1：文本编辑
+目标：让图形与连线文字进入真正可编辑状态。
 
 任务：
-- 为 `create-linker` 工具态补 `RendererContainer` 测试
-- 为 `LinkCreateOverlay` 补显示/触发测试
-- 补 `auto-scroll`
-- 补更多 `zoom / scroll` 组合场景
-- 补 clipboard 快捷键在容器级的集成测试，覆盖 selection/history 结果
+1. 明确文本编辑态与只读态边界
+2. 支持双击进入编辑
+3. 明确 Enter / Esc / blur 提交语义
+4. 补 shape 文本定位、换行、对齐
+5. 评估 linker 文本编辑与定位能力
 
 完成标志：
-- `RendererContainer` 关键输入分支都有最小自动化回归
-- 新增交互入口都能在 harness 下稳定复现
+- 文本编辑不再依赖临时数据修改
+- 文本编辑与 selection/history 能稳定协同
 
-### Phase 3：连续编辑稳态化
-目标：把高频动作的串联体验做稳。
+### Phase 2：连线编辑成熟度
+目标：补齐连线作为流程图核心能力的编辑质量。
 
 任务：
-- 覆盖 `box select -> drag -> resize -> rotate -> undo/redo`
-- 覆盖 `zoom / scroll -> drag|resize|rotate` 的跨模式串联
-- 复核缩放、滚动、自动滚动对交互会话的影响
-- 补 playground 手工验证清单
+1. 端点重连
+2. 控制点编辑
+3. 正交线路手动调整
+4. 连线文字定位
+5. line jump 视觉与稳定性优化
 
 完成标志：
-- 常见连续编辑流程可稳定回归
+- 连线可编辑性接近主流图编辑器基础水位
 
-### Phase 4：guide line 与编辑效率提升
-目标：补齐对齐辅助这一块最明显的体验差距。
+### Phase 3：容器与层级语义
+目标：从 group 迈向真正的层级编辑能力。
 
 任务：
-- 为 shape move/resize 抽出 guide 计算入口
-- 在 overlay 层呈现 guide line，不污染模型
-- 参考 `.processon` 的 `snapLine / snapResizeLine`，但保持 `core 计算 + renderer 呈现` 分层
-- 先补最小自动化回归，再考虑视觉细化
+1. 明确 parent / child 语义
+2. 容器内拖拽与脱离
+3. 容器选择与批量操作
+4. 跨容器移动后的关系修正
+5. 梳理容器相关 history 语义
 
 完成标志：
-- move/resize 具备最小可用吸附反馈
-- guide 逻辑不侵入 `Diagram` 文档态
+- 容器成为正式语义，而不是仅靠 group 模拟
+
+### Phase 4：样式体系与导航效率
+目标：提升长时间编辑的效率与一致性。
+
+任务：
+1. 默认样式与样式复用
+2. 批量样式应用
+3. 主题与 preset
+4. space 平移、zoom preset、actual size、fit
+5. 评估 minimap 与键盘微移
+
+完成标志：
+- 样式配置和导航能力进入可用状态
+
+### Phase 5：多 Page 分页
+目标：让单个 `Diagram` 文件支持多个 page，并把分页语义正式收进 `core`。
+
+任务：
+1. 在 `core` 中把 `Diagram` 升级为多 page 文件根模型
+2. 引入 page 级元素存储与排序
+3. 增加 `activePageId` 运行时状态与 page manager
+4. 完成切页、新建页、删除页、重命名页的最小语义闭环
+5. 评估跨页复制、移动、删除与历史语义
+
+完成标志：
+- 多 page 属于正式文档语义
+- 分页 UI 不反向污染 `core` 文档边界
+
+### Phase 6：正式持久化与导入导出
+目标：基于稳定的多 page `Diagram` 文件根格式，落地正式文件协议和产品入口。
+
+任务：
+1. 收敛 `packages/core` 的 `persistence` 模块
+2. 实现 `serializeDiagram / parseDiagram / loadDiagram`
+3. 在宿主层实现 `LocalSnapshot`
+4. 在 `@diagen/ui` 动作体系中新增保存、导入、导出
+5. 补导入错误提示、覆盖确认与导出文件命名策略
+
+完成标志：
+- 正式导入导出围绕 `Diagram`
+- 宿主快照不污染正式文件协议
+- 用户可以通过 UI 完成保存、导入、导出
+
+### Phase 7：保存体验与工作流
+目标：让持久化能力具备稳定的产品体验。
+
+任务：
+1. 增加 `dirty / revision / lastSavedAt`
+2. 在 UI 上显示保存状态
+3. 在关闭或刷新前提示未保存变更
+4. 完善自动保存策略
+5. 完善恢复与回退体验
+
+完成标志：
+- 用户能知道当前文档是否已保存
+- 保存状态与自动保存行为一致
 
 ---
 
-## 3. 立即任务
+## 3. 建议实现顺序
 
 ### P0
-- `packages/renderer/src/components/RendererContainer.tsx`
-  - 接入 `Ctrl/Cmd+C/X/V/D`
-  - 统一 `ctrl/meta` 修饰键判断
-- `packages/ui/src/toolbar/createToolbarBridge.ts`
-  - 补 `copy / cut / paste / duplicate`
-  - 补 disabled 条件
-- `packages/renderer/src/components/__tests__/RendererContainer.test.ts`
-  - 补 clipboard 快捷键、`create-linker`、`auto-scroll`、更多 `zoom / scroll` 回归
+- 文本编辑
+- 连线编辑成熟度
 
 ### P1
-- `packages/renderer/src/components/LinkCreateOverlay.tsx`
-  - 补显示条件与触发行为测试
-- 选择/拖拽/resize/rotate 跨模式组合验证
-- playground 手工验证清单
+- 容器与层级语义
+- 样式体系
+- 导航效率
+
+### P2
+- 多 page `core` 建模
+- page manager
+- 最小分页 UI
+
+### P3
+- 正式持久化协议
+- 本地快照闭环
+- 正式导入导出入口
+
+### P4
+- 保存体验与工作流
+
+## 3.1 近期执行建议
+
+如果只排接下来 2 到 3 个迭代，建议这样推进：
+
+1. 先完成文本编辑最小闭环
+2. 再完成连线重连与控制点编辑
+3. 然后进入容器与层级语义
+4. 样式体系与导航效率穿插推进，但不抢占前三项主线
+5. `page / 持久化 / 导入导出` 放到上述能力形成稳定模型后再整体推进
+
+原因：
+- 文本、连线、容器能力直接决定编辑器是否进入“可长期使用”阶段
+- page 与文件协议高度依赖稳定模型，过早推进容易反复返工
 
 ---
 
-## 4. 测试基线
+## 4. 测试计划
 
-已具备：
-- `createLinkerDrag`
-- `createInteractionMachine`
-- `clipboardManager`
-- `RendererContainer`
+必须新增：
+1. 文本编辑态与 history 协同测试
+2. 连线重连、控制点、线路文字测试
+3. 容器/层级语义测试
+4. 样式批量应用与导航效率测试
+5. page 切换、新建、删除、重命名的 `core` 语义测试
+6. 跨页 history / selection / clipboard 基础测试
+7. `serializeDiagram -> parseDiagram -> loadDiagram` 往返测试
+8. 自动保存与导入后状态清理测试
 
-下一批必须补：
-- clipboard keyboard path
-- `create-linker` 主入口
-- `LinkCreateOverlay`
-- `auto-scroll`
-- 更多 `zoom / scroll` 组合
-- 连续编辑串联场景
-
-建议测试顺序：
-1. clipboard 快捷键
-2. `create-linker`
-3. `LinkCreateOverlay`
-4. `auto-scroll`
-5. 连续操作串联
+建议手工回归：
+1. 双击文本编辑是否稳定
+2. 连线重连和控制点编辑是否顺手
+3. 容器内外拖拽是否符合直觉
+4. 导航、缩放、fit 是否流畅
+5. 多 page 切换后渲染与选择是否正确
+6. 导出后再导入，元素顺序和 page 设置是否保持
 
 ---
 
-## 5. 维护规则
-- `ROADMAP.md` 只保留“下一步要做什么”
-- 当前状态变化同步到 `PROJECT_OVERVIEW.md`
-- 细节设计不回写到路线图里，避免再次膨胀
+## 5. 范围控制
+
+本阶段不做：
+- 协作编辑
+- 评论/批注
+- 服务端同步
+- 多文档管理
+- 非 JSON 的导出格式
+
+原因：
+- 这些能力都建立在稳定编辑语义和正式文件协议之上
+- 当前先补编辑器核心生产力，再做外层协议与工作流，更符合对标产品的真实优先级

@@ -1,45 +1,58 @@
 # 仓库结构速览
 
 ## 1. 根目录
-- `.processon/`：参考实现
-- `AI_KB/`：知识库
-- `packages/`：业务包
-- `playgrounds/`：联调入口
-- `turbo.json` / `vitest.config.ts`：构建与测试配置
+- `AI_KB/`：当前知识库
+- `packages/`：各业务包
+- `playgrounds/vite/`：当前唯一正式联调入口
+- `.processon/`：历史参考资料
+- `turbo.json`、`vitest.config.ts`、`tsdown.config.ts`：构建与测试配置
 
-## 2. packages
-- `packages/core/`
-  - `src/model/`：Diagram / Shape / Linker / Page
-  - `src/designer/managers/`：`element / edit / selection / history / view / tool / group / clipboard`
-  - `src/schema/`：默认 shape / linker schema
-  - `src/utils/`：坐标、锚点、路由等
-- `packages/renderer/`
-  - `src/components/RendererContainer.tsx`：交互主入口
-  - `src/components/InteractionOverlay.tsx`：选框、手柄、锚点、快捷入口
-  - `src/components/LinkCreateOverlay.tsx`：快捷建线入口
-  - `src/primitives/`：`pan / selection / shapeDrag / resize / rotate / linkerDrag`
-  - `src/components/__tests__/rendererTestHarness.ts`：容器级测试夹具
-  - `src/components/__tests__/RendererContainer.test.ts`：容器级交互回归
-- `packages/primitives/`
-  - 浏览器基础能力
-- `packages/shared/`
-  - 数学、对象工具、通用类型
-- `packages/icons/`
-  - SVG 图标资产与生成脚本
-- `packages/components/`
-  - `panel / actionBar / menu`
-- `packages/ui/`
-  - `toolbar / sidebar / iconRegistry`
+## 2. 核心包
 
-## 3. 关键文件
-- 交互入口：`packages/renderer/src/components/RendererContainer.tsx`
-- 坐标归一化：`packages/renderer/src/primitives/createCoordinateService.ts`
-- 快捷建线：`packages/renderer/src/primitives/createLinkerDrag.ts`
-- 历史与事务：`packages/core/src/designer/managers/history.ts`
-- 编辑命令：`packages/core/src/designer/managers/edit.ts`
-- 剪贴板：`packages/core/src/designer/managers/clipboard.ts`
+### `packages/core`
+- `src/model/`
+  - `diagram.ts`
+  - `page.ts`
+  - `shape.ts`
+  - `linker.ts`
+  - `types.ts`
+- `src/designer/`
+  - `create.ts`
+  - `types.ts`
+  - `managers/`
+- `src/schema/`
+- `src/utils/`
 
-## 4. playground
-- `playgrounds/vite/`
-  - 当前唯一正式联调入口
-  - 已组合 `@diagen/core + @diagen/renderer + @diagen/ui`
+### `packages/renderer`
+- `src/components/Renderer/index.tsx`
+  - 当前真实的交互主入口
+- `src/components/InteractionOverlay/`
+  - 选择框、guide、shape 选中态、linker 控件
+- `src/components/Renderer/interaction/createPointerInteraction/`
+  - 指针交互状态机与各类交互实现
+- `src/components/Renderer/primitives/`
+  - `createCoordinateService`
+  - `createAutoScroll`
+- `src/.test/createRendererTestHarness.ts`
+  - renderer 集成测试夹具
+
+### `packages/ui`
+- `src/editor/Editor.tsx`
+- `src/toolbar/createToolbarBridge.ts`
+- `src/sidebar/createSidebarBridge.tsx`
+- `src/actions/createActions.ts`
+
+## 3. 关键文件索引
+- designer 工厂：`packages/core/src/designer/create.ts`
+- history：`packages/core/src/designer/managers/history.ts`
+- clipboard：`packages/core/src/designer/managers/clipboard.ts`
+- group：`packages/core/src/designer/managers/group.ts`
+- renderer：`packages/renderer/src/components/Renderer/index.tsx`
+- pointer interaction：`packages/renderer/src/components/Renderer/interaction/createPointerInteraction/index.ts`
+- renderer 集成测试：`packages/renderer/src/components/Renderer/index.test.ts`
+- playground 入口：`playgrounds/vite/src/App.tsx`
+
+## 4. 当前与旧文档的差异提醒
+- 当前交互入口是 `Renderer/index.tsx`，不是旧文档中的 `RendererContainer.tsx`
+- 坐标服务位于 `packages/renderer/src/components/Renderer/primitives/createCoordinateService.ts`
+- 快捷建线能力已并入 `InteractionOverlay + createPointerInteraction`，不再是独立老路径
