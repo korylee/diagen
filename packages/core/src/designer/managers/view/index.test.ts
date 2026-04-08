@@ -73,11 +73,11 @@ describe('view manager', () => {
     })
   })
 
-  it('存在 canvasOffset 时 toScreen/toCanvas 仍应互为逆变换', () => {
+  it('存在 originOffset 时 toScreen/toCanvas 仍应互为逆变换', () => {
     withDesigner(designer => {
       designer.view.setPan(120, -40)
       designer.view.setZoom(2)
-      designer.view.setCanvasOffset({ x: 80, y: 60 })
+      designer.view.setOriginOffset({ x: 80, y: 60 })
 
       const canvasPoint = { x: -30, y: 50 }
       const screenPoint = designer.view.toScreen(canvasPoint)
@@ -93,17 +93,17 @@ describe('view manager', () => {
       designer.view.setPan(0, 0)
       designer.view.setZoom(2, { x: 100, y: 100 })
 
-      expect(designer.view.viewport().zoom).toBe(2)
-      expect(designer.view.viewport().x).toBe(-100)
-      expect(designer.view.viewport().y).toBe(-100)
+      expect(designer.view.transform().zoom).toBe(2)
+      expect(designer.view.transform().x).toBe(-100)
+      expect(designer.view.transform().y).toBe(-100)
     })
   })
 
-  it('setZoom(center) 在非 1 倍缩放且存在 canvasOffset 时仍应保持指定画布点视觉位置稳定', () => {
+  it('setZoom(center) 在非 1 倍缩放且存在 originOffset 时仍应保持指定画布点视觉位置稳定', () => {
     withDesigner(designer => {
       designer.view.setPan(10, -20)
       designer.view.setZoom(2)
-      designer.view.setCanvasOffset({ x: 80, y: 60 })
+      designer.view.setOriginOffset({ x: 80, y: 60 })
 
       const focusPoint = { x: 100, y: 120 }
       const before = designer.view.toScreen(focusPoint)
@@ -114,7 +114,7 @@ describe('view manager', () => {
 
       expect(after.x).toBeCloseTo(before.x)
       expect(after.y).toBeCloseTo(before.y)
-      expect(designer.view.viewport().zoom).toBe(3)
+      expect(designer.view.transform().zoom).toBe(3)
     })
   })
 
@@ -123,9 +123,9 @@ describe('view manager', () => {
       designer.view.setViewportSize(1000, 500)
       designer.view.fitBounds({ x: 0, y: 0, w: 200, h: 100 })
 
-      expect(designer.view.viewport().zoom).toBe(5)
-      expect(designer.view.viewport().x).toBe(0)
-      expect(designer.view.viewport().y).toBe(0)
+      expect(designer.view.transform().zoom).toBe(5)
+      expect(designer.view.transform().x).toBe(0)
+      expect(designer.view.transform().y).toBe(0)
     })
   })
 
@@ -145,11 +145,11 @@ describe('view manager', () => {
 
   it('ensureContainerFits 应在内容越界时扩容', () => {
     withDesigner(designer => {
-      const before = designer.view.containerSize()
+      const before = designer.view.worldSize()
       const beforeWidth = before.width
       const beforeHeight = before.height
       const changed = designer.view.ensureContainerFits({ x: 0, y: 0, w: 2600, h: 1800 })
-      const after = designer.view.containerSize()
+      const after = designer.view.worldSize()
 
       expect(changed).toBe(true)
       expect(after.width).toBeGreaterThan(beforeWidth)
@@ -157,18 +157,18 @@ describe('view manager', () => {
     })
   })
 
-  it('ensureContainerFits 应在内容向左上越界时同步扩容并更新 canvasOffset', () => {
+  it('ensureContainerFits 应在内容向左上越界时同步扩容并更新 originOffset', () => {
     withDesigner(designer => {
       const changed = designer.view.ensureContainerFits({ x: -260, y: -260, w: 300, h: 240 })
 
       expect(changed).toBe(true)
-      expect(designer.view.canvasOffset()).toEqual({
+      expect(designer.view.originOffset()).toEqual({
         x: 600,
         y: 600,
       })
       // ensureContainerFits 会把页面 bounds 与越界内容一起合并后再计算容器尺寸，
       // 因此最终宽高需要覆盖“补偿后的整页内容”，而不是仅覆盖传入的 extraBounds。
-      expect(designer.view.containerSize()).toEqual({
+      expect(designer.view.worldSize()).toEqual({
         width: 2000,
         height: 2000,
       })
@@ -195,23 +195,23 @@ describe('view manager', () => {
       designer.view.setViewportSize(800, 600)
 
       designer.view.fitToContent()
-      const pageViewport = designer.view.viewport()
+      const pageTransform = designer.view.transform()
 
       const far = createShapeById('view_fit_far', 2400, 1600, 120, 90)
       designer.edit.add([far], { record: false, select: false })
 
       designer.view.fitToContent()
-      const zoomWithFar = designer.view.viewport().zoom
+      const zoomWithFar = designer.view.transform().zoom
       expect(zoomWithFar).toBeLessThan(1)
 
       designer.edit.remove([far.id], { record: false })
 
       designer.view.fitToContent()
-      const viewport = designer.view.viewport()
+      const transform = designer.view.transform()
 
-      expect(viewport.zoom).toBe(pageViewport.zoom)
-      expect(viewport.x).toBe(pageViewport.x)
-      expect(viewport.y).toBe(pageViewport.y)
+      expect(transform.zoom).toBe(pageTransform.zoom)
+      expect(transform.x).toBe(pageTransform.x)
+      expect(transform.y).toBe(pageTransform.y)
     })
   })
 

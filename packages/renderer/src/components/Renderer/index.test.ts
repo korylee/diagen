@@ -244,7 +244,7 @@ describe('Renderer', () => {
 
       const afterClient = harness.canvasToClient(watchedCanvasPoint)
 
-      expect(harness.designer.view.canvasOffset()).toEqual({
+      expect(harness.designer.view.originOffset()).toEqual({
         x: 300,
         y: 300,
       })
@@ -332,17 +332,17 @@ describe('Renderer', () => {
     }
   })
 
-  it('ctrl+wheel 缩放应以当前指针位置为中心更新 viewport', async () => {
+  it('ctrl+wheel 缩放应以当前指针位置为中心更新 transform', async () => {
     const harness = await createRendererTestHarness()
 
     try {
       await harness.dispatchCtrlWheelAtCanvas({ x: 200, y: 200 }, -100)
 
-      const viewport = harness.designer.view.viewport()
+      const transform = harness.designer.view.transform()
 
-      expect(viewport.zoom).toBeCloseTo(1.1)
-      expect(viewport.x).toBeCloseTo(-20)
-      expect(viewport.y).toBeCloseTo(-20)
+      expect(transform.zoom).toBeCloseTo(1.1)
+      expect(transform.x).toBeCloseTo(-20)
+      expect(transform.y).toBeCloseTo(-20)
     } finally {
       harness.dispose()
     }
@@ -685,7 +685,7 @@ describe('Renderer', () => {
         y: buttonRect.top + buttonRect.height / 2,
       }
       const draftLinker = harness.designer.element.linkers()[0]
-      const zoom = harness.designer.view.viewport().zoom
+      const zoom = harness.designer.view.transform().zoom
 
       await harness.dispatchWindowMouseMoveAtClient({
         x: buttonCenter.x + (340 - draftLinker.to.x) * zoom,

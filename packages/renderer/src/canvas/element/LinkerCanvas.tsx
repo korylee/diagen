@@ -29,7 +29,7 @@ export function LinkerCanvas(props: LinkerCanvasProps) {
   })
 
   const renderFrame = createMemo(() => {
-    const vp = view.viewport()
+    const currentTransform = view.transform()
     const vpSize = view.viewportSize()
     const route = layout().route
     const b = layout().bounds
@@ -39,10 +39,10 @@ export function LinkerCanvas(props: LinkerCanvasProps) {
     const height = Math.max(1, Math.ceil(rect.h))
 
     return {
-      visible: isBoundsVisible(b, vp, vpSize, view.canvasOffset()),
+      visible: isBoundsVisible(b, currentTransform, vpSize, view.originOffset()),
       route,
       bounds: b,
-      zoom: vp.zoom,
+      zoom: currentTransform.zoom,
       ratio,
       pixelWidth: width * ratio,
       pixelHeight: height * ratio,

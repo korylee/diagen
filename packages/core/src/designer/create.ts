@@ -2,7 +2,7 @@ import { createStore } from 'solid-js/store'
 
 import { createEmitter, DeepPartial, generateId, pick } from '@diagen/shared'
 import { LinkerType } from '../constants'
-import type { Viewport } from '../utils'
+import type { Transform } from '../utils'
 
 import { createDiagram, Diagram } from '../model'
 import {
@@ -20,7 +20,7 @@ import type { DesignerContext } from './managers/types'
 import type { DesignerEmitter, EditorConfig, EditorState } from './types'
 
 interface DesignerOptions extends DeepPartial<EditorConfig>, DeepPartial<Pick<Diagram, 'id' | 'name' | 'page'>> {
-  viewport?: Partial<Viewport>
+  transform?: Partial<Transform>
 }
 
 const DEFAULT_AUTO_GROW_CONFIG = {
@@ -98,22 +98,22 @@ function createInitialState(options: DesignerOptions): EditorState {
   return {
     // 持久化储存
     diagram,
-    viewport: {
+    transform: {
       x: 0,
       y: 0,
       zoom: 1,
-      ...options.viewport,
+      ...options.transform,
     },
     viewportSize: {
       width: 800,
       height: 600,
     },
-    containerSize: {
+    worldSize: {
       width: pageWidth,
       height: pageHeight,
     },
     // 运行时记录画布原点补偿，后续左/上自动扩展时会基于它做坐标对齐
-    canvasOffset: {
+    originOffset: {
       x: 0,
       y: 0,
     },

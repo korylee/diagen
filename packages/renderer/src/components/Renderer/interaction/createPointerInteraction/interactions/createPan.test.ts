@@ -70,7 +70,7 @@ describe('createPan', () => {
     })
   })
 
-  it('中键拖拽时应返回 true 并更新 viewport', () => {
+  it('中键拖拽时应返回 true 并更新 transform', () => {
     return withPan({ button: 1 }, ({ designer, pan }) => {
       expect(pan.start(createMouseEvent(10, 20, 1))).toBe(true)
       expect(pan.isActive()).toBe(true)
@@ -78,8 +78,8 @@ describe('createPan', () => {
 
       pan.move(createMouseEvent(25, 50, 1))
 
-      expect(designer.view.viewport().x).toBe(15)
-      expect(designer.view.viewport().y).toBe(30)
+    expect(designer.view.transform().x).toBe(15)
+    expect(designer.view.transform().y).toBe(30)
 
       pan.end()
       expect(pan.isActive()).toBe(false)

@@ -234,8 +234,8 @@ export async function createRendererTestHarness(options: CreateRendererTestHarne
   defineWritableNumber(viewport, 'scrollTop', 0)
   defineGetter(viewport, 'clientWidth', () => viewportRect.width)
   defineGetter(viewport, 'clientHeight', () => viewportRect.height)
-  defineGetter(viewport, 'scrollWidth', () => designer.view.containerSize().width + DefaultContainerInset * 2)
-  defineGetter(viewport, 'scrollHeight', () => designer.view.containerSize().height + DefaultContainerInset * 2)
+  defineGetter(viewport, 'scrollWidth', () => designer.view.worldSize().width + DefaultContainerInset * 2)
+  defineGetter(viewport, 'scrollHeight', () => designer.view.worldSize().height + DefaultContainerInset * 2)
 
   Object.defineProperty(viewport, 'getBoundingClientRect', {
     configurable: true,
@@ -247,12 +247,12 @@ export async function createRendererTestHarness(options: CreateRendererTestHarne
     value: () => {
       const left = viewportRect.left + DefaultContainerInset - viewport.scrollLeft
       const top = viewportRect.top + DefaultContainerInset - viewport.scrollTop
-      const containerSize = designer.view.containerSize()
+      const worldSize = designer.view.worldSize()
       return createDomRect({
         left,
         top,
-        width: containerSize.width,
-        height: containerSize.height,
+        width: worldSize.width,
+        height: worldSize.height,
       })
     },
   })

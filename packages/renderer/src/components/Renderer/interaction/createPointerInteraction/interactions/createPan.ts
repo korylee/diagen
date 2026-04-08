@@ -17,7 +17,7 @@ export function createPan(
   const [isActive, setIsActive] = createSignal(false)
   const [isSpacePressed, setIsSpacePressed] = createSignal(false)
   const [startMouse, setStartMouse] = createSignal<Point | null>(null)
-  const [startViewport, setStartViewport] = createSignal<Point | null>(null)
+  const [startTransform, setStartTransform] = createSignal<Point | null>(null)
 
   onMount(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -39,17 +39,17 @@ export function createPan(
   const start = (e: MouseEvent): boolean => {
     if (isActive() || !canPan(e)) return false
     batch(() => {
-      const vp = state.viewport
+      const currentTransform = state.transform
       setIsActive(true)
       setStartMouse({ x: e.clientX, y: e.clientY })
-      setStartViewport({ x: vp.x, y: vp.y })
+      setStartTransform({ x: currentTransform.x, y: currentTransform.y })
     })
     return true
   }
 
   const move = (e: MouseEvent) => {
     const sm = startMouse()
-    const sv = startViewport()
+    const sv = startTransform()
     if (!isActive() || !sm || !sv) return
     view.pan(sv.x + e.clientX - sm.x, sv.y + e.clientY - sm.y)
   }
@@ -58,7 +58,7 @@ export function createPan(
     batch(() => {
       setIsActive(false)
       setStartMouse(null)
-      setStartViewport(null)
+      setStartTransform(null)
     })
   }
 

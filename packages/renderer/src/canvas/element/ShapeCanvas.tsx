@@ -29,7 +29,7 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
   })
 
   const renderFrame = createMemo(() => {
-    const vp = view.viewport()
+    const currentTransform = view.transform()
     const vpSize = view.viewportSize()
     const bounds = getScreenBounds()
     const rotatedBounds = renderBounds()
@@ -37,8 +37,8 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
     const height = Math.max(1, Math.ceil(bounds.h))
 
     return {
-      visible: isBoundsVisible(rotatedBounds, vp, vpSize, view.canvasOffset()),
-      zoom: vp.zoom,
+      visible: isBoundsVisible(rotatedBounds, currentTransform, vpSize, view.originOffset()),
+      zoom: currentTransform.zoom,
       ratio: pixelRatio(),
       pixelWidth: width * pixelRatio(),
       pixelHeight: height * pixelRatio(),

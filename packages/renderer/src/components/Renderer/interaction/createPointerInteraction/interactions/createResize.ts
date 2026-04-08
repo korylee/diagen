@@ -67,7 +67,7 @@ export function createResize(
     update: ({ state, event, moveState }) => {
       const delta = pointerDelta.resolveDelta({
         moveState,
-        zoom: view.viewport().zoom,
+        zoom: view.transform().zoom,
         event,
       })
       const nextBounds = resolveResizeBounds({
@@ -140,7 +140,7 @@ export function createResize(
     if (!el || !isShape(el)) return null
 
     const { x, y, w, h } = el.props
-    const size = HANDLE_SIZE / view.viewport().zoom
+    const size = HANDLE_SIZE / view.transform().zoom
 
     const handles = [
       { dir: 'nw', px: x, py: y },

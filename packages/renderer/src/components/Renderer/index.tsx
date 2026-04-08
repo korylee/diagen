@@ -118,10 +118,10 @@ export function Renderer(props: {
   })
 
   const containerStyle = createMemo(() => {
-    const { containerSize, config } = state
+    const { worldSize, config } = state
     return {
-      width: `${containerSize.width}px`,
-      height: `${containerSize.height}px`,
+      width: `${worldSize.width}px`,
+      height: `${worldSize.height}px`,
       padding: `${config.containerInset}px`,
       overflow: 'hidden',
       position: 'relative',
@@ -134,8 +134,8 @@ export function Renderer(props: {
     } as const
   })
   const worldStyle = createMemo(() => {
-    const { containerSize } = state
-    const { viewport } = view
+    const { worldSize } = state
+    const { transform } = view
 
     return {
       position: 'relative' as const,
@@ -143,20 +143,20 @@ export function Renderer(props: {
       background: `var(--dg-page-background)`,
       'box-shadow': `var(--dg-page-shadow)`,
       'z-index': 0,
-      width: `${containerSize.width}px`,
-      height: `${containerSize.height}px`,
-      transform: `translate3d(${viewport().x}px, ${viewport().y}px, 0) scale(${viewport().zoom})`,
+      width: `${worldSize.width}px`,
+      height: `${worldSize.height}px`,
+      transform: `translate3d(${transform().x}px, ${transform().y}px, 0) scale(${transform().zoom})`,
       'transform-origin': '0 0',
     }
   })
   const sceneStyle = createMemo(() => {
-    const { containerSize, config } = state
+    const { worldSize, config } = state
     return {
       position: 'absolute' as const,
       left: `${config.containerInset}px`,
       top: `${config.containerInset}px`,
-      width: `${containerSize.width}px`,
-      height: `${containerSize.height}px`,
+      width: `${worldSize.width}px`,
+      height: `${worldSize.height}px`,
       overflow: 'visible',
       'z-index': 1,
     }
@@ -188,7 +188,7 @@ export function Renderer(props: {
     if (e.ctrlKey) {
       e.preventDefault()
       const delta = e.deltaY > 0 ? -0.1 : 0.1
-      const newZoom = Math.max(0.1, Math.min(5, view.viewport().zoom + delta))
+      const newZoom = Math.max(0.1, Math.min(5, view.transform().zoom + delta))
       view.setZoom(newZoom, coordinate.eventToCanvas(e))
     }
   }
@@ -210,42 +210,42 @@ export function Renderer(props: {
   onMount(() => {
     const el = viewportRef()
     if (!el) return
-    const viewport = view.viewport()
+    const transform = view.transform()
     const containerInset = state.config.containerInset
     const padding = 10
     const initialScroll = {
       // 初始滚动位置需要把运行时原点补偿一并算上，避免未来恢复态时出现首帧错位
-      left: Math.max(0, Math.round(containerInset + viewport.x + state.canvasOffset.x - padding)),
-      top: Math.max(0, Math.round(containerInset + viewport.y + state.canvasOffset.y - padding)),
+      left: Math.max(0, Math.round(containerInset + transform.x + state.originOffset.x - padding)),
+      top: Math.max(0, Math.round(containerInset + transform.y + state.originOffset.y - padding)),
     }
 
     el.scrollLeft = initialScroll.left
     el.scrollTop = initialScroll.top
   })
 
-  let lastCanvasOffset: Point | null = null
+  let lastOriginOffset: Point | null = null
   createEffect(() => {
     const el = viewportRef()
-    const nextOffset = { ...view.canvasOffset() }
+    const nextOffset = { ...view.originOffset() }
 
     if (!el) {
-      lastCanvasOffset = nextOffset
+      lastOriginOffset = nextOffset
       return
     }
 
-    if (!lastCanvasOffset) {
-      lastCanvasOffset = nextOffset
+    if (!lastOriginOffset) {
+      lastOriginOffset = nextOffset
       return
     }
 
-    const deltaX = nextOffset.x - lastCanvasOffset.x
-    const deltaY = nextOffset.y - lastCanvasOffset.y
+    const deltaX = nextOffset.x - lastOriginOffset.x
+    const deltaY = nextOffset.y - lastOriginOffset.y
     if (deltaX === 0 && deltaY === 0) return
 
     // 左/上自动扩展时同步补偿滚动位置，保证用户当前看到的画面不因原点平移而突跳
     el.scrollLeft = Math.max(0, el.scrollLeft + deltaX)
     el.scrollTop = Math.max(0, el.scrollTop + deltaY)
-    lastCanvasOffset = { x: nextOffset.x, y: nextOffset.y }
+    lastOriginOffset = { x: nextOffset.x, y: nextOffset.y }
   })
 
   onCleanup(() => {

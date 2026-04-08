@@ -1,8 +1,7 @@
 import type { Emitter, Point, Size } from '@diagen/shared'
 import type { LinkerType } from '../constants'
 import type { Diagram } from '../model'
-import type { Viewport } from '../utils'
-import type { LinkerRouteStrategy, RouterConfig, RouterOptions } from '../utils'
+import type { LinkerRouteStrategy, RouterConfig, RouterOptions, Transform } from '../utils'
 import type { ElementEvents, HistoryEvents, SelectionEvents } from './managers'
 
 /** 画布自增配置 */
@@ -66,17 +65,17 @@ export interface EditorState {
   /** 图表数据 */
   diagram: Diagram
 
-  /** 视口变换参数：x, y 为偏移，zoom 为缩放级别 */
-  viewport: Viewport
+  /** 画布变换参数：x, y 为偏移，zoom 为缩放级别 */
+  transform: Transform
 
   /** 视口窗口尺寸（可见区域） */
   viewportSize: Size
 
-  /** 滚动容器尺寸（可滚动内容区域） */
-  containerSize: Size
+  /** 世界尺寸（可滚动内容区域） */
+  worldSize: Size
 
   /** 画布原点相对容器左上角的运行时偏移（不持久化） */
-  canvasOffset: Point
+  originOffset: Point
 
   /** ui及性能配置 */
   config: EditorConfig

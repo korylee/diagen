@@ -156,7 +156,7 @@ export function createSceneDown(interaction: Interaction) {
 
   const hitScene = (point: Point): SceneHit | null =>
     hitTestScene(element.elements(), point, {
-      zoom: view.viewport().zoom,
+      zoom: view.transform().zoom,
       getLinkerLayout: linker => view.getLinkerLayout(linker),
     })
 

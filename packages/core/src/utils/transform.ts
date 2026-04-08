@@ -15,13 +15,13 @@ import { DEFAULTS } from '../constants.ts'
 // ============================================================================
 
 /**
- * 视口变换参数
+ * 画布变换参数
  *
  * 描述画布到屏幕的变换：
  * - x, y: 画布原点 (0,0) 在屏幕上的位置
  * - zoom: 缩放级别，1 = 100%
  */
-export interface Viewport extends Point {
+export interface Transform extends Point {
   zoom: number
 }
 
@@ -34,11 +34,11 @@ export interface Viewport extends Point {
  */
 export function screenToCanvas<T extends Point | Bounds>(
   val: T,
-  viewport: Viewport,
-  canvasOffset: Point = { x: 0, y: 0 },
+  transform: Transform,
+  originOffset: Point = { x: 0, y: 0 },
 ): T extends Bounds ? Bounds : Point {
-  const { zoom, x, y } = viewport
-  const { x: ox, y: oy } = canvasOffset
+  const { zoom, x, y } = transform
+  const { x: ox, y: oy } = originOffset
 
   const bounds = val as unknown as Bounds
   if (bounds.w != null) {
@@ -62,11 +62,11 @@ export function screenToCanvas<T extends Point | Bounds>(
  */
 export function canvasToScreen<T extends Point | Bounds>(
   val: T,
-  viewport: Viewport,
-  canvasOffset: Point = { x: 0, y: 0 },
+  transform: Transform,
+  originOffset: Point = { x: 0, y: 0 },
 ): T extends Bounds ? Bounds : Point {
-  const { zoom, x, y } = viewport
-  const { x: ox, y: oy } = canvasOffset
+  const { zoom, x, y } = transform
+  const { x: ox, y: oy } = originOffset
   const bounds = val as unknown as Bounds
 
   if (bounds.w != null) {
@@ -96,11 +96,11 @@ export function clampZoom(zoom: number, min: number = DEFAULTS.MIN_ZOOM, max: nu
 /** 判断矩形是否在视口中可见 */
 export function isBoundsVisible(
   bounds: Bounds,
-  viewport: Viewport,
+  transform: Transform,
   viewportSize: Size,
-  canvasOffset: Point = { x: 0, y: 0 },
+  originOffset: Point = { x: 0, y: 0 },
 ): boolean {
-  const screenBounds = canvasToScreen(bounds, viewport, canvasOffset)
+  const screenBounds = canvasToScreen(bounds, transform, originOffset)
   return !(
     screenBounds.x + screenBounds.w < 0 ||
     screenBounds.y + screenBounds.h < 0 ||
@@ -111,12 +111,12 @@ export function isBoundsVisible(
 
 /** 获取当前视口可见的画布区域 */
 export function getVisibleCanvasArea(
-  viewport: Viewport,
+  transform: Transform,
   viewportSize: Size,
-  canvasOffset: Point = { x: 0, y: 0 },
+  originOffset: Point = { x: 0, y: 0 },
 ): Bounds {
-  const topLeft = screenToCanvas({ x: 0, y: 0 }, viewport, canvasOffset)
-  const bottomRight = screenToCanvas({ x: viewportSize.width, y: viewportSize.height }, viewport, canvasOffset)
+  const topLeft = screenToCanvas({ x: 0, y: 0 }, transform, originOffset)
+  const bottomRight = screenToCanvas({ x: viewportSize.width, y: viewportSize.height }, transform, originOffset)
   return {
     x: topLeft.x,
     y: topLeft.y,

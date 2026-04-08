@@ -5,15 +5,15 @@ export function DesignerGrids() {
   const { state, view } = useDesigner()
   const grid = createMemo(() => {
     const { page } = state.diagram
-    const { containerSize, canvasOffset } = state
+    const { worldSize, originOffset } = state
     const zoom = view.zoom()
-    // world 层本身只处理 viewport 变换，这里把运行时原点补偿折算回本地坐标，保证网格与元素继续对齐
-    const patternOffsetX = zoom ? canvasOffset.x / zoom : 0
-    const patternOffsetY = zoom ? canvasOffset.y / zoom : 0
+    // world 层本身只处理 transform 变换，这里把运行时原点补偿折算回本地坐标，保证网格与元素继续对齐
+    const patternOffsetX = zoom ? originOffset.x / zoom : 0
+    const patternOffsetY = zoom ? originOffset.y / zoom : 0
 
     return {
-      width: containerSize.width,
-      height: containerSize.height,
+      width: worldSize.width,
+      height: worldSize.height,
       backgroundColor: page.backgroundColor,
       patternOffsetX,
       patternOffsetY,

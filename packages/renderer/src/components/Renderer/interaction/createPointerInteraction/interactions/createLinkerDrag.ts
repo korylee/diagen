@@ -176,7 +176,7 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
       return input.state
     },
     update: ({ state, event, moveState }) => {
-      const zoom = view.viewport().zoom
+      const zoom = view.transform().zoom
       const delta = pointerDelta.resolveDelta({
         moveState,
         zoom,
@@ -310,7 +310,7 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
   function getHitWithRoute(linker: LinkerElement, point: Point): { hit: LinkerHit | null; route: LinkerRoute } {
     const route = view.getLinkerRoute(linker)
     const hit = hitTestLinker(linker, route, point, {
-      zoom: view.viewport().zoom,
+      zoom: view.transform().zoom,
       endpointTolerance,
       controlTolerance,
       lineTolerance,
@@ -619,7 +619,7 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     if (!el || !isLinker(el)) return
 
     const currentPoint = mode === 'from' ? { x: el.from.x, y: el.from.y } : { x: el.to.x, y: el.to.y }
-    const zoom = view.viewport().zoom
+    const zoom = view.transform().zoom
     const maxDistance = snapDistance / zoom
     const stickDistance = snapStickDistance / zoom
     const oppositePoint = mode === 'from' ? el.to : el.from

@@ -25,11 +25,11 @@ export function createViewManager(
   const { state, setState, emitter } = ctx
   const { element, selection } = deps
 
-  const viewport = createMemo(() => state.viewport)
+  const transform = createMemo(() => state.transform)
   const viewportSize = createMemo(() => state.viewportSize)
-  const containerSize = createMemo(() => state.containerSize)
-  const canvasOffset = createMemo(() => state.canvasOffset)
-  const zoom = createMemo(() => viewport().zoom)
+  const worldSize = createMemo(() => state.worldSize)
+  const originOffset = createMemo(() => state.originOffset)
+  const zoom = createMemo(() => transform().zoom)
   const diagramPage = createMemo(() => state.diagram.page)
   const linkerRouteConfig = createMemo(() => state.config.linkerRoute)
   const linkerLayout = createLinkerLayoutController({
@@ -47,40 +47,40 @@ export function createViewManager(
     const newZoom = clampZoom(val)
 
     if (center) {
-      const currentViewport = viewport()
-      setState('viewport', {
+      const currentTransform = transform()
+      setState('transform', {
         zoom: newZoom,
-        // center 使用画布坐标。保持该画布点视觉位置不变时，viewport 只需补偿缩放前后的画布位移差。
-        x: currentViewport.x + center.x * (currentViewport.zoom - newZoom),
-        y: currentViewport.y + center.y * (currentViewport.zoom - newZoom),
+        // center 使用画布坐标。保持该画布点视觉位置不变时，transform 只需补偿缩放前后的画布位移差。
+        x: currentTransform.x + center.x * (currentTransform.zoom - newZoom),
+        y: currentTransform.y + center.y * (currentTransform.zoom - newZoom),
       })
     } else {
-      setState('viewport', 'zoom', newZoom)
+      setState('transform', 'zoom', newZoom)
     }
   }
 
   function setPan(x: number, y: number): void {
-    setState('viewport', { x, y })
+    setState('transform', { x, y })
   }
 
   function pan(deltaX: number, deltaY: number): void {
-    setPan(viewport().x + deltaX, viewport().y + deltaY)
+    setPan(transform().x + deltaX, transform().y + deltaY)
   }
 
   /** 屏幕坐标 → 画布坐标 */
   function toCanvas<T extends Point | Bounds>(val: T): T extends Bounds ? Bounds : Point {
-    return screenToCanvas(val, viewport(), canvasOffset())
+    return screenToCanvas(val, transform(), originOffset())
   }
 
   /** 画布坐标 → 屏幕坐标 */
   function toScreen<T extends Point | Bounds>(val: T): T extends Bounds ? Bounds : Point {
-    return canvasToScreen(val, viewport(), canvasOffset())
+    return canvasToScreen(val, transform(), originOffset())
   }
 
   function centerTo(point: Point): void {
     const { width, height } = viewportSize()
-    const offset = canvasOffset()
-    setState('viewport', {
+    const offset = originOffset()
+    setState('transform', {
       // 当画布原点已发生运行时补偿时，centerTo 需要扣除这部分偏移，才能维持真实居中结果
       x: width / 2 - point.x * zoom() - offset.x,
       y: height / 2 - point.y * zoom() - offset.y,
@@ -95,12 +95,12 @@ export function createViewManager(
     }
 
     const { width, height } = viewportSize()
-    const offset = canvasOffset()
+    const offset = originOffset()
     const zoomX = width / bounds.w
     const zoomY = height / bounds.h
     const newZoom = clampZoom(Math.min(zoomX, zoomY))
 
-    setState('viewport', {
+    setState('transform', {
       zoom: newZoom,
       // fitBounds 需要同时考虑画布原点补偿，否则左/上扩展后会出现居中偏差
       x: (width - bounds.w * newZoom) / 2 - bounds.x * newZoom - offset.x,
@@ -130,7 +130,7 @@ export function createViewManager(
     batch(() => {
       setState('diagram', 'page', { width: nextWidth, height: nextHeight })
       mergeBounds(createPageBounds(nextWidth, nextHeight))
-      setContainerSize(nextWidth, nextHeight)
+      setWorldSize(nextWidth, nextHeight)
     })
 
     flushAutoGrow()
@@ -143,16 +143,16 @@ export function createViewManager(
     })
   }
 
-  function setContainerSize(width: number, height: number): void {
-    setState('containerSize', {
+  function setWorldSize(width: number, height: number): void {
+    setState('worldSize', {
       width: normalizeCanvasSize(width),
       height: normalizeCanvasSize(height),
     })
   }
 
-  function setCanvasOffset(offset: Point): void {
+  function setOriginOffset(offset: Point): void {
     // 统一由 view 层维护运行时原点偏移，避免后续左/上扩展时多处直接改状态
-    setState('canvasOffset', {
+    setState('originOffset', {
       x: offset.x,
       y: offset.y,
     })
@@ -193,8 +193,8 @@ export function createViewManager(
     if (!autoGrow.enabled) return false
 
     const content = extraBounds ? mergeBounds(extraBounds) : bounds()
-    const current = containerSize()
-    const currentOffset = canvasOffset()
+    const current = worldSize()
+    const currentOffset = originOffset()
     const page = diagramPage()
 
     const nextGrowth = resolveContainerSizeForContent({
@@ -215,11 +215,11 @@ export function createViewManager(
 
     batch(() => {
       if (sizeChanged) {
-        setContainerSize(nextGrowth.width, nextGrowth.height)
+        setWorldSize(nextGrowth.width, nextGrowth.height)
       }
       if (offsetChanged) {
         // 统一在 view 层提交原点补偿，后续渲染层与交互层只读取这一份运行时状态
-        setCanvasOffset(nextOffset)
+        setOriginOffset(nextOffset)
       }
     })
 
@@ -309,10 +309,10 @@ export function createViewManager(
 
   return {
     page: diagramPage,
-    viewport,
+    transform,
     viewportSize,
-    containerSize,
-    canvasOffset,
+    worldSize,
+    originOffset,
     zoom,
     bounds,
     selectionBounds,
@@ -330,8 +330,8 @@ export function createViewManager(
     toScreen,
     setPageSize,
     setViewportSize,
-    setContainerSize,
-    setCanvasOffset,
+    setWorldSize,
+    setOriginOffset,
     getContentBounds,
     ensureContainerFits,
     scheduleAutoGrow,

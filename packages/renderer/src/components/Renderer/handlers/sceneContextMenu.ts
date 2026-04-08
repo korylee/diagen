@@ -20,7 +20,7 @@ export function createSceneContextMenu(params: {
 
   const hitScene = (point: Point): SceneHit | null =>
     hitTestScene(element.elements(), point, {
-      zoom: view.viewport().zoom,
+      zoom: view.transform().zoom,
       getLinkerLayout: linker => view.getLinkerLayout(linker),
     })
 
