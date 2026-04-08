@@ -214,6 +214,49 @@ describe('Renderer', () => {
     }
   })
 
+  it('左上自动扩展时应同步补偿滚动位置，保持当前画面稳定', async () => {
+    const harness = await createRendererTestHarness({
+      pageWidth: 200,
+      pageHeight: 200,
+      autoGrow: {
+        enabled: true,
+        growPadding: 40,
+        growStep: 50,
+      },
+    })
+
+    try {
+      const watchedCanvasPoint = { x: -200, y: -200 }
+      const beforeClient = harness.canvasToClient(watchedCanvasPoint)
+
+      const changed = harness.designer.view.ensureContainerFits({
+        // 使用远离 growPadding 的越界输入，避免测试卡在阈值边界
+        x: -260,
+        y: -260,
+        w: 300,
+        h: 240,
+      })
+
+      expect(changed).toBe(true)
+
+      await Promise.resolve()
+      await Promise.resolve()
+
+      const afterClient = harness.canvasToClient(watchedCanvasPoint)
+
+      expect(harness.designer.view.canvasOffset()).toEqual({
+        x: 300,
+        y: 300,
+      })
+      expect(harness.viewport.scrollLeft).toBe(300)
+      expect(harness.viewport.scrollTop).toBe(300)
+      expect(afterClient.x).toBe(beforeClient.x)
+      expect(afterClient.y).toBe(beforeClient.y)
+    } finally {
+      harness.dispose()
+    }
+  })
+
   it('缩放后拖拽图形应按画布坐标归一化位移，并保持单个 undo 单元', async () => {
     const harness = await createRendererTestHarness({
       shapes: [{ id: 'shape_drag', x: 100, y: 100, w: 100, h: 80 }],

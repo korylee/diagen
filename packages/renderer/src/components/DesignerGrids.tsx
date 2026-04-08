@@ -2,15 +2,21 @@ import { useDesigner } from './DesignerProvider'
 import { createMemo } from 'solid-js'
 
 export function DesignerGrids() {
-  const { state } = useDesigner()
+  const { state, view } = useDesigner()
   const grid = createMemo(() => {
     const { page } = state.diagram
-    const { containerSize } = state
+    const { containerSize, canvasOffset } = state
+    const zoom = view.zoom()
+    // world 层本身只处理 viewport 变换，这里把运行时原点补偿折算回本地坐标，保证网格与元素继续对齐
+    const patternOffsetX = zoom ? canvasOffset.x / zoom : 0
+    const patternOffsetY = zoom ? canvasOffset.y / zoom : 0
 
     return {
       width: containerSize.width,
       height: containerSize.height,
       backgroundColor: page.backgroundColor,
+      patternOffsetX,
+      patternOffsetY,
     }
   })
   return (
@@ -26,7 +32,13 @@ export function DesignerGrids() {
       }}
     >
       <defs>
-        <pattern id="flow_canvas_grid_item" width="61" height="61" patternUnits="userSpaceOnUse">
+        <pattern
+          id="flow_canvas_grid_item"
+          width="61"
+          height="61"
+          patternUnits="userSpaceOnUse"
+          patternTransform={`translate(${grid().patternOffsetX}, ${grid().patternOffsetY})`}
+        >
           <path
             id="flow_canvas_grid_path1"
             stroke-width="1"
@@ -48,6 +60,7 @@ export function DesignerGrids() {
           id="flow_canvas_watermark_item"
           width="300"
           height="300"
+          patternTransform={`translate(${grid().patternOffsetX}, ${grid().patternOffsetY})`}
         >
           <text
             x="150"

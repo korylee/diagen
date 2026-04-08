@@ -1,6 +1,6 @@
 import { batch, createComponent, createEffect } from 'solid-js'
 import { render } from 'solid-js/web'
-import { createDesigner, createShape, type Designer, type ShapeElement } from '@diagen/core'
+import { createDesigner, createShape, type AutoGrowConfig, type Designer, type ShapeElement } from '@diagen/core'
 import { createDgBem, type Point } from '@diagen/shared'
 import { DesignerProvider } from '../components/DesignerProvider'
 import { Renderer } from '../components/Renderer'
@@ -26,6 +26,7 @@ export interface CreateRendererTestHarnessOptions {
   pageWidth?: number
   pageHeight?: number
   shapes?: HarnessShapeInput[]
+  autoGrow?: Partial<AutoGrowConfig>
   rendererProps?: Omit<Parameters<typeof Renderer>[0], 'children'>
 }
 
@@ -110,6 +111,7 @@ function HarnessApp(props: {
   pageWidth: number
   pageHeight: number
   shapes: HarnessShapeInput[]
+  autoGrow?: Partial<AutoGrowConfig>
   rendererProps?: Omit<Parameters<typeof Renderer>[0], 'children'>
   onReady: (payload: { designer: Designer; interaction: CapturedInteraction }) => void
 }) {
@@ -122,6 +124,7 @@ function HarnessApp(props: {
     containerInset: DefaultContainerInset,
     autoGrow: {
       enabled: false,
+      ...props.autoGrow,
     },
   })
 
@@ -139,7 +142,7 @@ function HarnessApp(props: {
     get children() {
       return createComponent(Renderer, {
         ...props.rendererProps,
-        get children() {
+        get overlay() {
           return createComponent(InteractionProbe, {
             onReady: interaction => {
               props.onReady({
@@ -191,6 +194,7 @@ export async function createRendererTestHarness(options: CreateRendererTestHarne
         pageWidth,
         pageHeight,
         shapes,
+        autoGrow: options.autoGrow,
         rendererProps: options.rendererProps,
         onReady: payload => {
           capturedDesigner = payload.designer
@@ -230,8 +234,8 @@ export async function createRendererTestHarness(options: CreateRendererTestHarne
   defineWritableNumber(viewport, 'scrollTop', 0)
   defineGetter(viewport, 'clientWidth', () => viewportRect.width)
   defineGetter(viewport, 'clientHeight', () => viewportRect.height)
-  defineGetter(viewport, 'scrollWidth', () => pageWidth + DefaultContainerInset * 2)
-  defineGetter(viewport, 'scrollHeight', () => pageHeight + DefaultContainerInset * 2)
+  defineGetter(viewport, 'scrollWidth', () => designer.view.containerSize().width + DefaultContainerInset * 2)
+  defineGetter(viewport, 'scrollHeight', () => designer.view.containerSize().height + DefaultContainerInset * 2)
 
   Object.defineProperty(viewport, 'getBoundingClientRect', {
     configurable: true,
@@ -243,11 +247,12 @@ export async function createRendererTestHarness(options: CreateRendererTestHarne
     value: () => {
       const left = viewportRect.left + DefaultContainerInset - viewport.scrollLeft
       const top = viewportRect.top + DefaultContainerInset - viewport.scrollTop
+      const containerSize = designer.view.containerSize()
       return createDomRect({
         left,
         top,
-        width: pageWidth,
-        height: pageHeight,
+        width: containerSize.width,
+        height: containerSize.height,
       })
     },
   })

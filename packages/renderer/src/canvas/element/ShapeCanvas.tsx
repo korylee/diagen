@@ -22,7 +22,8 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
 
   /** 屏幕坐标系中的位置（DOM 定位用） */
   const getScreenBounds = createMemo(() => {
-    const b = view.toCanvas(renderBounds())
+    // 场景层使用屏幕坐标定位，左/上自动扩展后需要显式走 canvas -> screen 转换
+    const b = view.toScreen(renderBounds())
 
     return expandBounds(b, padding)
   })
@@ -36,7 +37,7 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
     const height = Math.max(1, Math.ceil(bounds.h))
 
     return {
-      visible: isBoundsVisible(rotatedBounds, vp, vpSize),
+      visible: isBoundsVisible(rotatedBounds, vp, vpSize, view.canvasOffset()),
       zoom: vp.zoom,
       ratio: pixelRatio(),
       pixelWidth: width * pixelRatio(),

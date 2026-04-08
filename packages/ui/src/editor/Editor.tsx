@@ -48,9 +48,7 @@ export function Editor(props: EditorProps) {
         shapeGuideTolerance={props.shapeGuideTolerance}
         resizeGuideTolerance={props.resizeGuideTolerance}
         onContextMenu={props.contextMenu?.disabled ? undefined : handleContextMenuRequest}
-      >
-        {props.children}
-      </Renderer>
+      />
 
       <Show when={!props.contextMenu?.disabled}>
         <ContextMenu

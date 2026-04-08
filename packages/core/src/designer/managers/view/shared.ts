@@ -11,6 +11,13 @@ interface ContainerSizeResolverOptions {
   page: Size
 }
 
+export interface ContainerAutoGrowResolution {
+  width: number
+  height: number
+  offsetX: number
+  offsetY: number
+}
+
 export function createPageBounds(width: number, height: number): Bounds {
   return {
     x: 0,
@@ -61,12 +68,18 @@ export function normalizeCanvasSize(value: number): number {
   return Math.max(1, Math.floor(value))
 }
 
-export function resolveContainerSizeForContent(options: ContainerSizeResolverOptions): Size {
+export function resolveContainerSizeForContent(options: ContainerSizeResolverOptions): ContainerAutoGrowResolution {
   const { autoGrow, content, current, page } = options
   const right = content.x + content.w
   const bottom = content.y + content.h
-  const requiredWidth = Math.max(page.width, Math.ceil(right + autoGrow.growPadding))
-  const requiredHeight = Math.max(page.height, Math.ceil(bottom + autoGrow.growPadding))
+  // 左/上方向的自增不直接改内容坐标，而是先产出原点补偿量，交给 view 层后续统一消费
+  const offsetX =
+    content.x < -autoGrow.growPadding ? ceilByStep(Math.ceil(-content.x + autoGrow.growPadding), autoGrow.growStep) : 0
+  const offsetY =
+    content.y < -autoGrow.growPadding ? ceilByStep(Math.ceil(-content.y + autoGrow.growPadding), autoGrow.growStep) : 0
+  // 右/下方向的尺寸计算需要叠加左/上补偿量，这样容器总尺寸才能真实覆盖平移后的页面与内容
+  const requiredWidth = Math.max(page.width + offsetX, Math.ceil(right + offsetX + autoGrow.growPadding))
+  const requiredHeight = Math.max(page.height + offsetY, Math.ceil(bottom + offsetY + autoGrow.growPadding))
 
   return {
     width:
@@ -77,6 +90,8 @@ export function resolveContainerSizeForContent(options: ContainerSizeResolverOpt
       requiredHeight > current.height
         ? Math.min(autoGrow.maxHeight, Math.max(current.height, ceilByStep(requiredHeight, autoGrow.growStep)))
         : current.height,
+    offsetX,
+    offsetY,
   }
 }
 

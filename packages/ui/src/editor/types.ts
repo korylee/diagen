@@ -9,7 +9,6 @@ export interface EditorContextMenuOptions {
 }
 
 export interface EditorProps {
-  children?: JSX.Element
   class?: string
   style?: Record<string, string>
   shapeGuideTolerance?: number

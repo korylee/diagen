@@ -22,7 +22,8 @@ export function LinkerCanvas(props: LinkerCanvasProps) {
 
   /** 屏幕坐标系中的位置（DOM 定位用） */
   const screenBounds = createMemo(() => {
-    const b = view.toCanvas(layout().bounds)
+    // 场景层使用屏幕坐标定位，左/上自动扩展后需要显式走 canvas -> screen 转换
+    const b = view.toScreen(layout().bounds)
 
     return expandBounds(b, padding)
   })
@@ -38,7 +39,7 @@ export function LinkerCanvas(props: LinkerCanvasProps) {
     const height = Math.max(1, Math.ceil(rect.h))
 
     return {
-      visible: isBoundsVisible(b, vp, vpSize),
+      visible: isBoundsVisible(b, vp, vpSize, view.canvasOffset()),
       route,
       bounds: b,
       zoom: vp.zoom,

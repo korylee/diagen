@@ -28,6 +28,7 @@ export function createViewManager(
   const viewport = createMemo(() => state.viewport)
   const viewportSize = createMemo(() => state.viewportSize)
   const containerSize = createMemo(() => state.containerSize)
+  const canvasOffset = createMemo(() => state.canvasOffset)
   const zoom = createMemo(() => viewport().zoom)
   const diagramPage = createMemo(() => state.diagram.page)
   const linkerRouteConfig = createMemo(() => state.config.linkerRoute)
@@ -47,11 +48,11 @@ export function createViewManager(
 
     if (center) {
       const currentViewport = viewport()
-      const scale = newZoom / currentViewport.zoom
       setState('viewport', {
         zoom: newZoom,
-        x: center.x - (center.x - currentViewport.x) * scale,
-        y: center.y - (center.y - currentViewport.y) * scale,
+        // center 使用画布坐标。保持该画布点视觉位置不变时，viewport 只需补偿缩放前后的画布位移差。
+        x: currentViewport.x + center.x * (currentViewport.zoom - newZoom),
+        y: currentViewport.y + center.y * (currentViewport.zoom - newZoom),
       })
     } else {
       setState('viewport', 'zoom', newZoom)
@@ -68,19 +69,21 @@ export function createViewManager(
 
   /** 屏幕坐标 → 画布坐标 */
   function toCanvas<T extends Point | Bounds>(val: T): T extends Bounds ? Bounds : Point {
-    return screenToCanvas(val, viewport())
+    return screenToCanvas(val, viewport(), canvasOffset())
   }
 
   /** 画布坐标 → 屏幕坐标 */
   function toScreen<T extends Point | Bounds>(val: T): T extends Bounds ? Bounds : Point {
-    return canvasToScreen(val, viewport())
+    return canvasToScreen(val, viewport(), canvasOffset())
   }
 
   function centerTo(point: Point): void {
     const { width, height } = viewportSize()
+    const offset = canvasOffset()
     setState('viewport', {
-      x: width / 2 - point.x * zoom(),
-      y: height / 2 - point.y * zoom(),
+      // 当画布原点已发生运行时补偿时，centerTo 需要扣除这部分偏移，才能维持真实居中结果
+      x: width / 2 - point.x * zoom() - offset.x,
+      y: height / 2 - point.y * zoom() - offset.y,
     })
   }
 
@@ -92,14 +95,16 @@ export function createViewManager(
     }
 
     const { width, height } = viewportSize()
+    const offset = canvasOffset()
     const zoomX = width / bounds.w
     const zoomY = height / bounds.h
     const newZoom = clampZoom(Math.min(zoomX, zoomY))
 
     setState('viewport', {
       zoom: newZoom,
-      x: (width - bounds.w * newZoom) / 2 - bounds.x * newZoom,
-      y: (height - bounds.h * newZoom) / 2 - bounds.y * newZoom,
+      // fitBounds 需要同时考虑画布原点补偿，否则左/上扩展后会出现居中偏差
+      x: (width - bounds.w * newZoom) / 2 - bounds.x * newZoom - offset.x,
+      y: (height - bounds.h * newZoom) / 2 - bounds.y * newZoom - offset.y,
     })
   }
 
@@ -145,6 +150,14 @@ export function createViewManager(
     })
   }
 
+  function setCanvasOffset(offset: Point): void {
+    // 统一由 view 层维护运行时原点偏移，避免后续左/上扩展时多处直接改状态
+    setState('canvasOffset', {
+      x: offset.x,
+      y: offset.y,
+    })
+  }
+
   function getPageBounds(): Bounds {
     const { width, height } = diagramPage()
     return createPageBounds(width, height)
@@ -181,18 +194,35 @@ export function createViewManager(
 
     const content = extraBounds ? mergeBounds(extraBounds) : bounds()
     const current = containerSize()
+    const currentOffset = canvasOffset()
     const page = diagramPage()
 
-    const nextSize = resolveContainerSizeForContent({
+    const nextGrowth = resolveContainerSizeForContent({
       autoGrow,
       content,
       current,
       page: { width: page.width, height: page.height },
     })
+    const nextOffset = {
+      // auto-grow 只扩不缩，左/上补偿量同样保持单向增长，避免拖拽回退时画布原点抖动
+      x: Math.max(currentOffset.x, nextGrowth.offsetX),
+      y: Math.max(currentOffset.y, nextGrowth.offsetY),
+    }
+    const sizeChanged = nextGrowth.width !== current.width || nextGrowth.height !== current.height
+    const offsetChanged = nextOffset.x !== currentOffset.x || nextOffset.y !== currentOffset.y
 
-    if (nextSize.width === current.width && nextSize.height === current.height) return false
+    if (!sizeChanged && !offsetChanged) return false
 
-    setContainerSize(nextSize.width, nextSize.height)
+    batch(() => {
+      if (sizeChanged) {
+        setContainerSize(nextGrowth.width, nextGrowth.height)
+      }
+      if (offsetChanged) {
+        // 统一在 view 层提交原点补偿，后续渲染层与交互层只读取这一份运行时状态
+        setCanvasOffset(nextOffset)
+      }
+    })
+
     return true
   }
 
@@ -282,6 +312,7 @@ export function createViewManager(
     viewport,
     viewportSize,
     containerSize,
+    canvasOffset,
     zoom,
     bounds,
     selectionBounds,
@@ -300,6 +331,7 @@ export function createViewManager(
     setPageSize,
     setViewportSize,
     setContainerSize,
+    setCanvasOffset,
     getContentBounds,
     ensureContainerFits,
     scheduleAutoGrow,

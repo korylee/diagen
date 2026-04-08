@@ -1,4 +1,4 @@
-import type { Emitter, Size } from '@diagen/shared'
+import type { Emitter, Point, Size } from '@diagen/shared'
 import type { LinkerType } from '../constants'
 import type { Diagram } from '../model'
 import type { Viewport } from '../utils'
@@ -65,7 +65,7 @@ export interface EditorConfig {
 export interface EditorState {
   /** 图表数据 */
   diagram: Diagram
-  
+
   /** 视口变换参数：x, y 为偏移，zoom 为缩放级别 */
   viewport: Viewport
 
@@ -74,6 +74,9 @@ export interface EditorState {
 
   /** 滚动容器尺寸（可滚动内容区域） */
   containerSize: Size
+
+  /** 画布原点相对容器左上角的运行时偏移（不持久化） */
+  canvasOffset: Point
 
   /** ui及性能配置 */
   config: EditorConfig

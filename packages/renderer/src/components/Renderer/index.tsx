@@ -41,7 +41,8 @@ export interface RendererContextMenuRequest {
 }
 
 export function Renderer(props: {
-  children?: JSX.Element
+  world?: JSX.Element
+  overlay?: JSX.Element
   /** Optional class name for styling */
   class?: string
   /** Optional inline styles */
@@ -132,7 +133,7 @@ export function Renderer(props: {
       }),
     } as const
   })
-  const canvasStyle = createMemo(() => {
+  const worldStyle = createMemo(() => {
     const { containerSize } = state
     const { viewport } = view
 
@@ -213,12 +214,38 @@ export function Renderer(props: {
     const containerInset = state.config.containerInset
     const padding = 10
     const initialScroll = {
-      left: Math.max(0, Math.round(containerInset + viewport.x - padding)),
-      top: Math.max(0, Math.round(containerInset + viewport.y - padding)),
+      // 初始滚动位置需要把运行时原点补偿一并算上，避免未来恢复态时出现首帧错位
+      left: Math.max(0, Math.round(containerInset + viewport.x + state.canvasOffset.x - padding)),
+      top: Math.max(0, Math.round(containerInset + viewport.y + state.canvasOffset.y - padding)),
     }
 
     el.scrollLeft = initialScroll.left
     el.scrollTop = initialScroll.top
+  })
+
+  let lastCanvasOffset: Point | null = null
+  createEffect(() => {
+    const el = viewportRef()
+    const nextOffset = { ...view.canvasOffset() }
+
+    if (!el) {
+      lastCanvasOffset = nextOffset
+      return
+    }
+
+    if (!lastCanvasOffset) {
+      lastCanvasOffset = nextOffset
+      return
+    }
+
+    const deltaX = nextOffset.x - lastCanvasOffset.x
+    const deltaY = nextOffset.y - lastCanvasOffset.y
+    if (deltaX === 0 && deltaY === 0) return
+
+    // 左/上自动扩展时同步补偿滚动位置，保证用户当前看到的画面不因原点平移而突跳
+    el.scrollLeft = Math.max(0, el.scrollLeft + deltaX)
+    el.scrollTop = Math.max(0, el.scrollTop + deltaY)
+    lastCanvasOffset = { x: nextOffset.x, y: nextOffset.y }
   })
 
   onCleanup(() => {
@@ -236,9 +263,10 @@ export function Renderer(props: {
           onContextMenu={onContextMenu}
           on:wheel={{ passive: false, handleEvent: onWheel }}
         >
-          {/*世界层（canvas 坐标，交给 transform 处理）*/}
-          <div style={canvasStyle()} class={bem('canvas')}>
+          {/*世界层（世界 坐标，交给 transform 处理）*/}
+          <div style={worldStyle()} class={bem('world')}>
             <DesignerGrids />
+            {props.world}
           </div>
 
           {/*渲染层（屏幕坐标，不做 transform）*/}
@@ -257,7 +285,7 @@ export function Renderer(props: {
           <div class={bem('overlay')} style={overlayStyle()}>
             <InteractionOverlay />
 
-            {props.children}
+            {props.overlay}
           </div>
         </div>
       </div>

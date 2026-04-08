@@ -112,6 +112,11 @@ function createInitialState(options: DesignerOptions): EditorState {
       width: pageWidth,
       height: pageHeight,
     },
+    // 运行时记录画布原点补偿，后续左/上自动扩展时会基于它做坐标对齐
+    canvasOffset: {
+      x: 0,
+      y: 0,
+    },
     config: createResolvedConfig(options),
     tool: {
       type: 'idle',
