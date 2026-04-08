@@ -3,7 +3,7 @@ import { isBoundsVisible } from '@diagen/core'
 import { createDevicePixelRatio } from '@diagen/primitives'
 import { expandBounds, getRotatedBounds } from '@diagen/shared'
 import { createEffect, createMemo } from 'solid-js'
-import { useDesigner } from '../../components'
+import { useDesigner } from '../../context'
 import { renderShape } from '../../utils'
 
 export interface ShapeCanvasProps {

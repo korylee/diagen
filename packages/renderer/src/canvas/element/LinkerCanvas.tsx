@@ -1,10 +1,10 @@
 import type { LinkerElement } from '@diagen/core'
 import { isBoundsVisible } from '@diagen/core'
 import { createDevicePixelRatio } from '@diagen/primitives'
-import { createEffect, createMemo } from 'solid-js'
-import { useDesigner } from '../../components'
-import { renderLinker } from '../../utils'
 import { expandBounds } from '@diagen/shared'
+import { createEffect, createMemo } from 'solid-js'
+import { useDesigner } from '../../context'
+import { renderLinker } from '../../utils'
 
 export interface LinkerCanvasProps {
   linker: LinkerElement

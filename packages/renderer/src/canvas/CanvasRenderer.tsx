@@ -1,6 +1,6 @@
 import { isLinker, isShape } from '@diagen/core'
 import { For } from 'solid-js'
-import { useDesigner } from '../components'
+import { useDesigner } from '../context'
 import { LinkerCanvas, ShapeCanvas } from './element'
 
 export interface CanvasRendererProps {}

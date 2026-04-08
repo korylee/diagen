@@ -9,6 +9,7 @@ import {
   type ResolvedPathAction,
   type ShapeElement,
 } from '@diagen/core'
+import { getLinkerTextBox } from './linkerText'
 
 export function parseColor(color: string | undefined): string {
   if (!color) return 'rgba(0,0,0,1)'
@@ -281,21 +282,26 @@ export function renderLinker(ctx: CanvasRenderingContext2D, linker: LinkerElemen
   }
 
   if (text) {
-    const midIdx = Math.floor(points.length / 2)
-    const midPoint = points[midIdx]
-    applyFontStyle(ctx, fontStyle)
-    const metrics = ctx.measureText(text)
+    const box = getLinkerTextBox(route, text, fontStyle, {
+      curved: linkerType === 'curved',
+      measureText: line => ctx.measureText(line).width,
+    })
+    if (!box) {
+      ctx.restore()
+      return
+    }
+
     ctx.fillStyle = 'white'
-    ctx.fillRect(
-      midPoint.x - metrics.width / 2 - 2,
-      midPoint.y - (fontStyle?.size || 13) / 2 - 2,
-      metrics.width + 4,
-      (fontStyle?.size || 13) + 4,
-    )
+    ctx.fillRect(box.x, box.y, box.w, box.h)
+    applyFontStyle(ctx, fontStyle)
     ctx.fillStyle = parseColor(fontStyle?.color)
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(text, midPoint.x, midPoint.y)
+
+    const contentTop = box.y + (box.h - box.lines.length * box.lineHeight) / 2
+    for (let i = 0; i < box.lines.length; i++) {
+      ctx.fillText(box.lines[i], box.cx, contentTop + i * box.lineHeight + box.lineHeight / 2)
+    }
   }
 
   ctx.restore()

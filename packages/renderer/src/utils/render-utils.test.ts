@@ -1,6 +1,7 @@
 import { createLinker } from '@diagen/core'
 import { describe, expect, it, vi } from 'vitest'
 import { renderLinker } from './render-utils'
+import { getLinkerTextBox } from './linkerText'
 
 function createContextMock() {
   return {
@@ -56,6 +57,26 @@ function createStraightLinkerById(id: string) {
 }
 
 describe('renderLinker', () => {
+  it('折线路径文本应按路径长度中点定位，而不是直接落在拐点', () => {
+    const box = getLinkerTextBox(
+      {
+        points: [
+          { x: 0, y: 0 },
+          { x: 60, y: 0 },
+          { x: 60, y: 100 },
+        ],
+        fromAngle: 0,
+        toAngle: 90,
+      },
+      '文本',
+      createStraightLinkerById('linker_text_box').fontStyle,
+    )
+
+    expect(box).toBeTruthy()
+    expect(box?.cx).toBeCloseTo(60)
+    expect(box?.cy).toBeCloseTo(20)
+  })
+
   it('应按顺序绘制水平 line jump', () => {
     const ctx = createContextMock()
     const linker = createStraightLinkerById('render_jump_horizontal')
@@ -171,5 +192,26 @@ describe('renderLinker', () => {
       [52, 46, 48, 50],
       [40, 46, 36, 50],
     ])
+  })
+
+  it('连线文本应支持多行绘制，并使用共享文本框布局', () => {
+    const ctx = createContextMock()
+    const linker = createStraightLinkerById('render_multiline_text')
+    linker.text = '第一行\n第二行'
+    ctx.measureText = vi.fn((line: string) => ({ width: line.length * 10 })) as unknown as typeof ctx.measureText
+
+    renderLinker(ctx, linker, {
+      points: [
+        { x: 0, y: 0 },
+        { x: 100, y: 0 },
+      ],
+      fromAngle: 0,
+      toAngle: 0,
+    })
+
+    expect(ctx.fillRect).toHaveBeenCalledTimes(1)
+    expect(ctx.fillText).toHaveBeenCalledTimes(2)
+    expect(ctx.fillText).toHaveBeenNthCalledWith(1, '第一行', 50, expect.any(Number))
+    expect(ctx.fillText).toHaveBeenNthCalledWith(2, '第二行', 50, expect.any(Number))
   })
 })

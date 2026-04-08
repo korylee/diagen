@@ -2,9 +2,8 @@ import { batch, createComponent, createEffect } from 'solid-js'
 import { render } from 'solid-js/web'
 import { createDesigner, createShape, type AutoGrowConfig, type Designer, type ShapeElement } from '@diagen/core'
 import { createDgBem, type Point } from '@diagen/shared'
-import { DesignerProvider } from '../components/DesignerProvider'
-import { Renderer } from '../components/Renderer'
-import { useInteraction } from '../components/InteractionProvider'
+import { DesignerProvider, useInteraction } from '../context'
+import { Renderer } from '../scene'
 
 interface RectLike {
   left: number
@@ -169,6 +168,7 @@ export async function createRendererTestHarness(options: CreateRendererTestHarne
   canvasToClient: (point: Point) => Point
   getOverlayElementsByCursor: (cursor: string) => HTMLElement[]
   dispatchSceneMouseDownAtCanvas: (point: Point, init?: MouseEventInit) => Promise<MouseEvent>
+  dispatchSceneDoubleClickAtCanvas: (point: Point, init?: MouseEventInit) => Promise<MouseEvent>
   dispatchSceneContextMenuAtCanvas: (point: Point, init?: MouseEventInit) => Promise<MouseEvent>
   dispatchElementMouseDownAtClient: (element: HTMLElement, point: Point, init?: MouseEventInit) => Promise<MouseEvent>
   dispatchElementMouseDown: (element: HTMLElement, init?: MouseEventInit) => Promise<MouseEvent>
@@ -285,7 +285,7 @@ export async function createRendererTestHarness(options: CreateRendererTestHarne
 
   async function dispatchMouseEvent(
     target: EventTarget,
-    type: 'mousedown' | 'mousemove' | 'mouseup' | 'contextmenu',
+    type: 'mousedown' | 'mousemove' | 'mouseup' | 'contextmenu' | 'dblclick',
     point: Point,
     init: MouseEventInit = {},
   ): Promise<MouseEvent> {
@@ -308,6 +308,10 @@ export async function createRendererTestHarness(options: CreateRendererTestHarne
 
   async function dispatchSceneMouseDownAtCanvas(point: Point, init: MouseEventInit = {}): Promise<MouseEvent> {
     return dispatchMouseEvent(sceneLayer, 'mousedown', canvasToClient(point), init)
+  }
+
+  async function dispatchSceneDoubleClickAtCanvas(point: Point, init: MouseEventInit = {}): Promise<MouseEvent> {
+    return dispatchMouseEvent(sceneLayer, 'dblclick', canvasToClient(point), init)
   }
 
   async function dispatchSceneContextMenuAtCanvas(point: Point, init: MouseEventInit = {}): Promise<MouseEvent> {
@@ -379,6 +383,7 @@ export async function createRendererTestHarness(options: CreateRendererTestHarne
     canvasToClient,
     getOverlayElementsByCursor,
     dispatchSceneMouseDownAtCanvas,
+    dispatchSceneDoubleClickAtCanvas,
     dispatchSceneContextMenuAtCanvas,
     dispatchElementMouseDownAtClient,
     dispatchElementMouseDown,

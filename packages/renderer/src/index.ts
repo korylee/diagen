@@ -5,5 +5,6 @@
 import './theme/theme.css'
 
 export * from './utils'
-export * from './components'
 export * from './canvas'
+export * from './context'
+export * from './scene'

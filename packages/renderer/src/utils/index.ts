@@ -1,4 +1,6 @@
 export * from './render-utils'
+export * from './linkerText'
+export * from './shapeText'
 export * from './path-cache'
 export * from './linker-hit-test'
 export * from './scene-hit-test'
