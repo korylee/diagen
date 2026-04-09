@@ -52,13 +52,3 @@ export function createDiagram(overrides: DeepPartial<Diagram> = {}) {
     page: createPage(overrides.page),
   } as Diagram
 }
-
-/** 序列化图表 */
-export function serializeDiagram(diagram: Diagram): string {
-  return JSON.stringify(diagram)
-}
-
-/** 反序列化图表 */
-export function deserializeDiagram(json: string): Diagram {
-  return JSON.parse(json)
-}

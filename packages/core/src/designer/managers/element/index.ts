@@ -7,17 +7,13 @@ import {
   type UnionNestedValue,
   type UnionValue,
 } from '@diagen/shared'
-import { batch, createMemo } from 'solid-js'
+import { createMemo } from 'solid-js'
 import { produce, type StoreSetter } from 'solid-js/store'
 import {
-  type BoxProps,
-  type DiagramElement,
   isLinker,
   isShape,
-  type LinkerElement,
-  type LinkerEndpoint,
-  type ShapeElement,
 } from '../../../model'
+import type { BoxProps, DiagramElement, LinkerElement, LinkerEndpoint, ShapeElement } from '../../../model'
 import { Schema } from '../../../schema'
 import type { DesignerContext } from '../types'
 import {
@@ -66,16 +62,37 @@ export const createElementManager = (ctx: DesignerContext) => {
     elementMap,
   })
 
+  function replaceCurrentDocument(next: {
+    elements?: Record<string, DiagramElement>
+    orderList?: string[]
+  }): void {
+    setState('diagram', current => {
+      // 单页文档下直接替换根模型字段，减少无语义的转发层。
+      return {
+        ...current,
+        ...(next.elements !== undefined ? { elements: next.elements } : {}),
+        ...(next.orderList !== undefined ? { orderList: next.orderList } : {}),
+      }
+    })
+  }
+
   function add(els: MaybeArray<DiagramElement>) {
     const elements = ensureArray(els)
     const ids: string[] = []
-    batch(() => {
+
+    setState('diagram', produce(diagram => {
+      const nextElements = diagram.elements
+      const nextOrderList = diagram.orderList
+
       for (const element of elements) {
-        setState('diagram', 'elements', element.id, element)
+        nextElements[element.id] = element
         ids.push(element.id)
       }
-      setState('diagram', 'orderList', list => [...list, ...ids])
-    })
+
+      // 当前阶段仍为单页文档，新增元素直接追加到根 orderList。
+      nextOrderList.push(...ids)
+    }))
+
     emitter.emit('element:added', { elements })
   }
 
@@ -83,18 +100,18 @@ export const createElementManager = (ctx: DesignerContext) => {
     const ids = ensureArray(els).map(el => (typeof el === 'string' ? el : el.id))
     const idsSet = new Set(ids)
     const elements = getElementsByIds(ids)
-    batch(() => {
-      setState(
-        'diagram',
-        'elements',
-        produce(els => {
-          for (const id of ids) {
-            delete els[id] // 在 produce 内部直接删除
-          }
-        }),
-      )
-      setState('diagram', 'orderList', list => list.filter(id => !idsSet.has(id)))
-    })
+
+    setState('diagram', produce(diagram => {
+      const nextElements = diagram.elements
+      const nextOrderList = diagram.orderList
+
+      for (const id of ids) {
+        delete nextElements[id]
+      }
+
+      const filtered = nextOrderList.filter(id => !idsSet.has(id))
+      nextOrderList.splice(0, nextOrderList.length, ...filtered)
+    }))
 
     emitter.emit('element:removed', { elements })
   }
@@ -112,27 +129,30 @@ export const createElementManager = (ctx: DesignerContext) => {
   ): void
   function update(id: MaybeArray<string>, setter: StoreSetter<DiagramElement>): void
   function update(id: MaybeArray<string>, ...args: unknown[]) {
+    // update 仍保留现有精细路径更新能力，避免这一阶段扩大改动面。
     setState('diagram', 'elements', id, ...(args as [any]))
     const elements = getElementsByIds(ensureArray(id))
     emitter.emit('element:updated', { elements })
   }
 
-  function load(elements: Record<string, DiagramElement>, orderList: string[] = []) {
-    batch(() => {
-      setState('diagram', 'elements', elements)
-      setState('diagram', 'orderList', orderList ?? keys(elements))
+  function load(elements: Record<string, DiagramElement>, orderList?: string[]) {
+    replaceCurrentDocument({
+      elements,
+      orderList: orderList ?? keys(elements),
     })
   }
 
   function setOrderList(nextOrderList: string[]) {
-    setState('diagram', 'orderList', nextOrderList)
+    replaceCurrentDocument({
+      orderList: nextOrderList,
+    })
   }
 
   function clear() {
     const list = indexes.elements()
-    batch(() => {
-      setState('diagram', 'elements', {})
-      setState('diagram', 'orderList', [])
+    replaceCurrentDocument({
+      elements: {},
+      orderList: [],
     })
     emitter.emit('element:cleared', { elements: list })
   }

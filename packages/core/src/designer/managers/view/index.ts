@@ -1,8 +1,9 @@
 import { type Bounds, DeepPartial, normalizeBounds, type Point } from '@diagen/shared'
 import { batch, createMemo, createSignal } from 'solid-js'
-import { isLinker, isShape, type DiagramElement, type LinkerElement } from '../../../model'
-import { canvasToScreen, clampZoom, screenToCanvas } from '../../../_utils'
-import type { LinkerRoute } from '../../../_utils/router'
+import { isLinker, isShape } from '../../../model'
+import type { DiagramElement, DiagramPage, LinkerElement } from '../../../model'
+import { canvasToScreen, clampZoom, screenToCanvas } from '../../../transform'
+import type { LinkerRoute } from '../../../router'
 import type { ElementManager } from '../element'
 import type { DesignerContext } from '../types'
 import type { SelectionManager } from '../selection'
@@ -123,12 +124,25 @@ export function createViewManager(
     setZoom(zoom() - 0.1)
   }
 
+  function patchDiagramPage(patch: Partial<DiagramPage>): void {
+    setState('diagram', current => {
+      // 当前仍是单页模型，页面配置直接挂在 diagram.page 上。
+      return {
+        ...current,
+        page: {
+          ...current.page,
+          ...patch,
+        },
+      }
+    })
+  }
+
   function setPageSize(width: number, height: number): void {
     const nextWidth = normalizeCanvasSize(width)
     const nextHeight = normalizeCanvasSize(height)
 
     batch(() => {
-      setState('diagram', 'page', { width: nextWidth, height: nextHeight })
+      patchDiagramPage({ width: nextWidth, height: nextHeight })
       mergeBounds(createPageBounds(nextWidth, nextHeight))
       setWorldSize(nextWidth, nextHeight)
     })

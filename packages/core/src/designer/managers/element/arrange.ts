@@ -1,6 +1,9 @@
 import type { Accessor } from 'solid-js'
 import { produce, type SetStoreFunction } from 'solid-js/store'
-import { isShape, type DiagramElement, type ShapeElement } from '../../../model'
+import {
+  isShape,
+} from '../../../model'
+import type { DiagramElement, ShapeElement } from '../../../model'
 import type { EditorState } from '../../types'
 
 export type ElementAlignType = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom'
@@ -30,8 +33,8 @@ export function createElementArrangeActions(options: CreateElementArrangeActions
 
     options.setState(
       'diagram',
-      'elements',
-      produce(elements => {
+      produce(diagram => {
+        const elements = diagram.elements
         for (const shape of selectedShapes) {
           const element = elements[shape.id] as ShapeElement
           if (!element) continue
@@ -77,8 +80,8 @@ export function createElementArrangeActions(options: CreateElementArrangeActions
       let currentX = first.props.x
       options.setState(
         'diagram',
-        'elements',
-        produce(elements => {
+        produce(diagram => {
+          const elements = diagram.elements
           for (const shape of sorted) {
             const element = elements[shape.id] as ShapeElement
             if (!element) continue
@@ -99,8 +102,8 @@ export function createElementArrangeActions(options: CreateElementArrangeActions
     let currentY = first.props.y
     options.setState(
       'diagram',
-      'elements',
-      produce(elements => {
+      produce(diagram => {
+        const elements = diagram.elements
         for (const shape of sorted) {
           const element = elements[shape.id] as ShapeElement
           if (!element) continue
@@ -113,25 +116,35 @@ export function createElementArrangeActions(options: CreateElementArrangeActions
 
   function toFront(ids: string[]): void {
     const idsSet = new Set(ids)
-    options.setState('diagram', 'orderList', list => {
+    options.setState('diagram', current => {
+      const list = current.orderList
       const remaining = list.filter(id => !idsSet.has(id))
       const moving = list.filter(id => idsSet.has(id))
-      return [...remaining, ...moving]
+      // 当前仍是根级 orderList，层级调整直接返回新的顺序数组。
+      return {
+        ...current,
+        orderList: [...remaining, ...moving],
+      }
     })
   }
 
   function toBack(ids: string[]): void {
     const idsSet = new Set(ids)
-    options.setState('diagram', 'orderList', list => {
+    options.setState('diagram', current => {
+      const list = current.orderList
       const remaining = list.filter(id => !idsSet.has(id))
       const moving = list.filter(id => idsSet.has(id))
-      return [...moving, ...remaining]
+      return {
+        ...current,
+        orderList: [...moving, ...remaining],
+      }
     })
   }
 
   function moveForward(ids: string[]): void {
     const idsSet = new Set(ids)
-    options.setState('diagram', 'orderList', list => {
+    options.setState('diagram', current => {
+      const list = current.orderList
       const nextList = [...list]
 
       for (let i = nextList.length - 2; i >= 0; i--) {
@@ -142,13 +155,17 @@ export function createElementArrangeActions(options: CreateElementArrangeActions
         }
       }
 
-      return nextList
+      return {
+        ...current,
+        orderList: nextList,
+      }
     })
   }
 
   function moveBackward(ids: string[]): void {
     const idsSet = new Set(ids)
-    options.setState('diagram', 'orderList', list => {
+    options.setState('diagram', current => {
+      const list = current.orderList
       const nextList = [...list]
 
       for (let i = 1; i < nextList.length; i++) {
@@ -159,7 +176,10 @@ export function createElementArrangeActions(options: CreateElementArrangeActions
         }
       }
 
-      return nextList
+      return {
+        ...current,
+        orderList: nextList,
+      }
     })
   }
 

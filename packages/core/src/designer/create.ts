@@ -2,9 +2,11 @@ import { createStore } from 'solid-js/store'
 
 import { createEmitter, DeepPartial, generateId, pick } from '@diagen/shared'
 import { LinkerType } from '../constants'
-import type { Transform } from '../_utils'
+import { unwrapClone } from '../_internal'
+import type { Transform } from '../transform'
 
-import { createDiagram, Diagram } from '../model'
+import { createDiagram } from '../model'
+import type { Diagram } from '../model'
 import {
   type Command,
   createEditManager,
@@ -48,6 +50,21 @@ const DEFAULT_LINKER_ROUTE_CONFIG = {
   },
   lineJumpRadius: 10,
 } as const
+
+function serializeDesignerDiagram(diagram: Diagram): string {
+  return JSON.stringify(diagram, null, 2)
+}
+
+function loadDesignerDiagram(input: string | Diagram): Diagram {
+  // Designer 内部统一在加载时补齐 Diagram 缺省结构，并断开外部引用。
+  const raw = typeof input === 'string' ? (JSON.parse(input) as Diagram) : input
+  return createDiagram(unwrapClone(raw))
+}
+
+function cloneDesignerDiagram(diagram: Diagram): Diagram {
+  // 历史记录与 load 回滚都依赖完整快照，统一复用同一份规范化逻辑。
+  return loadDesignerDiagram(diagram)
+}
 
 function createResolvedConfig(options: DesignerOptions): EditorConfig {
   const containerInset = typeof options.containerInset === 'number' ? options.containerInset : 800
@@ -93,6 +110,7 @@ function createResolvedConfig(options: DesignerOptions): EditorConfig {
 
 function createInitialState(options: DesignerOptions): EditorState {
   const diagram = createDiagram(pick(options, ['id', 'name', 'page']))
+  // 当前仍是单页模型，这里直接读取 diagram.page，避免再包一层空访问函数。
   const { width: pageWidth, height: pageHeight } = diagram.page
 
   return {
@@ -151,13 +169,13 @@ export function createDesigner(options: DesignerOptions = {}) {
   const tool = createToolManager(ctx)
 
   function serialize(): string {
-    return JSON.stringify(state.diagram, null, 2)
+    return serializeDesignerDiagram(state.diagram)
   }
 
   function loadFromJSON(json: string, options: { recordHistory?: boolean } = {}): void {
     const { recordHistory = false } = options
-
-    const diagram = JSON.parse(json) as Diagram
+    const previousDiagram = cloneDesignerDiagram(state.diagram)
+    const nextDiagram = loadDesignerDiagram(json)
 
     const command: Command = {
       id: generateId('cmd_load'),
@@ -165,16 +183,20 @@ export function createDesigner(options: DesignerOptions = {}) {
       timestamp: Date.now(),
 
       execute: () => {
-        setState('diagram', diagram)
+        // 加载文档按完整 diagram 快照替换，避免只回滚局部字段导致 page/meta 丢失。
+        setState('diagram', cloneDesignerDiagram(nextDiagram))
+        selection.clear()
       },
 
       undo: () => {
-        setState('diagram', 'elements', {})
-        setState('diagram', 'orderList', [])
+        // undo 同样恢复完整文档快照，保持 load 前后的根模型一致性。
+        setState('diagram', cloneDesignerDiagram(previousDiagram))
+        selection.clear()
       },
 
       redo: () => {
-        command.execute()
+        setState('diagram', cloneDesignerDiagram(nextDiagram))
+        selection.clear()
       },
     }
 
@@ -183,8 +205,6 @@ export function createDesigner(options: DesignerOptions = {}) {
     } else {
       command.execute()
     }
-
-    selection.clear()
   }
 
   return {
