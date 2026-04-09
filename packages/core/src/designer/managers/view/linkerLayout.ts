@@ -8,7 +8,7 @@ import {
   calculateLinkerRoute,
   type LinkerRoute,
   type LinkerRouteOptions,
-} from '../../../_utils/router'
+} from '../../../router'
 import type { LinkerRouteConfig } from '../../types'
 import type { ElementManager } from '../element'
 import { calculateLinkerBounds } from './shared'

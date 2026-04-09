@@ -1,6 +1,6 @@
 import type { Point } from '@diagen/shared'
-import type { LinkerType } from '../../constants'
-import type { DiagramElement, LinkerElement, LinkerEndpoint, ShapeElement } from '../../model'
+import type { LinkerType } from '../constants'
+import type { DiagramElement, LinkerElement, LinkerEndpoint, ShapeElement } from '../model'
 import { getShapeAnchorInfoById, resolveShapePerimeterInfo } from '../anchors'
 import type { Obstacle, RouterConfig } from './types'
 import { calculateObstacleRoute, createObstaclesFromElements, type RouterOptions } from './obstacleRoute'

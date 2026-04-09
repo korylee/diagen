@@ -1,10 +1,10 @@
 import type { Bounds, Point } from '@diagen/shared'
 import { describe, expect, it } from 'vitest'
-import { aStarRoute, createObstacleFromBounds } from '../astar'
-import { calculateLineJumps, calculateObstacleRoute, calculateRoutePoints, createObstaclesFromElements } from '../index'
-import { orthogonalRoute } from '../orthogonal'
-import type { Obstacle, RouterConfig } from '../types'
-import { calculateRouteCost, euclideanDistance, isRouteValid, simplifyOrthogonalPath } from '../utils'
+import { aStarRoute, createObstacleFromBounds } from './astar'
+import { calculateLineJumps, calculateObstacleRoute, calculateRoutePoints, createObstaclesFromElements } from './index'
+import { orthogonalRoute } from './orthogonal'
+import type { Obstacle, RouterConfig } from './types'
+import { calculateRouteCost, euclideanDistance, isRouteValid, simplifyOrthogonalPath } from './utils'
 
 const defaultConfig: RouterConfig = {
   gridSize: 10,

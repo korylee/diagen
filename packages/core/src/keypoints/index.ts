@@ -5,7 +5,7 @@
 
 import type { Point } from '@diagen/shared'
 import type { ShapeElement } from '../model'
-import { evaluateExpression, resolvePoints } from './expression'
+import { evaluateExpression, resolvePoints } from '../expression'
 
 /**
  * 关键点定义（相对坐标表达式）

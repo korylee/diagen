@@ -1,6 +1,6 @@
 import type { Bounds, Point } from '@diagen/shared'
-import { isShape } from '../../model'
-import type { DiagramElement } from '../../model'
+import { isShape } from '../model'
+import type { DiagramElement } from '../model'
 import { aStarRoute, type AStarRouteOptions, createObstacleFromBounds } from './astar'
 import { orthogonalRoute, type OrthogonalRouteOptions } from './orthogonal'
 import type { Obstacle, RouteResult, RouterConfig } from './types'
