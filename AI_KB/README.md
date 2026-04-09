@@ -11,7 +11,7 @@
 4. `AI_KB/DOMAIN_MODEL.md`
 5. `AI_KB/CAPABILITY_PRIORITIES.md`
 6. `AI_KB/ROADMAP.md`
-7. `AI_KB/PHASE_1_TEXT_EDITING.md`
+7. `AI_KB/CURRENT_PLAN.md`
 8. `AI_KB/DEV_GUIDE.md`
 
 ## 当前结论
@@ -19,7 +19,7 @@
 - `@diagen/renderer` 已完成主要交互主链路，包含框选、拖拽、缩放、旋转、建线、快捷建线、自动扩容、自动滚动与 context menu 上下文识别。
 - `@diagen/ui` 已提供 toolbar / sidebar / editor 壳层，但仍缺少保存、导入、导出等产品入口。
 - 当前后续优先级已调整为先补齐对标 `draw.io / ProcessOn` 的核心编辑能力，再进入 `page + 持久化 + 导入导出`。
-- 当前若直接进入实现，默认从 `Phase 1` 文本编辑开始，实施入口见 `AI_KB/PHASE_1_TEXT_EDITING.md`。
+- shape / linker 文本编辑最小闭环已完成，当前直接进入实现时，实施入口见 `AI_KB/CURRENT_PLAN.md`。
 
 ## 当前设计原则
 - 项目尚未对外发布，也没有外部调用方。
@@ -35,8 +35,8 @@
 ## 维护规则
 - 包结构、目录入口变化：更新 `REPO_MAP.md`
 - 当前能力、优先级、阶段判断变化：更新 `PROJECT_OVERVIEW.md` 和 `ROADMAP.md`
-- 当前执行阶段与起手文件变化：更新对应 `AI_KB/PHASE_*` 文档
+- 当前执行阶段与起手文件变化：更新 `AI_KB/CURRENT_PLAN.md`
 - 文档态与运行时边界变化：更新 `ARCHITECTURE.md` 和 `DOMAIN_MODEL.md`
 - 调试命令、测试入口变化：更新 `DEV_GUIDE.md`
 
-最后更新：2026-04-08
+最后更新：2026-04-09
