@@ -1,5 +1,6 @@
 import { createSignal, onCleanup } from 'solid-js'
-import { calculateResizeGuideSnap, isShape, type GuideLine, type ShapeElement } from '@diagen/core'
+import { isShape, type ShapeElement } from '@diagen/core'
+import { calculateResizeGuideSnap, type GuideLine } from '@diagen/core/guide'
 import { getRotatedBounds } from '@diagen/shared'
 import type { Bounds, Point } from '@diagen/shared'
 import { useDesigner } from '../../../context'

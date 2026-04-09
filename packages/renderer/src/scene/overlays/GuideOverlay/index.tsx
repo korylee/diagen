@@ -1,6 +1,6 @@
-import { GuideLine } from '@diagen/core'
 import { For, Show, createMemo } from 'solid-js'
 import { useInteraction } from '../../../context/InteractionProvider'
+import { GuideLine } from '@diagen/core/guide'
 
 export function GuideOverlay() {
   const { pointer, coordinate } = useInteraction()
@@ -24,7 +24,8 @@ export function GuideOverlay() {
         const end = coordinate.canvasToScreen({ x: line.pos, y: line.to })
         const distanceStart =
           line.distanceFrom != null ? coordinate.canvasToScreen({ x: line.pos, y: line.distanceFrom }) : null
-        const distanceEnd = line.distanceTo != null ? coordinate.canvasToScreen({ x: line.pos, y: line.distanceTo }) : null
+        const distanceEnd =
+          line.distanceTo != null ? coordinate.canvasToScreen({ x: line.pos, y: line.distanceTo }) : null
         return {
           axis: line.axis,
           x1: start.x,
@@ -41,7 +42,8 @@ export function GuideOverlay() {
       const end = coordinate.canvasToScreen({ x: line.to, y: line.pos })
       const distanceStart =
         line.distanceFrom != null ? coordinate.canvasToScreen({ x: line.distanceFrom, y: line.pos }) : null
-      const distanceEnd = line.distanceTo != null ? coordinate.canvasToScreen({ x: line.distanceTo, y: line.pos }) : null
+      const distanceEnd =
+        line.distanceTo != null ? coordinate.canvasToScreen({ x: line.distanceTo, y: line.pos }) : null
       return {
         axis: line.axis,
         x1: start.x,
@@ -79,11 +81,15 @@ export function GuideOverlay() {
                 y1={segment.y1}
                 x2={segment.x2}
                 y2={segment.y2}
-              stroke="var(--dg-selection-color)"
-              stroke-width="1"
-              stroke-dasharray="4 3"
-            />
-              <Show when={segment.distance != null && segment.distance > 0 && segment.labelX != null && segment.labelY != null}>
+                stroke="var(--dg-selection-color)"
+                stroke-width="1"
+                stroke-dasharray="4 3"
+              />
+              <Show
+                when={
+                  segment.distance != null && segment.distance > 0 && segment.labelX != null && segment.labelY != null
+                }
+              >
                 <text
                   data-guide-distance={`${segment.distance}px`}
                   x={segment.labelX!}

@@ -1,4 +1,5 @@
-import { isShape, resolvePathValue, type ShapeElement } from '@diagen/core'
+import { isShape, type ShapeElement } from '@diagen/core'
+import { resolvePathValue } from '@diagen/core/path'
 import { isPointInBounds, rotatePoint, type Point } from '@diagen/shared'
 
 export interface ShapeTextBox {

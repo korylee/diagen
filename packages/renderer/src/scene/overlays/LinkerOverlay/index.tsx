@@ -1,4 +1,4 @@
-import { getShapeAnchorInfo, isLinker, isShape } from '@diagen/core'
+import {  isLinker, isShape } from '@diagen/core'
 import { type Point } from '@diagen/shared'
 import { createMemo } from 'solid-js'
 import { useDesigner } from '../../../context/DesignerProvider'
@@ -10,6 +10,7 @@ import { LinkQuickCreatePanel } from './LinkQuickCreatePanel'
 import { LinkTargetHighlights } from './LinkTargetHighlights'
 import { SelectedLinkerOverlay } from './SelectedLinkerOverlay'
 import type { LinkerControlHandle, QuickCreateAction, QuickCreatePanel, QuickCreatePlacement } from './types'
+import { getShapeAnchorInfo } from '@diagen/core/anchors'
 
 import './index.scss'
 

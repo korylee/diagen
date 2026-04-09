@@ -1,4 +1,5 @@
-import { compilePathActions, type CompiledPathAction, type ShapeElement } from '@diagen/core'
+import { type ShapeElement } from '@diagen/core'
+import { compilePathActions, type CompiledPathAction } from '@diagen/core/path'
 
 export interface CachedPath {
   pathId: string

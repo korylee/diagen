@@ -1,10 +1,6 @@
 import { createSignal, onCleanup } from 'solid-js'
 import {
-  getShapeAnchorInfo,
-  getShapePerimeterInfo,
   isLinker,
-  resolvePreferredCreateAnchor,
-  resolveShapePerimeterInfo,
   type LinkerElement,
   type LinkerEndpointBinding,
   type LinkerEndpoint,
@@ -25,6 +21,12 @@ import type { EventToCanvas } from '../../services/createCoordinateService'
 import { createDragSession } from '../shared/createDragSession'
 import type { CreatePointerDragTrackerOptions } from '../shared/createPointerDragTracker'
 import { createPointerDeltaState } from '../shared/createPointerDeltaState'
+import {
+  getShapeAnchorInfo,
+  getShapePerimeterInfo,
+  resolvePreferredCreateAnchor,
+  resolveShapePerimeterInfo,
+} from '@diagen/core/anchors'
 
 export type LinkerDragMode = 'from' | 'to' | 'control' | 'line' | 'text'
 type LinkerEndpointMode = Extract<LinkerDragMode, 'from' | 'to'>
@@ -426,9 +428,7 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     } else if (hit.type === 'segment') {
       mode = 'control'
       const segmentState =
-        el.linkerType === 'orthogonal'
-          ? prepareOrthogonalSegmentDragState(route, hit.segmentIndex ?? 0)
-          : null
+        el.linkerType === 'orthogonal' ? prepareOrthogonalSegmentDragState(route, hit.segmentIndex ?? 0) : null
 
       if (segmentState) {
         startPoints = segmentState.points
@@ -438,7 +438,9 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
         startControl = segmentState.points[segmentState.controlIndex]
       } else {
         const insertionIndex =
-          startPoints.length === 0 ? 0 : Math.max(0, Math.min(startPoints.length, hit.segmentIndex ?? startPoints.length))
+          startPoints.length === 0
+            ? 0
+            : Math.max(0, Math.min(startPoints.length, hit.segmentIndex ?? startPoints.length))
         const insertedPoint = { x: point.x, y: point.y }
         startPoints = [...startPoints]
         startPoints.splice(insertionIndex, 0, insertedPoint)
@@ -730,7 +732,10 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     return true
   }
 
-  function prepareOrthogonalSegmentDragState(route: LinkerRoute, segmentIndex: number): OrthogonalSegmentDragState | null {
+  function prepareOrthogonalSegmentDragState(
+    route: LinkerRoute,
+    segmentIndex: number,
+  ): OrthogonalSegmentDragState | null {
     if (route.points.length < 2) return null
     if (segmentIndex < 0 || segmentIndex >= route.points.length - 1) return null
 
@@ -803,9 +808,17 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     const nextAxis = resolveOrthogonalAxis(startControl, nextPoint)
 
     if (prevAxis === 'x') {
-      xBindings.push(controlIndex === 0 ? { type: 'endpoint', point: prevPoint } : { type: 'control', index: controlIndex - 1, point: prevPoint })
+      xBindings.push(
+        controlIndex === 0
+          ? { type: 'endpoint', point: prevPoint }
+          : { type: 'control', index: controlIndex - 1, point: prevPoint },
+      )
     } else if (prevAxis === 'y') {
-      yBindings.push(controlIndex === 0 ? { type: 'endpoint', point: prevPoint } : { type: 'control', index: controlIndex - 1, point: prevPoint })
+      yBindings.push(
+        controlIndex === 0
+          ? { type: 'endpoint', point: prevPoint }
+          : { type: 'control', index: controlIndex - 1, point: prevPoint },
+      )
     }
 
     if (nextAxis === 'x') {
@@ -822,7 +835,11 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
       )
     }
 
-    if ((prevAxis === null && nextAxis === null) || (prevAxis === null && nextAxis !== null) || (prevAxis !== null && nextAxis === null)) {
+    if (
+      (prevAxis === null && nextAxis === null) ||
+      (prevAxis === null && nextAxis !== null) ||
+      (prevAxis !== null && nextAxis === null)
+    ) {
       return null
     }
 
@@ -856,12 +873,7 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     return nextPoints
   }
 
-  function applyOrthogonalAxis(
-    axis: Axis,
-    current: Point,
-    nextPoints: Point[],
-    bindings: OrthogonalBinding[],
-  ): void {
+  function applyOrthogonalAxis(axis: Axis, current: Point, nextPoints: Point[], bindings: OrthogonalBinding[]): void {
     if (bindings.length === 0) return
 
     const endpointBinding = bindings.find(binding => binding.type === 'endpoint')
@@ -993,12 +1005,7 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     }
   }
 
-  function normalizeTextPosition(
-    textPosition: {
-      dx: number
-      dy: number
-    },
-  ): LinkerElement['textPosition'] {
+  function normalizeTextPosition(textPosition: { dx: number; dy: number }): LinkerElement['textPosition'] {
     if (isSameNumber(textPosition.dx, 0) && isSameNumber(textPosition.dy, 0)) {
       return undefined
     }

@@ -1,4 +1,5 @@
-import { calculateMoveGuideSnap, isShape, type GuideLine, type ShapeElement } from '@diagen/core'
+import { isShape, type ShapeElement } from '@diagen/core'
+import { calculateMoveGuideSnap, type GuideLine } from '@diagen/core/guide'
 import type { Bounds, Point } from '@diagen/shared'
 import { getRotatedBounds, unionBounds } from '@diagen/shared'
 import { batch, createSignal, onCleanup } from 'solid-js'

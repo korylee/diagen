@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createLinker, createShape, getShapeAnchorInfo, getShapePerimeterInfo } from '@diagen/core'
+import { createLinker, createShape } from '@diagen/core'
 import { rotatePoint } from '@diagen/shared'
 import { createRendererTestHarness } from '../.test/createRendererTestHarness'
 import { getLinkerTextBox } from '../utils'
+import { getShapePerimeterInfo, getShapeAnchorInfo } from '@diagen/core/anchors'
 
 type RendererHarness = Awaited<ReturnType<typeof createRendererTestHarness>>
 
@@ -734,27 +735,30 @@ describe('Renderer', () => {
     })
 
     try {
-      harness.designer.edit.add([
-        createLinker({
-          id: 'linker_edit_zoom_scroll',
-          name: 'linker_edit_zoom_scroll',
-          from: {
-            id: 'shape_linker_edit_source',
-            x: 200,
-            y: 140,
-            binding: { type: 'free' },
-          },
-          to: {
-            id: null,
-            x: 260,
-            y: 140,
-            binding: { type: 'free' },
-          },
-        }),
-      ], {
-        record: false,
-        select: false,
-      })
+      harness.designer.edit.add(
+        [
+          createLinker({
+            id: 'linker_edit_zoom_scroll',
+            name: 'linker_edit_zoom_scroll',
+            from: {
+              id: 'shape_linker_edit_source',
+              x: 200,
+              y: 140,
+              binding: { type: 'free' },
+            },
+            to: {
+              id: null,
+              x: 260,
+              y: 140,
+              binding: { type: 'free' },
+            },
+          }),
+        ],
+        {
+          record: false,
+          select: false,
+        },
+      )
       harness.designer.selection.replace(['linker_edit_zoom_scroll'])
       await Promise.resolve()
 
@@ -1591,7 +1595,9 @@ describe('Renderer', () => {
 
       await harness.dispatchSceneDoubleClickAtCanvas({ x: 140, y: 140 })
 
-      const editor = harness.overlayLayer.querySelector('textarea[data-text-editor="true"]') as HTMLTextAreaElement | null
+      const editor = harness.overlayLayer.querySelector(
+        'textarea[data-text-editor="true"]',
+      ) as HTMLTextAreaElement | null
       expect(editor).toBeTruthy()
       expect(editor?.value).toBe('开始')
 
@@ -1677,7 +1683,9 @@ describe('Renderer', () => {
 
       await harness.dispatchSceneDoubleClickAtCanvas({ x: 140, y: 140 })
 
-      const editor = harness.overlayLayer.querySelector('textarea[data-text-editor="true"]') as HTMLTextAreaElement | null
+      const editor = harness.overlayLayer.querySelector(
+        'textarea[data-text-editor="true"]',
+      ) as HTMLTextAreaElement | null
       expect(editor).toBeTruthy()
 
       editor!.value = '已取消'
@@ -1724,7 +1732,9 @@ describe('Renderer', () => {
 
       await harness.dispatchSceneDoubleClickAtCanvas({ x: 140, y: 140 })
 
-      const editor = harness.overlayLayer.querySelector('textarea[data-text-editor="true"]') as HTMLTextAreaElement | null
+      const editor = harness.overlayLayer.querySelector(
+        'textarea[data-text-editor="true"]',
+      ) as HTMLTextAreaElement | null
       expect(editor).toBeTruthy()
 
       editor!.value = '组合中'
@@ -1741,7 +1751,9 @@ describe('Renderer', () => {
       await flushMicrotasks()
 
       const duringComposition = harness.designer.getElementById('shape_composition_text')
-      expect(duringComposition && duringComposition.type === 'shape' ? duringComposition.textBlock[0]?.text : null).toBe('原文本')
+      expect(
+        duringComposition && duringComposition.type === 'shape' ? duringComposition.textBlock[0]?.text : null,
+      ).toBe('原文本')
       expect(harness.overlayLayer.querySelector('textarea[data-text-editor="true"]')).toBeTruthy()
 
       editor!.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }))
@@ -1786,7 +1798,9 @@ describe('Renderer', () => {
 
       await harness.dispatchSceneDoubleClickAtCanvas({ x: 140, y: 130 })
 
-      const editor = harness.overlayLayer.querySelector('textarea[data-text-editor="true"]') as HTMLTextAreaElement | null
+      const editor = harness.overlayLayer.querySelector(
+        'textarea[data-text-editor="true"]',
+      ) as HTMLTextAreaElement | null
       expect(editor).toBeTruthy()
 
       Object.defineProperty(editor!, 'scrollHeight', {
@@ -1823,14 +1837,10 @@ describe('Renderer', () => {
     }
 
     try {
-      const rotatedCenter = rotatePoint(
-        { x: block.x + block.w / 2, y: block.y + block.h / 2 },
-        shape.angle,
-        {
-          x: shape.w / 2,
-          y: shape.h / 2,
-        },
-      )
+      const rotatedCenter = rotatePoint({ x: block.x + block.w / 2, y: block.y + block.h / 2 }, shape.angle, {
+        x: shape.w / 2,
+        y: shape.h / 2,
+      })
 
       harness.designer.edit.add(
         [
@@ -1870,7 +1880,9 @@ describe('Renderer', () => {
         y: shape.y + rotatedCenter.y,
       })
 
-      const editor = harness.overlayLayer.querySelector('textarea[data-text-editor="true"]') as HTMLTextAreaElement | null
+      const editor = harness.overlayLayer.querySelector(
+        'textarea[data-text-editor="true"]',
+      ) as HTMLTextAreaElement | null
       expect(editor).toBeTruthy()
 
       const screenCenter = harness.designer.view.toScreen({
@@ -1931,7 +1943,9 @@ describe('Renderer', () => {
 
       await harness.dispatchSceneDoubleClickAtCanvas({ x: 260, y: 140 })
 
-      const editor = harness.overlayLayer.querySelector('textarea[data-text-editor="true"]') as HTMLTextAreaElement | null
+      const editor = harness.overlayLayer.querySelector(
+        'textarea[data-text-editor="true"]',
+      ) as HTMLTextAreaElement | null
       expect(editor).toBeTruthy()
       expect(editor?.value).toBe('原连线')
 
@@ -1984,7 +1998,9 @@ describe('Renderer', () => {
 
       await harness.dispatchSceneDoubleClickAtCanvas({ x: 260, y: 140 })
 
-      const editor = harness.overlayLayer.querySelector('textarea[data-text-editor="true"]') as HTMLTextAreaElement | null
+      const editor = harness.overlayLayer.querySelector(
+        'textarea[data-text-editor="true"]',
+      ) as HTMLTextAreaElement | null
       expect(editor).toBeTruthy()
 
       Object.defineProperty(editor!, 'scrollWidth', {
@@ -2047,7 +2063,9 @@ describe('Renderer', () => {
 
       await harness.dispatchSceneDoubleClickAtCanvas({ x: 300, y: 120 })
 
-      const editor = harness.overlayLayer.querySelector('textarea[data-text-editor="true"]') as HTMLTextAreaElement | null
+      const editor = harness.overlayLayer.querySelector(
+        'textarea[data-text-editor="true"]',
+      ) as HTMLTextAreaElement | null
       expect(editor).toBeTruthy()
 
       Object.defineProperty(editor!, 'scrollWidth', {
@@ -2166,7 +2184,9 @@ describe('Renderer', () => {
 
       await harness.dispatchSceneDoubleClickAtCanvas({ x: 300, y: 120 })
 
-      const editor = harness.overlayLayer.querySelector('textarea[data-text-editor="true"]') as HTMLTextAreaElement | null
+      const editor = harness.overlayLayer.querySelector(
+        'textarea[data-text-editor="true"]',
+      ) as HTMLTextAreaElement | null
       expect(editor).toBeTruthy()
 
       const linker = harness.designer.getElementById('linker_text_position')
@@ -2335,7 +2355,10 @@ describe('Renderer', () => {
               y: 220,
               binding: { type: 'free' },
             },
-            points: [{ x: 160, y: 100 }, { x: 160, y: 220 }],
+            points: [
+              { x: 160, y: 100 },
+              { x: 160, y: 220 },
+            ],
           }),
         ],
         {
@@ -2347,11 +2370,16 @@ describe('Renderer', () => {
 
       await harness.dispatchSceneDoubleClickAtCanvas({ x: 190, y: 150 })
 
-      const editor = harness.overlayLayer.querySelector('textarea[data-text-editor="true"]') as HTMLTextAreaElement | null
+      const editor = harness.overlayLayer.querySelector(
+        'textarea[data-text-editor="true"]',
+      ) as HTMLTextAreaElement | null
       expect(editor).toBeTruthy()
 
       harness.designer.edit.update('linker_edit_follow_route', {
-        points: [{ x: 200, y: 100 }, { x: 200, y: 220 }],
+        points: [
+          { x: 200, y: 100 },
+          { x: 200, y: 220 },
+        ],
       })
       await flushMicrotasks()
       await flushMicrotasks()
@@ -2400,7 +2428,10 @@ describe('Renderer', () => {
               y: 220,
               binding: { type: 'free' },
             },
-            points: [{ x: 160, y: 100 }, { x: 160, y: 220 }],
+            points: [
+              { x: 160, y: 100 },
+              { x: 160, y: 220 },
+            ],
           }),
         ],
         {
@@ -2412,7 +2443,9 @@ describe('Renderer', () => {
 
       await harness.dispatchSceneDoubleClickAtCanvas({ x: 160, y: 160 })
 
-      const editor = harness.overlayLayer.querySelector('textarea[data-text-editor="true"]') as HTMLTextAreaElement | null
+      const editor = harness.overlayLayer.querySelector(
+        'textarea[data-text-editor="true"]',
+      ) as HTMLTextAreaElement | null
       expect(editor).toBeTruthy()
 
       const linker = harness.designer.getElementById('linker_broken_text')
@@ -2465,7 +2498,9 @@ describe('Renderer', () => {
 
       await harness.dispatchSceneDoubleClickAtCanvas({ x: 140, y: 140 })
 
-      const editor = harness.overlayLayer.querySelector('textarea[data-text-editor="true"]') as HTMLTextAreaElement | null
+      const editor = harness.overlayLayer.querySelector(
+        'textarea[data-text-editor="true"]',
+      ) as HTMLTextAreaElement | null
       expect(editor).toBeTruthy()
 
       editor!.value = '点击提交'
@@ -2507,7 +2542,9 @@ describe('Renderer', () => {
 
       await harness.dispatchSceneDoubleClickAtCanvas({ x: 140, y: 140 })
 
-      const editor = harness.overlayLayer.querySelector('textarea[data-text-editor="true"]') as HTMLTextAreaElement | null
+      const editor = harness.overlayLayer.querySelector(
+        'textarea[data-text-editor="true"]',
+      ) as HTMLTextAreaElement | null
       expect(editor).toBeTruthy()
 
       editor!.value = '切工具提交'
@@ -2557,7 +2594,9 @@ describe('Renderer', () => {
 
       await harness.dispatchSceneDoubleClickAtCanvas({ x: 140, y: 140 })
 
-      const editor = harness.overlayLayer.querySelector('textarea[data-text-editor="true"]') as HTMLTextAreaElement | null
+      const editor = harness.overlayLayer.querySelector(
+        'textarea[data-text-editor="true"]',
+      ) as HTMLTextAreaElement | null
       expect(editor).toBeTruthy()
 
       editor!.value = '切选中提交'
@@ -2613,7 +2652,9 @@ describe('Renderer', () => {
 
       await harness.dispatchSceneDoubleClickAtCanvas({ x: 140, y: 140 })
 
-      const editor = harness.overlayLayer.querySelector('textarea[data-text-editor="true"]') as HTMLTextAreaElement | null
+      const editor = harness.overlayLayer.querySelector(
+        'textarea[data-text-editor="true"]',
+      ) as HTMLTextAreaElement | null
       expect(editor).toBeTruthy()
 
       editor!.value = '右键提交'

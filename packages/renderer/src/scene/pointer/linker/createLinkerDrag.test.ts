@@ -1,15 +1,8 @@
 import { createRoot } from 'solid-js'
 import { describe, expect, it, vi } from 'vitest'
-import {
-  createDesigner,
-  createLinker,
-  createShape,
-  getShapeAnchorInfo,
-  getShapePerimeterInfo,
-  resolvePreferredCreateAnchor,
-  type LinkerElement,
-} from '@diagen/core'
+import { createDesigner, createLinker, createShape, type LinkerElement } from '@diagen/core'
 import { createLinkerDrag } from './createLinkerDrag'
+import { getShapeAnchorInfo, getShapePerimeterInfo, resolvePreferredCreateAnchor } from '@diagen/core/anchors'
 
 const testContext = vi.hoisted(() => ({
   designer: null as ReturnType<typeof createDesigner> | null,
