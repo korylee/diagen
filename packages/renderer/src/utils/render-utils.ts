@@ -1,15 +1,13 @@
 import {
-  resolvePathActions,
-  resolvePathValue,
   type FillStyle,
   type FontStyle,
   type LineStyle,
   type LinkerElement,
   type LinkerRoute,
-  type ResolvedPathAction,
   type ShapeElement,
 } from '@diagen/core'
 import { getLinkerTextBox } from './linkerText'
+import { resolvePathActions, type ResolvedPathAction, resolvePathValue } from '@diagen/core/path'
 
 export function parseColor(color: string | undefined): string {
   if (!color) return 'rgba(0,0,0,1)'
@@ -284,6 +282,7 @@ export function renderLinker(ctx: CanvasRenderingContext2D, linker: LinkerElemen
   if (text) {
     const box = getLinkerTextBox(route, text, fontStyle, {
       curved: linkerType === 'curved',
+      textPosition: linker.textPosition,
       measureText: line => ctx.measureText(line).width,
     })
     if (!box) {

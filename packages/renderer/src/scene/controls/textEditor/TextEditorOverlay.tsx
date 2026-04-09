@@ -101,6 +101,7 @@ export function TextEditorOverlay(props: {
       const fontStyle = element.fontStyle
       const box = getLinkerTextBox(route, props.draft(), fontStyle, {
         curved: element.linkerType === 'curved',
+        textPosition: element.textPosition,
       })
       if (!box) return null
 

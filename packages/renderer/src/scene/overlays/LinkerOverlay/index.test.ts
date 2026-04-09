@@ -43,27 +43,58 @@ describe('LinkerOverlay', () => {
       harness.designer.selection.replace([linker.id])
       await flushEffects()
 
-      const storedLinker = harness.designer.element.getElementById(linker.id) as { points?: Array<{ x: number; y: number }> } | undefined
+      const storedLinker = harness.designer.element.getElementById(linker.id) as
+        | { points?: Array<{ x: number; y: number }> }
+        | undefined
       expect(storedLinker?.points ?? []).toHaveLength(2)
 
       const fromHandle = harness.overlayLayer.querySelector('.dg-linker-overlay__from-endpoint')
       const toHandle = harness.overlayLayer.querySelector('.dg-linker-overlay__to-endpoint')
       const path = harness.overlayLayer.querySelector('path')
-      const overlayRoot = path?.closest('div')
-      const controlHandles =
-        overlayRoot == null
-          ? []
-          : Array.from(overlayRoot.children).filter((node): node is HTMLElement => {
-              if (!(node instanceof HTMLElement) || node.tagName !== 'DIV') return false
-              if (node.className.length > 0) return false
-              const styleText = (node.getAttribute('style') ?? '').replace(/\s+/g, '')
-              return styleText.startsWith('left:') && styleText.includes('top:')
-            })
+      const controlHandles = harness.overlayLayer.querySelectorAll('.dg-linker-overlay__control-point')
 
       expect(fromHandle).toBeTruthy()
       expect(toHandle).toBeTruthy()
       expect(path).toBeTruthy()
       expect(controlHandles).toHaveLength(2)
+    } finally {
+      harness.dispose()
+    }
+  })
+
+  it('选中带文本的连线时应渲染标签框反馈', async () => {
+    const harness = await createRendererTestHarness()
+
+    try {
+      const linker = createLinker({
+        id: 'linker_overlay_text_box',
+        name: 'linker_overlay_text_box',
+        linkerType: 'straight',
+        text: '标签',
+        textPosition: {
+          dx: 20,
+          dy: -10,
+        },
+        from: {
+          id: null,
+          x: 100,
+          y: 100,
+          binding: { type: 'free' },
+        },
+        to: {
+          id: null,
+          x: 240,
+          y: 100,
+          binding: { type: 'free' },
+        },
+      })
+
+      harness.designer.edit.add([linker], { record: false, select: false })
+      harness.designer.selection.replace([linker.id])
+      await flushEffects()
+
+      const textBox = harness.overlayLayer.querySelector('.dg-linker-overlay__text-box')
+      expect(textBox).toBeTruthy()
     } finally {
       harness.dispose()
     }
@@ -109,6 +140,63 @@ describe('LinkerOverlay', () => {
       await harness.dispatchWindowMouseMoveAtCanvas({ x: 180, y: 120 })
       await harness.dispatchWindowMouseUp()
       expect(interaction.pointer.machine.mode()).toBe('idle')
+    } finally {
+      harness.dispose()
+    }
+  })
+
+  it('双击 broken 连线控制点后应删除该点并更新 overlay', async () => {
+    const harness = await createRendererTestHarness({
+      shapes: [
+        { id: 'shape_control_remove_a', x: 100, y: 100, w: 100, h: 80 },
+        { id: 'shape_control_remove_b', x: 320, y: 100, w: 100, h: 80 },
+      ],
+    })
+
+    try {
+      const linker = createLinker({
+        id: 'linker_overlay_remove_control',
+        name: 'linker_overlay_remove_control',
+        linkerType: 'broken',
+        from: {
+          id: 'shape_control_remove_a',
+          x: 200,
+          y: 140,
+          binding: { type: 'free' },
+        },
+        to: {
+          id: 'shape_control_remove_b',
+          x: 320,
+          y: 140,
+          binding: { type: 'free' },
+        },
+        points: [
+          { x: 240, y: 90 },
+          { x: 280, y: 190 },
+        ],
+      })
+
+      harness.designer.edit.add([linker], { record: false, select: false })
+      harness.designer.selection.replace([linker.id])
+      await flushEffects()
+
+      const controlHandle = harness.overlayLayer.querySelector(
+        '.dg-linker-overlay__control-point[data-linker-control-index="0"]',
+      ) as HTMLElement | null
+      expect(controlHandle).toBeTruthy()
+
+      controlHandle!.dispatchEvent(
+        new MouseEvent('dblclick', {
+          bubbles: true,
+          cancelable: true,
+        }),
+      )
+      await flushEffects()
+
+      const storedLinker = harness.designer.element.getElementById(linker.id) as
+        | { points?: Array<{ x: number; y: number }> }
+        | undefined
+      expect(storedLinker?.points).toEqual([{ x: 280, y: 190 }])
     } finally {
       harness.dispose()
     }

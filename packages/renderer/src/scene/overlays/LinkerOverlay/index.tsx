@@ -3,6 +3,7 @@ import { type Point } from '@diagen/shared'
 import { createMemo } from 'solid-js'
 import { useDesigner } from '../../../context/DesignerProvider'
 import { useInteraction } from '../../../context/InteractionProvider'
+import { getLinkerTextBox } from '../../../utils'
 import type { RectHighlightItem } from '../RectHighlightOverlay'
 import { createRoutePath } from './createRoutePath'
 import { LinkQuickCreatePanel } from './LinkQuickCreatePanel'
@@ -171,6 +172,31 @@ export function LinkerOverlay() {
       canvas: point,
     }))
   })
+  const textBounds = createMemo(() => {
+    const linker = selectedLinker()
+    const routeValue = route()
+    if (!linker || !routeValue) return null
+
+    const box = getLinkerTextBox(routeValue, linker.text, linker.fontStyle, {
+      curved: linker.linkerType === 'curved',
+      textPosition: linker.textPosition,
+    })
+    if (!box) return null
+
+    const bounds = coordinate.canvasToScreen({
+      x: box.x,
+      y: box.y,
+      w: box.w,
+      h: box.h,
+    })
+
+    return {
+      x: bounds.x,
+      y: bounds.y,
+      w: bounds.w,
+      h: bounds.h,
+    }
+  })
   const snapTarget = createMemo(() => pointer.linkerDrag.snapTarget())
   const fixedSnapTarget = createMemo(() => {
     const candidate = snapTarget()
@@ -247,7 +273,16 @@ export function LinkerOverlay() {
     })
   }
 
-  const selectedLinkerOverlay = createMemo(() => {
+  const removeControlPoint = (e: MouseEvent, index: number) => {
+    const linker = selectedLinker()
+    if (!linker) return
+
+    e.stopPropagation()
+    e.preventDefault()
+    pointer.linkerDrag.removeControlPoint(linker.id, index)
+  }
+
+  const overlayModel = createMemo(() => {
     const handles = endpointHandles()
     if (!selectedLinker() || !handles) return null
 
@@ -255,6 +290,7 @@ export function LinkerOverlay() {
       routePath: routePath(),
       endpointHandles: handles,
       controlHandles: controlHandles(),
+      textBounds: textBounds(),
       anchorItems: anchorItems(),
     }
   })
@@ -270,9 +306,10 @@ export function LinkerOverlay() {
       <LinkQuickCreatePanel panel={quickCreatePanel()} onStart={startQuickCreate} />
 
       <SelectedLinkerOverlay
-        model={selectedLinkerOverlay()}
+        model={overlayModel()}
         onStartEndpointDrag={startEndpointDrag}
         onStartControlDrag={(event, handle) => startControlDrag(event, handle.index, handle.canvas)}
+        onRemoveControlPoint={(event, handle) => removeControlPoint(event, handle.index)}
       />
     </>
   )

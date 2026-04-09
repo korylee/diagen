@@ -141,4 +141,86 @@ describe('scene-hit-test', () => {
     expect(hit?.type).toBe('linker')
     expect(hit?.element.id).toBe(upper.id)
   })
+
+  it('标签区域与 segment 热区重叠时，应优先返回 text 命中', () => {
+    const linker = createLinker('text_over_segment')
+    linker.linkerType = 'straight'
+    linker.text = '标签'
+    const route = createRoute([
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+    ])
+
+    const hit = hitTestScene(
+      [linker],
+      { x: 50, y: 0 },
+      {
+        zoom: 1,
+        getLinkerLayout: () => ({
+          route,
+          bounds: createBounds(route.points),
+        }),
+      },
+    )
+
+    expect(hit?.type).toBe('linker')
+    expect(hit?.hit.type).toBe('text')
+  })
+
+  it('标签区域覆盖端点时，应优先返回端点命中', () => {
+    const linker = createLinker('text_over_endpoint')
+    linker.linkerType = 'straight'
+    linker.text = '标签'
+    linker.textPosition = {
+      dx: -50,
+      dy: 0,
+    }
+    const route = createRoute([
+      { x: 0, y: 0 },
+      { x: 100, y: 0 },
+    ])
+
+    const hit = hitTestScene(
+      [linker],
+      { x: 0, y: 0 },
+      {
+        zoom: 1,
+        getLinkerLayout: () => ({
+          route,
+          bounds: createBounds(route.points),
+        }),
+      },
+    )
+
+    expect(hit?.type).toBe('linker')
+    expect(hit?.hit.type).toBe('from')
+  })
+
+  it('标签区域覆盖控制点时，应优先返回控制点命中', () => {
+    const linker = createLinker('text_over_control')
+    linker.linkerType = 'broken'
+    linker.text = '标签'
+    linker.points = [{ x: 50, y: 0 }]
+    const route = createRoute([
+      { x: 0, y: 0 },
+      { x: 50, y: 0 },
+      { x: 100, y: 0 },
+    ])
+
+    const hit = hitTestScene(
+      [linker],
+      { x: 50, y: 0 },
+      {
+        zoom: 1,
+        getLinkerLayout: () => ({
+          route,
+          bounds: createBounds(route.points),
+        }),
+      },
+    )
+
+    expect(hit?.type).toBe('linker')
+    expect(hit?.hit.type).toBe('control')
+    expect(hit?.hit.controlIndex).toBe(0)
+  })
 })

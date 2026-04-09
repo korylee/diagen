@@ -77,6 +77,31 @@ describe('renderLinker', () => {
     expect(box?.cy).toBeCloseTo(20)
   })
 
+  it('连线文本框应叠加正式偏移量', () => {
+    const box = getLinkerTextBox(
+      {
+        points: [
+          { x: 0, y: 0 },
+          { x: 100, y: 0 },
+        ],
+        fromAngle: 0,
+        toAngle: 0,
+      },
+      '文本',
+      createStraightLinkerById('linker_text_position').fontStyle,
+      {
+        textPosition: {
+          dx: 24,
+          dy: -18,
+        },
+      },
+    )
+
+    expect(box).toBeTruthy()
+    expect(box?.cx).toBeCloseTo(74)
+    expect(box?.cy).toBeCloseTo(-18)
+  })
+
   it('应按顺序绘制水平 line jump', () => {
     const ctx = createContextMock()
     const linker = createStraightLinkerById('render_jump_horizontal')
@@ -194,6 +219,45 @@ describe('renderLinker', () => {
     ])
   })
 
+  it('反向垂直 segment 也应保持 jump 顺序稳定', () => {
+    const ctx = createContextMock()
+    const linker = createStraightLinkerById('render_jump_vertical_reverse')
+
+    renderLinker(ctx, linker, {
+      points: [
+        { x: 50, y: 100 },
+        { x: 50, y: 0 },
+      ],
+      fromAngle: 0,
+      toAngle: 0,
+      jumps: [
+        {
+          segmentIndex: 0,
+          center: { x: 50, y: 52 },
+          orientation: 'vertical',
+          radius: 4,
+        },
+        {
+          segmentIndex: 0,
+          center: { x: 50, y: 40 },
+          orientation: 'vertical',
+          radius: 4,
+        },
+      ],
+    })
+
+    expect(ctx.moveTo).toHaveBeenCalledWith(50, 100)
+    expect(ctx.lineTo.mock.calls).toEqual([
+      [50, 56],
+      [50, 44],
+      [50, 0],
+    ])
+    expect(ctx.quadraticCurveTo.mock.calls).toEqual([
+      [54, 52, 50, 48],
+      [54, 40, 50, 36],
+    ])
+  })
+
   it('连线文本应支持多行绘制，并使用共享文本框布局', () => {
     const ctx = createContextMock()
     const linker = createStraightLinkerById('render_multiline_text')
@@ -213,5 +277,28 @@ describe('renderLinker', () => {
     expect(ctx.fillText).toHaveBeenCalledTimes(2)
     expect(ctx.fillText).toHaveBeenNthCalledWith(1, '第一行', 50, expect.any(Number))
     expect(ctx.fillText).toHaveBeenNthCalledWith(2, '第二行', 50, expect.any(Number))
+  })
+
+  it('连线文本绘制应使用正式偏移后的中心点', () => {
+    const ctx = createContextMock()
+    const linker = createStraightLinkerById('render_positioned_text')
+    linker.text = '标签'
+    linker.textPosition = {
+      dx: 30,
+      dy: -12,
+    }
+    ctx.measureText = vi.fn(() => ({ width: 20 })) as unknown as typeof ctx.measureText
+
+    renderLinker(ctx, linker, {
+      points: [
+        { x: 0, y: 0 },
+        { x: 100, y: 0 },
+      ],
+      fromAngle: 0,
+      toAngle: 0,
+    })
+
+    expect(ctx.fillRect).toHaveBeenCalledWith(expect.any(Number), expect.any(Number), expect.any(Number), expect.any(Number))
+    expect(ctx.fillText).toHaveBeenCalledWith('标签', 80, -12)
   })
 })

@@ -45,9 +45,17 @@ export interface LinkerControlHandle {
   }
 }
 
+export interface LinkerTextBounds {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
 export interface SelectedLinkerOverlayModel {
   routePath: string
   endpointHandles: LinkerEndpointHandles
   controlHandles: LinkerControlHandle[]
+  textBounds: LinkerTextBounds | null
   anchorItems: RectHighlightItem[]
 }

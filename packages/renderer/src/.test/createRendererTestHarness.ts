@@ -168,6 +168,7 @@ export async function createRendererTestHarness(options: CreateRendererTestHarne
   canvasToClient: (point: Point) => Point
   getOverlayElementsByCursor: (cursor: string) => HTMLElement[]
   dispatchSceneMouseDownAtCanvas: (point: Point, init?: MouseEventInit) => Promise<MouseEvent>
+  dispatchSceneMouseMoveAtCanvas: (point: Point, init?: MouseEventInit) => Promise<MouseEvent>
   dispatchSceneDoubleClickAtCanvas: (point: Point, init?: MouseEventInit) => Promise<MouseEvent>
   dispatchSceneContextMenuAtCanvas: (point: Point, init?: MouseEventInit) => Promise<MouseEvent>
   dispatchElementMouseDownAtClient: (element: HTMLElement, point: Point, init?: MouseEventInit) => Promise<MouseEvent>
@@ -310,6 +311,10 @@ export async function createRendererTestHarness(options: CreateRendererTestHarne
     return dispatchMouseEvent(sceneLayer, 'mousedown', canvasToClient(point), init)
   }
 
+  async function dispatchSceneMouseMoveAtCanvas(point: Point, init: MouseEventInit = {}): Promise<MouseEvent> {
+    return dispatchMouseEvent(sceneLayer, 'mousemove', canvasToClient(point), init)
+  }
+
   async function dispatchSceneDoubleClickAtCanvas(point: Point, init: MouseEventInit = {}): Promise<MouseEvent> {
     return dispatchMouseEvent(sceneLayer, 'dblclick', canvasToClient(point), init)
   }
@@ -383,6 +388,7 @@ export async function createRendererTestHarness(options: CreateRendererTestHarne
     canvasToClient,
     getOverlayElementsByCursor,
     dispatchSceneMouseDownAtCanvas,
+    dispatchSceneMouseMoveAtCanvas,
     dispatchSceneDoubleClickAtCanvas,
     dispatchSceneContextMenuAtCanvas,
     dispatchElementMouseDownAtClient,

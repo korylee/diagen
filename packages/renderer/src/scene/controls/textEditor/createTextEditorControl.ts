@@ -1,7 +1,7 @@
 import { isLinker, isShape } from '@diagen/core'
 import type { Point } from '@diagen/shared'
 import { createEffect, createMemo, createSignal } from 'solid-js'
-import { getLinkerTextBox, hitTestScene, isPointInShapeTextBox } from '../../../utils'
+import { getLinkerTextBox, hitTestScene, isPointInLinkerTextBox, isPointInShapeTextBox } from '../../../utils'
 import { useDesigner } from '../../../context/DesignerProvider'
 import type { Interaction } from '../../../context/InteractionProvider'
 
@@ -32,10 +32,10 @@ function shouldOpenTextEditor(params: {
 
   const box = getLinkerTextBox(sceneHit.route, sceneHit.element.text, sceneHit.element.fontStyle, {
     curved: sceneHit.element.linkerType === 'curved',
+    textPosition: sceneHit.element.textPosition,
   })
   if (!box) return false
-
-  return point.x >= box.x && point.x <= box.x + box.w && point.y >= box.y && point.y <= box.y + box.h
+  return isPointInLinkerTextBox(point, box)
 }
 
 export function createTextEditorControl(params: { interaction: Interaction }) {

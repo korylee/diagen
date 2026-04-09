@@ -49,4 +49,13 @@
     cursor: crosshair;
     pointer-events: auto;
   }
+
+  &__text-box {
+    transform: translateZ(0);
+    border: 1px dashed rgba(6, 123, 239, 0.75);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.35);
+    pointer-events: none;
+    box-sizing: border-box;
+  }
 }

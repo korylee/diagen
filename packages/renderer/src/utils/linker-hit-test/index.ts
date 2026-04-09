@@ -1,7 +1,7 @@
 import type { LinkerElement, LinkerRoute } from '@diagen/core'
 import { getDistance, type Point } from '@diagen/shared'
 
-export type LinkerHitType = 'from' | 'to' | 'control' | 'segment' | 'line'
+export type LinkerHitType = 'from' | 'to' | 'control' | 'segment' | 'line' | 'text'
 
 export interface LinkerHit {
   type: LinkerHitType

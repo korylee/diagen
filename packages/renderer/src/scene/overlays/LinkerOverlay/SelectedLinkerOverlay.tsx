@@ -9,6 +9,7 @@ export function SelectedLinkerOverlay(props: {
   model: SelectedLinkerOverlayModel | null
   onStartEndpointDrag: (event: MouseEvent, type: 'from' | 'to') => void
   onStartControlDrag: (event: MouseEvent, handle: LinkerControlHandle) => void
+  onRemoveControlPoint: (event: MouseEvent, handle: LinkerControlHandle) => void
 }) {
   return (
     <Show when={props.model}>
@@ -69,6 +70,8 @@ export function SelectedLinkerOverlay(props: {
             <For each={model.controlHandles}>
               {handle => (
                 <div
+                  class={bem('control-point')}
+                  data-linker-control-index={handle.index}
                   style={{
                     position: 'absolute',
                     left: `${handle.screen.x}px`,
@@ -83,9 +86,25 @@ export function SelectedLinkerOverlay(props: {
                     'pointer-events': 'auto',
                   }}
                   onMouseDown={event => props.onStartControlDrag(event, handle)}
+                  onDblClick={event => props.onRemoveControlPoint(event, handle)}
                 />
               )}
             </For>
+
+            <Show when={model.textBounds}>
+              {textBounds => (
+                <div
+                  class={bem('text-box')}
+                  style={{
+                    position: 'absolute',
+                    left: `${textBounds().x}px`,
+                    top: `${textBounds().y}px`,
+                    width: `${textBounds().w}px`,
+                    height: `${textBounds().h}px`,
+                  }}
+                />
+              )}
+            </Show>
 
             <RectHighlightOverlay items={model.anchorItems} visible={model.anchorItems.length > 0} zIndex={9998} />
           </div>

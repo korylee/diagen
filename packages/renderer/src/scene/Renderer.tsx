@@ -1,28 +1,35 @@
 import { DesignerToolState } from '@diagen/core'
 import { createEventListener, createKeyboard } from '@diagen/primitives'
 import { createDgBem, type Point } from '@diagen/shared'
-import { createEffect, createMemo, createSignal, JSX, onCleanup, onMount } from 'solid-js'
+import { createEffect, createMemo, createSignal, JSX, onCleanup, onMount, Show } from 'solid-js'
 import { isServer } from 'solid-js/web'
+import { hitTestScene } from '../utils'
 import { CanvasRenderer } from '../canvas'
 import { InteractionProvider } from '../context'
 import { useDesigner } from '../context/DesignerProvider'
+import { TextEditorOverlay } from './controls/textEditor'
 import { createSceneContextMenu } from './events/createSceneContextMenu'
 import { createSceneMouseDown } from './events/createSceneMouseDown'
 import { createTextEditorControl } from './controls/textEditor'
 import { createPointerInteraction } from './pointer'
-import { OverlayRoot } from './overlays/OverlayRoot'
+import { BoxSelectionOverlay } from './overlays/BoxSelectionOverlay'
+import { GuideOverlay } from './overlays/GuideOverlay'
+import { LinkerOverlay } from './overlays/LinkerOverlay'
+import { ShapeSelectionOverlay } from './overlays/ShapeSelectionOverlay'
 import { DesignerGrids } from './parts/DesignerGrids'
 import { createAutoScroll } from './services/createAutoScroll'
 import { createCoordinateService } from './services/createCoordinateService'
 import './Renderer.scss'
 
-function getCursor(params: { isGrabbing: boolean; toolType: DesignerToolState['type'] }) {
-  const { isGrabbing, toolType } = params
+function getCursor(params: { isGrabbing: boolean; toolType: DesignerToolState['type']; hoverCursor: string | null }) {
+  const { isGrabbing, toolType, hoverCursor } = params
   if (isGrabbing) return 'grabbing'
 
   if (toolType === 'create-shape' || toolType === 'create-linker') {
     return 'crosshair'
   }
+
+  if (hoverCursor) return hoverCursor
 
   return 'default'
 }
@@ -52,10 +59,12 @@ export function Renderer(props: {
   /** 右键菜单上下文请求 */
   onContextMenu?: (request: RendererContextMenuRequest) => void
 }) {
-  const { selection, edit, view, state, history, tool, clipboard } = useDesigner()
+  const { selection, edit, view, state, history, tool, clipboard, element } = useDesigner()
 
   const [viewportRef, setViewportRef] = createSignal<HTMLDivElement | null>(null)
+  const [containerRef, setContainerRef] = createSignal<HTMLDivElement | null>(null)
   const [sceneRef, setSceneRef] = createSignal<HTMLDivElement | null>(null)
+  const [hoverCursor, setHoverCursor] = createSignal<string | null>(null)
   const coordinate = createCoordinateService({
     viewportRef,
     sceneLayerRef: sceneRef,
@@ -133,6 +142,7 @@ export function Renderer(props: {
       cursor: getCursor({
         isGrabbing: pointer.machine.shouldShowGrabbingCursor(),
         toolType: state.tool.type,
+        hoverCursor: hoverCursor(),
       }),
     } as const
   })
@@ -196,6 +206,32 @@ export function Renderer(props: {
       const newZoom = Math.max(0.1, Math.min(5, view.transform().zoom + delta))
       view.setZoom(newZoom, coordinate.eventToCanvas(e))
     }
+  }
+
+  const updateHoverCursor = (event: MouseEvent) => {
+    if (pointer.machine.isActive() || textEditor.isEditing() || !tool.isIdle()) {
+      setHoverCursor(null)
+      return
+    }
+
+    const container = containerRef()
+    if (!container) {
+      setHoverCursor(null)
+      return
+    }
+
+    const target = event.target
+    if (!(target instanceof Node) || !container.contains(target)) {
+      setHoverCursor(null)
+      return
+    }
+
+    const sceneHit = hitTestScene(element.elements(), coordinate.eventToCanvas(event), {
+      zoom: view.transform().zoom,
+      getLinkerLayout: linker => view.getLinkerLayout(linker),
+    })
+
+    setHoverCursor(sceneHit?.type === 'linker' && sceneHit.hit.type === 'text' ? 'move' : null)
   }
 
   if (!isServer) {
@@ -262,6 +298,7 @@ export function Renderer(props: {
       <div ref={setViewportRef} class={bem('viewport')}>
         {/*滚动容器*/}
         <div
+          ref={setContainerRef}
           style={containerStyle()}
           class={bem('container')}
           onMouseDown={onMouseDown}
@@ -279,6 +316,10 @@ export function Renderer(props: {
             ref={setSceneRef}
             class={bem('scene')}
             style={sceneStyle()}
+            onMouseMove={updateHoverCursor}
+            onMouseLeave={() => {
+              setHoverCursor(null)
+            }}
             on:mousedown={e => {
               if (textEditor.onMouseDown(e)) return
               onSceneMouseDown(e)
@@ -289,17 +330,26 @@ export function Renderer(props: {
           </div>
 
           {/*交互覆盖层（屏幕坐标，不做 transform）*/}
-          <OverlayRoot
-            style={overlayStyle()}
-            isEditing={textEditor.isEditing}
-            session={textEditor.session}
-            draft={textEditor.draft}
-            setDraft={textEditor.setDraft}
-            commit={textEditor.commit}
-            cancel={textEditor.cancel}
-          >
+          <div class="dg-renderer__overlay" style={overlayStyle()}>
+            <Show when={!textEditor.isEditing()}>
+              <BoxSelectionOverlay />
+              <GuideOverlay />
+              <LinkerOverlay />
+              <ShapeSelectionOverlay />
+            </Show>
+
+            <Show when={textEditor.session()}>
+              <TextEditorOverlay
+                session={textEditor.session}
+                draft={textEditor.draft}
+                setDraft={textEditor.setDraft}
+                commit={textEditor.commit}
+                cancel={textEditor.cancel}
+              />
+            </Show>
+
             {props.overlay}
-          </OverlayRoot>
+          </div>
         </div>
       </div>
     </InteractionProvider>

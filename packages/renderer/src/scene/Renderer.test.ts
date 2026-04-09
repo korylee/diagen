@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createLinker, createShape } from '@diagen/core'
+import { createLinker, createShape, getShapeAnchorInfo, getShapePerimeterInfo } from '@diagen/core'
 import { rotatePoint } from '@diagen/shared'
 import { createRendererTestHarness } from '../.test/createRendererTestHarness'
 import { getLinkerTextBox } from '../utils'
@@ -784,6 +784,428 @@ describe('Renderer', () => {
       expectLinkerEndpoint(harness, 'linker_edit_zoom_scroll', 'to', {
         id: 'shape_linker_edit_target',
       })
+    } finally {
+      harness.dispose()
+    }
+  })
+
+  it('拖拽 fixed 端点到空白区域后应解除绑定，并支持 undo/redo', async () => {
+    const harness = await createRendererTestHarness({
+      shapes: [
+        { id: 'shape_linker_fixed_source', x: 100, y: 100, w: 100, h: 80 },
+        { id: 'shape_linker_fixed_target', x: 340, y: 100, w: 100, h: 80 },
+      ],
+    })
+
+    try {
+      const sourceShape = harness.designer.getElementById('shape_linker_fixed_source')
+      expect(sourceShape?.type).toBe('shape')
+      if (!sourceShape || sourceShape.type !== 'shape') {
+        throw new Error('shape_linker_fixed_source 未找到')
+      }
+
+      const sourceAnchor = getShapeAnchorInfo(sourceShape, 1)
+      expect(sourceAnchor).toBeTruthy()
+      if (!sourceAnchor) {
+        throw new Error('shape_linker_fixed_source 锚点未找到')
+      }
+
+      harness.designer.edit.add(
+        [
+          createLinker({
+            id: 'linker_fixed_to_free',
+            name: 'linker_fixed_to_free',
+            from: {
+              id: sourceShape.id,
+              x: sourceAnchor.point.x,
+              y: sourceAnchor.point.y,
+              angle: sourceAnchor.angle,
+              binding: {
+                type: 'fixed',
+                anchorId: sourceAnchor.id,
+              },
+            },
+            to: {
+              id: null,
+              x: 260,
+              y: 200,
+              binding: { type: 'free' },
+            },
+          }),
+        ],
+        {
+          record: false,
+          select: false,
+        },
+      )
+      harness.designer.selection.replace(['linker_fixed_to_free'])
+      await Promise.resolve()
+
+      const endpoint = harness.overlayLayer.querySelector('.dg-linker-overlay__from-endpoint') as HTMLElement | null
+      expect(endpoint).toBeTruthy()
+
+      await harness.dispatchElementMouseDownAtClient(endpoint!, harness.canvasToClient(sourceAnchor.point))
+      await harness.dispatchWindowMouseMoveAtCanvas({ x: 40, y: 40 })
+      await harness.dispatchWindowMouseUp()
+
+      const moved = harness.designer.getElementById('linker_fixed_to_free')
+      expect(moved?.type).toBe('linker')
+      if (!moved || moved.type !== 'linker') {
+        throw new Error('linker_fixed_to_free 未找到')
+      }
+
+      expect(moved.from.id).toBeNull()
+      expect(moved.from.binding).toEqual({ type: 'free' })
+      expect(moved.from.x).toBe(40)
+      expect(moved.from.y).toBe(40)
+      expect(harness.designer.history.undoStack()).toHaveLength(1)
+
+      harness.designer.undo()
+      const undone = harness.designer.getElementById('linker_fixed_to_free')
+      expect(undone?.type).toBe('linker')
+      if (!undone || undone.type !== 'linker') {
+        throw new Error('linker_fixed_to_free undo 后未找到')
+      }
+
+      expect(undone.from.id).toBe(sourceShape.id)
+      expect(undone.from.binding).toEqual({
+        type: 'fixed',
+        anchorId: sourceAnchor.id,
+      })
+      expect(undone.from.x).toBe(sourceAnchor.point.x)
+      expect(undone.from.y).toBe(sourceAnchor.point.y)
+
+      harness.designer.redo()
+      const redone = harness.designer.getElementById('linker_fixed_to_free')
+      expect(redone?.type).toBe('linker')
+      if (!redone || redone.type !== 'linker') {
+        throw new Error('linker_fixed_to_free redo 后未找到')
+      }
+
+      expect(redone.from.id).toBeNull()
+      expect(redone.from.binding).toEqual({ type: 'free' })
+      expect(redone.from.x).toBe(40)
+      expect(redone.from.y).toBe(40)
+    } finally {
+      harness.dispose()
+    }
+  })
+
+  it('拖拽 perimeter 端点重连后，undo/redo 应恢复原 perimeter 绑定', async () => {
+    const harness = await createRendererTestHarness({
+      shapes: [
+        { id: 'shape_linker_perimeter_source', x: 100, y: 100, w: 100, h: 80 },
+        { id: 'shape_linker_perimeter_target', x: 340, y: 100, w: 100, h: 80 },
+      ],
+    })
+
+    try {
+      const sourceShape = harness.designer.getElementById('shape_linker_perimeter_source')
+      const targetShape = harness.designer.getElementById('shape_linker_perimeter_target')
+      expect(sourceShape?.type).toBe('shape')
+      expect(targetShape?.type).toBe('shape')
+      if (!sourceShape || sourceShape.type !== 'shape' || !targetShape || targetShape.type !== 'shape') {
+        throw new Error('perimeter 测试图形未找到')
+      }
+
+      const sourcePerimeter = getShapePerimeterInfo(sourceShape, { x: 120, y: 100 })
+      const targetAnchor = getShapeAnchorInfo(targetShape, 3)
+      expect(sourcePerimeter).toBeTruthy()
+      expect(targetAnchor).toBeTruthy()
+      if (!sourcePerimeter || !targetAnchor) {
+        throw new Error('perimeter 或 target 锚点未找到')
+      }
+
+      harness.designer.edit.add(
+        [
+          createLinker({
+            id: 'linker_perimeter_reconnect',
+            name: 'linker_perimeter_reconnect',
+            from: {
+              id: sourceShape.id,
+              x: sourcePerimeter.point.x,
+              y: sourcePerimeter.point.y,
+              angle: sourcePerimeter.angle,
+              binding: {
+                type: 'perimeter',
+                pathIndex: sourcePerimeter.pathIndex,
+                segmentIndex: sourcePerimeter.segmentIndex,
+                t: sourcePerimeter.t,
+              },
+            },
+            to: {
+              id: null,
+              x: 240,
+              y: 240,
+              binding: { type: 'free' },
+            },
+          }),
+        ],
+        {
+          record: false,
+          select: false,
+        },
+      )
+      harness.designer.selection.replace(['linker_perimeter_reconnect'])
+      await Promise.resolve()
+
+      const endpoint = harness.overlayLayer.querySelector('.dg-linker-overlay__from-endpoint') as HTMLElement | null
+      expect(endpoint).toBeTruthy()
+
+      await harness.dispatchElementMouseDownAtClient(endpoint!, harness.canvasToClient(sourcePerimeter.point))
+      await harness.dispatchWindowMouseMoveAtCanvas(targetAnchor.point)
+      await harness.dispatchWindowMouseUp()
+
+      const moved = harness.designer.getElementById('linker_perimeter_reconnect')
+      expect(moved?.type).toBe('linker')
+      if (!moved || moved.type !== 'linker') {
+        throw new Error('linker_perimeter_reconnect 未找到')
+      }
+
+      expect(moved.from.id).toBe(targetShape.id)
+      expect(moved.from.binding).toEqual({
+        type: 'fixed',
+        anchorId: targetAnchor.id,
+      })
+      expect(harness.designer.history.undoStack()).toHaveLength(1)
+
+      harness.designer.undo()
+      const undone = harness.designer.getElementById('linker_perimeter_reconnect')
+      expect(undone?.type).toBe('linker')
+      if (!undone || undone.type !== 'linker') {
+        throw new Error('linker_perimeter_reconnect undo 后未找到')
+      }
+
+      expect(undone.from.id).toBe(sourceShape.id)
+      expect(undone.from.binding).toEqual({
+        type: 'perimeter',
+        pathIndex: sourcePerimeter.pathIndex,
+        segmentIndex: sourcePerimeter.segmentIndex,
+        t: sourcePerimeter.t,
+      })
+
+      harness.designer.redo()
+      const redone = harness.designer.getElementById('linker_perimeter_reconnect')
+      expect(redone?.type).toBe('linker')
+      if (!redone || redone.type !== 'linker') {
+        throw new Error('linker_perimeter_reconnect redo 后未找到')
+      }
+
+      expect(redone.from.id).toBe(targetShape.id)
+      expect(redone.from.binding).toEqual({
+        type: 'fixed',
+        anchorId: targetAnchor.id,
+      })
+    } finally {
+      harness.dispose()
+    }
+  })
+
+  it('双击删除 broken 控制点后应走点规范化，并支持 undo/redo', async () => {
+    const harness = await createRendererTestHarness({
+      shapes: [
+        { id: 'shape_remove_control_source', x: 100, y: 100, w: 100, h: 80 },
+        { id: 'shape_remove_control_target', x: 320, y: 100, w: 100, h: 80 },
+      ],
+    })
+
+    try {
+      harness.designer.edit.add(
+        [
+          createLinker({
+            id: 'linker_remove_control',
+            name: 'linker_remove_control',
+            linkerType: 'broken',
+            from: {
+              id: 'shape_remove_control_source',
+              x: 200,
+              y: 140,
+              binding: { type: 'free' },
+            },
+            to: {
+              id: 'shape_remove_control_target',
+              x: 320,
+              y: 140,
+              binding: { type: 'free' },
+            },
+            points: [
+              { x: 240, y: 140 },
+              { x: 280, y: 140 },
+            ],
+          }),
+        ],
+        {
+          record: false,
+          select: false,
+        },
+      )
+      harness.designer.selection.replace(['linker_remove_control'])
+      await flushMicrotasks()
+
+      const controlHandle = harness.overlayLayer.querySelector(
+        '.dg-linker-overlay__control-point[data-linker-control-index="0"]',
+      ) as HTMLElement | null
+      expect(controlHandle).toBeTruthy()
+
+      controlHandle!.dispatchEvent(
+        new MouseEvent('dblclick', {
+          bubbles: true,
+          cancelable: true,
+        }),
+      )
+      await flushMicrotasks()
+
+      expect(getLinkerOrThrow(harness, 'linker_remove_control').points).toEqual([])
+      expect(harness.designer.history.undoStack()).toHaveLength(1)
+
+      harness.designer.undo()
+      await flushMicrotasks()
+      expect(getLinkerOrThrow(harness, 'linker_remove_control').points).toEqual([
+        { x: 240, y: 140 },
+        { x: 280, y: 140 },
+      ])
+
+      harness.designer.redo()
+      await flushMicrotasks()
+      expect(getLinkerOrThrow(harness, 'linker_remove_control').points).toEqual([])
+    } finally {
+      harness.dispose()
+    }
+  })
+
+  it('拖拽 orthogonal 控制点后应保持横纵段，并支持 undo/redo', async () => {
+    const harness = await createRendererTestHarness({
+      shapes: [
+        { id: 'shape_orthogonal_control_source', x: 100, y: 100, w: 100, h: 80 },
+        { id: 'shape_orthogonal_control_target', x: 420, y: 260, w: 100, h: 80 },
+      ],
+    })
+
+    try {
+      harness.designer.edit.add(
+        [
+          createLinker({
+            id: 'linker_orthogonal_control_drag',
+            name: 'linker_orthogonal_control_drag',
+            linkerType: 'orthogonal',
+            from: {
+              id: null,
+              x: 200,
+              y: 140,
+              binding: { type: 'free' },
+            },
+            to: {
+              id: null,
+              x: 420,
+              y: 300,
+              binding: { type: 'free' },
+            },
+            points: [
+              { x: 200, y: 220 },
+              { x: 320, y: 220 },
+              { x: 320, y: 300 },
+            ],
+          }),
+        ],
+        {
+          record: false,
+          select: false,
+        },
+      )
+      harness.designer.selection.replace(['linker_orthogonal_control_drag'])
+      await flushMicrotasks()
+
+      const controlHandle = harness.overlayLayer.querySelector(
+        '.dg-linker-overlay__control-point[data-linker-control-index="1"]',
+      ) as HTMLElement | null
+      expect(controlHandle).toBeTruthy()
+
+      await harness.dispatchElementMouseDownAtClient(controlHandle!, harness.canvasToClient({ x: 320, y: 220 }))
+      await harness.dispatchWindowMouseMoveAtCanvas({ x: 360, y: 250 })
+      await harness.dispatchWindowMouseUp()
+
+      expect(getLinkerOrThrow(harness, 'linker_orthogonal_control_drag').points).toEqual([
+        { x: 200, y: 250 },
+        { x: 360, y: 250 },
+        { x: 360, y: 300 },
+      ])
+      expect(harness.designer.history.undoStack()).toHaveLength(1)
+
+      harness.designer.undo()
+      expect(getLinkerOrThrow(harness, 'linker_orthogonal_control_drag').points).toEqual([
+        { x: 200, y: 220 },
+        { x: 320, y: 220 },
+        { x: 320, y: 300 },
+      ])
+
+      harness.designer.redo()
+      expect(getLinkerOrThrow(harness, 'linker_orthogonal_control_drag').points).toEqual([
+        { x: 200, y: 250 },
+        { x: 360, y: 250 },
+        { x: 360, y: 300 },
+      ])
+    } finally {
+      harness.dispose()
+    }
+  })
+
+  it('拖拽 orthogonal 中间线段后应平移整段，并支持 undo/redo', async () => {
+    const harness = await createRendererTestHarness()
+
+    try {
+      harness.designer.edit.add(
+        [
+          createLinker({
+            id: 'linker_orthogonal_segment_drag',
+            name: 'linker_orthogonal_segment_drag',
+            linkerType: 'orthogonal',
+            from: {
+              id: null,
+              x: 100,
+              y: 100,
+              binding: { type: 'free' },
+            },
+            to: {
+              id: null,
+              x: 300,
+              y: 300,
+              binding: { type: 'free' },
+            },
+            points: [
+              { x: 100, y: 200 },
+              { x: 300, y: 200 },
+            ],
+          }),
+        ],
+        {
+          record: false,
+          select: false,
+        },
+      )
+      harness.designer.selection.replace(['linker_orthogonal_segment_drag'])
+      await flushMicrotasks()
+
+      await harness.dispatchSceneMouseDownAtCanvas({ x: 200, y: 200 })
+      await harness.dispatchWindowMouseMoveAtCanvas({ x: 200, y: 240 })
+      await harness.dispatchWindowMouseUp()
+
+      expect(getLinkerOrThrow(harness, 'linker_orthogonal_segment_drag').points).toEqual([
+        { x: 100, y: 240 },
+        { x: 300, y: 240 },
+      ])
+      expect(harness.designer.history.undoStack()).toHaveLength(1)
+
+      harness.designer.undo()
+      expect(getLinkerOrThrow(harness, 'linker_orthogonal_segment_drag').points).toEqual([
+        { x: 100, y: 200 },
+        { x: 300, y: 200 },
+      ])
+
+      harness.designer.redo()
+      expect(getLinkerOrThrow(harness, 'linker_orthogonal_segment_drag').points).toEqual([
+        { x: 100, y: 240 },
+        { x: 300, y: 240 },
+      ])
     } finally {
       harness.dispose()
     }
@@ -1587,6 +2009,78 @@ describe('Renderer', () => {
     }
   })
 
+  it('带正式偏移的 linker 编辑框增长时应围绕正式标签中心重排，且不改 textPosition', async () => {
+    const harness = await createRendererTestHarness()
+
+    try {
+      harness.designer.edit.add(
+        [
+          createLinker({
+            id: 'linker_resize_text_positioned',
+            name: 'linker_resize_text_positioned',
+            linkerType: 'straight',
+            text: '短',
+            textPosition: {
+              dx: 40,
+              dy: -20,
+            },
+            from: {
+              id: null,
+              x: 200,
+              y: 140,
+              binding: { type: 'free' },
+            },
+            to: {
+              id: null,
+              x: 320,
+              y: 140,
+              binding: { type: 'free' },
+            },
+          }),
+        ],
+        {
+          record: false,
+          select: false,
+        },
+      )
+      await Promise.resolve()
+
+      await harness.dispatchSceneDoubleClickAtCanvas({ x: 300, y: 120 })
+
+      const editor = harness.overlayLayer.querySelector('textarea[data-text-editor="true"]') as HTMLTextAreaElement | null
+      expect(editor).toBeTruthy()
+
+      Object.defineProperty(editor!, 'scrollWidth', {
+        configurable: true,
+        get: () => 280,
+      })
+      Object.defineProperty(editor!, 'scrollHeight', {
+        configurable: true,
+        get: () => 40,
+      })
+
+      editor!.value = '一段更长的正式偏移标签文本'
+      editor!.dispatchEvent(new InputEvent('input', { bubbles: true }))
+      await flushMicrotasks()
+      await flushMicrotasks()
+
+      expect(parsePx(editor!.style.width)).toBeCloseTo(280)
+      expect(parsePx(editor!.style.left)).toBeCloseTo(160)
+      expect(parsePx(editor!.style.top)).toBeCloseTo(100)
+
+      editor!.dispatchEvent(new FocusEvent('blur', { bubbles: true }))
+      await flushMicrotasks()
+
+      expect(getLinkerOrThrow(harness, 'linker_resize_text_positioned').text).toBe('一段更长的正式偏移标签文本')
+      expect(getLinkerOrThrow(harness, 'linker_resize_text_positioned').textPosition).toEqual({
+        dx: 40,
+        dy: -20,
+      })
+    } finally {
+      harness.dispose()
+    }
+  })
+
   it('双击 linker 的非文本区域时不应进入编辑态', async () => {
     const harness = await createRendererTestHarness()
 
@@ -1624,6 +2118,260 @@ describe('Renderer', () => {
 
       expect(harness.overlayLayer.querySelector('textarea[data-text-editor="true"]')).toBeNull()
       expect(harness.designer.selection.selectedIds()).toEqual([])
+    } finally {
+      harness.dispose()
+    }
+  })
+
+  it('带正式偏移的 linker 标签应按偏移后位置命中并定位编辑框', async () => {
+    const harness = await createRendererTestHarness()
+
+    try {
+      harness.designer.edit.add(
+        [
+          createLinker({
+            id: 'linker_text_position',
+            name: 'linker_text_position',
+            linkerType: 'straight',
+            text: '偏移标签',
+            textPosition: {
+              dx: 40,
+              dy: -20,
+            },
+            from: {
+              id: null,
+              x: 200,
+              y: 140,
+              binding: { type: 'free' },
+            },
+            to: {
+              id: null,
+              x: 320,
+              y: 140,
+              binding: { type: 'free' },
+            },
+          }),
+        ],
+        {
+          record: false,
+          select: false,
+        },
+      )
+      await Promise.resolve()
+
+      await harness.dispatchSceneDoubleClickAtCanvas({ x: 260, y: 140 })
+      await flushMicrotasks()
+
+      expect(harness.overlayLayer.querySelector('textarea[data-text-editor="true"]')).toBeNull()
+
+      await harness.dispatchSceneDoubleClickAtCanvas({ x: 300, y: 120 })
+
+      const editor = harness.overlayLayer.querySelector('textarea[data-text-editor="true"]') as HTMLTextAreaElement | null
+      expect(editor).toBeTruthy()
+
+      const linker = harness.designer.getElementById('linker_text_position')
+      expect(linker?.type).toBe('linker')
+      if (!linker || linker.type !== 'linker') {
+        throw new Error('linker_text_position 未找到')
+      }
+
+      const box = getLinkerTextBox(harness.designer.view.getLinkerRoute(linker), linker.text, linker.fontStyle, {
+        curved: false,
+        textPosition: linker.textPosition,
+      })
+      expect(box).toBeTruthy()
+
+      const bounds = harness.designer.view.toScreen({
+        x: box!.x,
+        y: box!.y,
+        w: box!.w,
+        h: box!.h,
+      })
+
+      expect(parsePx(editor!.style.left)).toBeCloseTo(bounds.x)
+      expect(parsePx(editor!.style.top)).toBeCloseTo(bounds.y)
+      expect(parsePx(editor!.style.width)).toBeCloseTo(bounds.w)
+      expect(parsePx(editor!.style.height)).toBeCloseTo(bounds.h)
+    } finally {
+      harness.dispose()
+    }
+  })
+
+  it('鼠标悬停 linker 标签区域时应显示 move 光标', async () => {
+    const harness = await createRendererTestHarness()
+
+    try {
+      harness.designer.edit.add(
+        [
+          createLinker({
+            id: 'linker_hover_text_cursor',
+            name: 'linker_hover_text_cursor',
+            linkerType: 'straight',
+            text: '悬停标签',
+            textPosition: {
+              dx: 40,
+              dy: -20,
+            },
+            from: {
+              id: null,
+              x: 200,
+              y: 140,
+              binding: { type: 'free' },
+            },
+            to: {
+              id: null,
+              x: 320,
+              y: 140,
+              binding: { type: 'free' },
+            },
+          }),
+        ],
+        {
+          record: false,
+          select: false,
+        },
+      )
+      await Promise.resolve()
+
+      await harness.dispatchSceneMouseMoveAtCanvas({ x: 300, y: 120 })
+
+      expect(harness.container.style.cursor).toBe('move')
+
+      await harness.dispatchSceneMouseMoveAtCanvas({ x: 200, y: 200 })
+
+      expect(harness.container.style.cursor).toBe('default')
+    } finally {
+      harness.dispose()
+    }
+  })
+
+  it('拖拽 linker 标签后应写入 textPosition，并支持 undo/redo', async () => {
+    const harness = await createRendererTestHarness()
+
+    try {
+      harness.designer.edit.add(
+        [
+          createLinker({
+            id: 'linker_drag_text_position',
+            name: 'linker_drag_text_position',
+            linkerType: 'straight',
+            text: '可拖拽标签',
+            from: {
+              id: null,
+              x: 200,
+              y: 140,
+              binding: { type: 'free' },
+            },
+            to: {
+              id: null,
+              x: 320,
+              y: 140,
+              binding: { type: 'free' },
+            },
+          }),
+        ],
+        {
+          record: false,
+          select: false,
+        },
+      )
+      await Promise.resolve()
+
+      await harness.dispatchSceneMouseDownAtCanvas({ x: 260, y: 140 })
+      await harness.dispatchWindowMouseUp()
+      await flushMicrotasks()
+
+      const interaction = harness.getInteraction()
+      await harness.dispatchSceneMouseDownAtCanvas({ x: 260, y: 140 })
+      expect(interaction.pointer.machine.mode()).toBe('draggingLinker')
+
+      await harness.dispatchWindowMouseMoveAtCanvas({ x: 300, y: 120 })
+      await harness.dispatchWindowMouseUp()
+
+      expect(interaction.pointer.machine.mode()).toBe('idle')
+      expect(getLinkerOrThrow(harness, 'linker_drag_text_position').textPosition).toEqual({
+        dx: 40,
+        dy: -20,
+      })
+      expect(harness.designer.history.undoStack()).toHaveLength(1)
+
+      harness.designer.undo()
+      expect(getLinkerOrThrow(harness, 'linker_drag_text_position').textPosition).toBeUndefined()
+
+      harness.designer.redo()
+      expect(getLinkerOrThrow(harness, 'linker_drag_text_position').textPosition).toEqual({
+        dx: 40,
+        dy: -20,
+      })
+    } finally {
+      harness.dispose()
+    }
+  })
+
+  it('编辑带正式偏移的 linker 文本时，route 变化后编辑框应保持相对偏移', async () => {
+    const harness = await createRendererTestHarness()
+
+    try {
+      harness.designer.edit.add(
+        [
+          createLinker({
+            id: 'linker_edit_follow_route',
+            name: 'linker_edit_follow_route',
+            linkerType: 'broken',
+            text: '跟随路线',
+            textPosition: {
+              dx: 30,
+              dy: -10,
+            },
+            from: {
+              id: null,
+              x: 100,
+              y: 100,
+              binding: { type: 'free' },
+            },
+            to: {
+              id: null,
+              x: 220,
+              y: 220,
+              binding: { type: 'free' },
+            },
+            points: [{ x: 160, y: 100 }, { x: 160, y: 220 }],
+          }),
+        ],
+        {
+          record: false,
+          select: false,
+        },
+      )
+      await Promise.resolve()
+
+      await harness.dispatchSceneDoubleClickAtCanvas({ x: 190, y: 150 })
+
+      const editor = harness.overlayLayer.querySelector('textarea[data-text-editor="true"]') as HTMLTextAreaElement | null
+      expect(editor).toBeTruthy()
+
+      harness.designer.edit.update('linker_edit_follow_route', {
+        points: [{ x: 200, y: 100 }, { x: 200, y: 220 }],
+      })
+      await flushMicrotasks()
+      await flushMicrotasks()
+
+      const linker = getLinkerOrThrow(harness, 'linker_edit_follow_route')
+      const box = getLinkerTextBox(harness.designer.view.getLinkerRoute(linker), linker.text, linker.fontStyle, {
+        curved: false,
+        textPosition: linker.textPosition,
+      })
+      expect(box).toBeTruthy()
+
+      const bounds = harness.designer.view.toScreen({
+        x: box!.x,
+        y: box!.y,
+        w: box!.w,
+        h: box!.h,
+      })
+
+      expect(parsePx(editor!.style.left)).toBeCloseTo(bounds.x)
+      expect(parsePx(editor!.style.top)).toBeCloseTo(bounds.y)
     } finally {
       harness.dispose()
     }
@@ -1675,6 +2423,7 @@ describe('Renderer', () => {
 
       const box = getLinkerTextBox(harness.designer.view.getLinkerRoute(linker), linker.text, linker.fontStyle, {
         curved: false,
+        textPosition: linker.textPosition,
       })
       expect(box).toBeTruthy()
 
