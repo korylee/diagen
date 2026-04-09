@@ -31,6 +31,7 @@
     "unplugin-solid": "catalog:dev",
     "vite": "catalog:dev",
     "vite-plugin-solid": "catalog:dev",
+    "tinyglobby": "catalog:dev",
     "vitest": "catalog:test"
   },
   "pnpm": {

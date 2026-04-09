@@ -1,41 +1,86 @@
-import type { UserConfig } from 'tsdown'
+import { existsSync } from 'node:fs'
+import type { Format, UserConfig } from 'tsdown'
+import { globSync } from 'tinyglobby'
 // import solid from '@rolldown-plugin/solid'
 import solid from 'unplugin-solid/rolldown'
 
-const externals = ['solid-js', /@diagen\/.*/]
+type ExternalItem = string | RegExp
 
-export function createTsDownConfig() {
-  const baseConfig: UserConfig = {
-    target: 'es2015',
-    plugins: [solid()],
-    dts: true,
-    platform: 'browser',
-    external: [...externals],
+const baseExternals: ExternalItem[] = ['solid-js', /@diagen\/.*/]
+
+interface CreateTsDownConfigOptions {
+  copy?: UserConfig['copy']
+  cwd?: string
+  dts?: UserConfig['dts']
+  external?: ExternalItem[]
+  minify?: boolean
+  submodules?: boolean
+  target?: UserConfig['target']
+}
+
+export function createTsDownConfig(options: CreateTsDownConfigOptions = {}) {
+  const cwd = options.cwd ?? process.cwd()
+  const { copy, dts = true, external = [], minify = true, submodules, target = 'es2015' } = options
+
+  const srcDir = 'src'
+  const root = `${cwd}/${srcDir}`.replace(/\\/g, '/')
+  const rootEntry = `${srcDir}/index.ts`
+
+  const entries: Record<string, string> = {
+    index: `${srcDir}/index.ts`,
   }
 
+  if (submodules && existsSync(root)) {
+    for (const path of globSync(['*/index.ts', '*/index.tsx'], { cwd: root, onlyFiles: true })) {
+      const [name] = path.split('/')
+      if (!name || name.startsWith('_') || name.startsWith('.')) continue
+      entries[name] = `${srcDir}/${path}`
+    }
+  }
+
+  const baseConfig: UserConfig = {
+    target,
+    plugins: [solid()],
+    dts,
+    platform: 'browser',
+    deps: {
+      neverBundle: [...baseExternals, ...external],
+    },
+  }
+
+  const formats = ['cjs', 'esm'] as Format[]
   const configs: UserConfig[] = []
 
-  const formats = ['cjs', 'esm'] as const
   formats.forEach(format => {
     const isEs = format === 'esm'
     const ext = isEs ? 'mjs' : 'js'
-    configs.push({
-      ...baseConfig,
-      format,
-      dts: !isEs,
-      outExtensions: () => ({
-        js: `.${ext}`,
-      }),
-    })
-    configs.push({
-      ...baseConfig,
-      format,
-      dts: false,
-      minify: true,
-      outExtensions: () => ({
-        js: `.min.${ext}`,
-      }),
-    })
+
+    for (const [name, file] of Object.entries(entries)) {
+      configs.push({
+        ...baseConfig,
+        entry: { [name]: file },
+        format,
+        dts: isEs,
+        copy: configs.length === 0 ? copy : undefined,
+        outExtensions: () => ({
+          js: `.${ext}`,
+          dts: isEs ? '.d.ts' : undefined,
+        }),
+      })
+    }
+
+    if (rootEntry && minify) {
+      configs.push({
+        ...baseConfig,
+        entry: rootEntry,
+        format,
+        dts: false,
+        minify: true,
+        outExtensions: () => ({
+          js: `.min.${ext}`,
+        }),
+      })
+    }
   })
 
   return configs

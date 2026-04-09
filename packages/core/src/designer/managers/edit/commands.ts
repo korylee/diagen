@@ -2,7 +2,7 @@ import { keys, type UnionKeyOf, type UnionNestedKeyOf, type UnionNestedValue } f
 import { batch } from 'solid-js'
 import type { StoreSetter } from 'solid-js/store'
 import type { DiagramElement } from '../../../model'
-import { unwrapClone } from '../../../utils'
+import { unwrapClone } from '../../../_utils'
 import { type Command, createCommand } from '../history'
 import {
   type ChangeEntry,

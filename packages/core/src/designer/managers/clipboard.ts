@@ -1,6 +1,6 @@
 import { generateId, type Point } from '@diagen/shared'
 import { batch } from 'solid-js'
-import { unwrapClone } from '../../utils'
+import { unwrapClone } from '../../_utils'
 import { type DiagramElement, isLinker, isShape, type LinkerEndpoint } from '../../model'
 import type { EditManager } from './edit'
 import type { ElementManager } from './element'

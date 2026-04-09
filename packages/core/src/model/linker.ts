@@ -11,6 +11,12 @@ export type LinkerEndpointBinding =
   | { type: 'fixed'; anchorId: string }
   | { type: 'perimeter'; pathIndex: number; segmentIndex: number; t: number }
 
+/** 连线标签相对路线中心的正式偏移 */
+export interface LinkerTextPosition {
+  dx: number
+  dy: number
+}
+
 /** 连线端点 */
 export interface LinkerEndpoint {
   id?: string | null   // 连接的形状 ID
@@ -35,6 +41,9 @@ export interface LinkerElement extends BaseElement {
 
   /** 计算后的路由点 */
   routePoints?: Array<{ x: number; y: number }>
+
+  /** 连线标签位置；未设置时跟随路线中心自动定位 */
+  textPosition?: LinkerTextPosition
 
   /** 样式 */
   lineStyle: LineStyle
@@ -69,6 +78,7 @@ export function createLinker(patch: Partial<LinkerElement>):LinkerElement {
       binding: { type: 'free' },
     },
     points: [],
+    textPosition: undefined,
     lineStyle: {
       lineWidth: 2,
       lineColor: '50,50,50',

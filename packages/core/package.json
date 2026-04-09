@@ -25,6 +25,11 @@
       "module": "./dist/index.mjs",
       "import": "./dist/index.mjs",
       "require": "./index.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "import": "./dist/*.mjs",
+      "require": "./dist/*.js"
     }
   },
   "scripts": {

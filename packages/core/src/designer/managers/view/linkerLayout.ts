@@ -8,10 +8,10 @@ import {
   calculateLinkerRoute,
   type LinkerRoute,
   type LinkerRouteOptions,
-} from '../../../utils/router'
+} from '../../../_utils/router'
 import type { LinkerRouteConfig } from '../../types'
 import type { ElementManager } from '../element'
-import { calculateLinkerBoundsFromRoute } from './shared'
+import { calculateLinkerBounds } from './shared'
 
 export interface LinkerLayout {
   route: LinkerRoute
@@ -123,7 +123,7 @@ export function createLinkerLayoutController(options: CreateLinkerLayoutControll
     }
 
     const route = calculateLinkerRoute(linker, getShapeById, resolveRouteOptions(linker))
-    const bounds = calculateLinkerBoundsFromRoute(route)
+    const bounds = calculateLinkerBounds(linker, route)
 
     linkerLayoutCache.set(linker.id, {
       stamp,

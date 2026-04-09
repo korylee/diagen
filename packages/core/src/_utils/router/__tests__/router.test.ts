@@ -233,6 +233,58 @@ describe('router index', () => {
 
       expect(jumps).toEqual([])
     })
+
+    it('反向水平 segment 计算 jump 时仍应保持稳定顺序与半径', () => {
+      const route = createHorizontalStraightRoute(50, 100, 0)
+      const otherRoutes = [createVerticalStraightRoute(40), createVerticalStraightRoute(52)]
+
+      const jumps = calculateLineJumps(route, otherRoutes, {
+        radius: 10,
+        endpointPadding: 10,
+        jumpGap: 4,
+      })
+
+      expect(jumps).toEqual([
+        {
+          segmentIndex: 0,
+          center: { x: 40, y: 50 },
+          orientation: 'horizontal',
+          radius: 4,
+        },
+        {
+          segmentIndex: 0,
+          center: { x: 52, y: 50 },
+          orientation: 'horizontal',
+          radius: 4,
+        },
+      ])
+    })
+
+    it('反向垂直 segment 计算 jump 时仍应保持稳定顺序与半径', () => {
+      const route = createVerticalStraightRoute(50, 100, 0)
+      const otherRoutes = [createHorizontalStraightRoute(40), createHorizontalStraightRoute(52)]
+
+      const jumps = calculateLineJumps(route, otherRoutes, {
+        radius: 10,
+        endpointPadding: 10,
+        jumpGap: 4,
+      })
+
+      expect(jumps).toEqual([
+        {
+          segmentIndex: 0,
+          center: { x: 50, y: 40 },
+          orientation: 'vertical',
+          radius: 4,
+        },
+        {
+          segmentIndex: 0,
+          center: { x: 50, y: 52 },
+          orientation: 'vertical',
+          radius: 4,
+        },
+      ])
+    })
   })
 
   describe('calculateObstacleRoute', () => {

@@ -1,4 +1,5 @@
 export * from './router'
+export * from './linkerText'
 export * from './transform'
 export * from './expression'
 export * from './path'

@@ -1,3 +1,5 @@
+import { isSameNumber } from '../immutable'
+
 export interface Point {
   x: number
   y: number
@@ -26,7 +28,7 @@ export function getDistance(p1: Point, p2: Point): number {
 }
 
 export function isSamePoint(a: Point, b: Point): boolean {
-  return Math.abs(a.x - b.x) < 1e-6 && Math.abs(a.y - b.y) < 1e-6
+  return isSameNumber(a.x, b.x) && isSameNumber(a.y, b.y)
 }
 
 export function isPointInBounds(point: Point, b: Bounds): boolean {

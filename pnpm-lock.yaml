@@ -24,6 +24,9 @@ catalogs:
     svgo:
       specifier: ^4.0.1
       version: 4.0.1
+    tinyglobby:
+      specifier: ^0.2.15
+      version: 0.2.15
     tsdown:
       specifier: ^0.21.7
       version: 0.21.5
@@ -94,6 +97,9 @@ importers:
       svgo:
         specifier: catalog:dev
         version: 4.0.1
+      tinyglobby:
+        specifier: catalog:dev
+        version: 0.2.15
       tsdown:
         specifier: catalog:dev
         version: 0.21.5(@tsdown/css@0.21.5)(typescript@5.9.3)

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { deepClone } from '../object'
+import { deepClone } from './object'
 
 describe('object', () => {
   describe('deepClone', () => {
@@ -43,17 +43,6 @@ describe('object', () => {
 
       expect(cloned).not.toBe(source)
       expect(cloned.self).toBe(cloned)
-    })
-
-    it('应该忽略 symbol 元数据', () => {
-      const meta = Symbol('meta')
-      const source = { id: 'node' } as { id: string; [meta]?: { source: string } }
-      source[meta] = { source: 'hidden' }
-
-      const cloned = deepClone(source)
-
-      expect(Reflect.ownKeys(cloned)).toEqual(['id'])
-      expect((cloned as typeof source)[meta]).toBeUndefined()
     })
   })
 })

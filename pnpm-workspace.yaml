@@ -16,6 +16,7 @@ catalogs:
     turbo: ^2.8.12
     svgo: ^4.0.1
     'sass-embedded': ^1.98.0
+    tinyglobby: ^0.2.15
   test:
     '@vitest/coverage-v8': ^4.1.0
     '@vitest/ui': ^4.1.0

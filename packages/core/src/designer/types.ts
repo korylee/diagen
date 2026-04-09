@@ -1,7 +1,7 @@
 import type { Emitter, Point, Size } from '@diagen/shared'
 import type { LinkerType } from '../constants'
 import type { Diagram } from '../model'
-import type { LinkerRouteStrategy, RouterConfig, RouterOptions, Transform } from '../utils'
+import type { LinkerRouteStrategy, RouterConfig, RouterOptions, Transform } from '../_utils'
 import type { ElementEvents, HistoryEvents, SelectionEvents } from './managers'
 
 /** 画布自增配置 */

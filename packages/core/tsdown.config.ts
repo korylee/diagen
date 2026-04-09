@@ -1,3 +1,5 @@
 import { createTsDownConfig } from '../../tsdown.config.ts'
 
-export default createTsDownConfig()
+export default createTsDownConfig({
+  submodules: true,
+})

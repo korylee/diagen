@@ -2,7 +2,7 @@ import { createStore } from 'solid-js/store'
 
 import { createEmitter, DeepPartial, generateId, pick } from '@diagen/shared'
 import { LinkerType } from '../constants'
-import type { Transform } from '../utils'
+import type { Transform } from '../_utils'
 
 import { createDiagram, Diagram } from '../model'
 import {

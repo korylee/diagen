@@ -1,8 +1,15 @@
-import { normalizeBounds, pick, unionBounds, type Bounds, type Size } from '@diagen/shared'
-import { type ShapeElement } from '../../../model'
-import type { LinkerRoute } from '../../../utils/router'
-import type { AutoGrowConfig } from '../../types'
+import {
+  normalizeBounds,
+  pick,
+  unionBounds,
+  type Bounds,
+  type Size,
+} from '@diagen/shared'
 import { createRafLoop } from '@diagen/primitives'
+import { type LinkerElement, type ShapeElement } from '../../../model'
+import { getLinkerTextBox } from '../../../_utils'
+import { type LinkerRoute } from '../../../_utils/router'
+import type { AutoGrowConfig } from '../../types'
 
 interface ContainerSizeResolverOptions {
   autoGrow: AutoGrowConfig
@@ -39,6 +46,13 @@ export function getShapeBounds(shape: ShapeElement): Bounds {
   return pick(shape.props, ['x', 'y', 'w', 'h'])
 }
 
+export function calculateLinkerBounds(linker: LinkerElement, route: LinkerRoute): Bounds {
+  const routeBounds = calculateLinkerBoundsFromRoute(route)
+  const textBounds = calculateLinkerTextBounds(linker, route)
+
+  return textBounds ? unionNormalizedBounds(routeBounds, textBounds) : routeBounds
+}
+
 export function calculateLinkerBoundsFromRoute(route: LinkerRoute): Bounds {
   if (route.points.length === 0) {
     return { x: 0, y: 0, w: 1, h: 1 }
@@ -61,6 +75,21 @@ export function calculateLinkerBoundsFromRoute(route: LinkerRoute): Bounds {
     y: minY,
     w: maxX - minX || 1,
     h: maxY - minY || 1,
+  }
+}
+
+function calculateLinkerTextBounds(linker: LinkerElement, route: LinkerRoute): Bounds | null {
+  const box = getLinkerTextBox(route, linker.text, linker.fontStyle, {
+    curved: linker.linkerType === 'curved',
+    textPosition: linker.textPosition,
+  })
+  if (!box) return null
+
+  return {
+    x: box.x,
+    y: box.y,
+    w: box.w,
+    h: box.h,
   }
 }
 

@@ -18,7 +18,6 @@ export {
 } from './linkerRoute'
 
 export { calculateLineJumps, type CalculateLineJumpsOptions } from './lineJumps'
-
 // 障碍规避路由
 export {
   calculateObstacleRoute, calculateRoutePoints, createObstaclesFromElements, DEFAULT_ROUTER_CONFIG, type RouterAlgorithm,

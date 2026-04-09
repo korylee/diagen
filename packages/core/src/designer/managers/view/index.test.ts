@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { isIntersects } from '@diagen/shared'
 import { createLinker, createShape, type ShapeElement } from '../../../model'
 import { createDesigner } from '../../create'
-import * as routerUtils from '../../../utils/router'
+import * as routerUtils from '../../../_utils/router'
 
 function withDesigner(run: (designer: ReturnType<typeof createDesigner>) => void) {
   createRoot(dispose => {
@@ -231,6 +231,53 @@ describe('view manager', () => {
       expect(layout.route.points.length).toBeGreaterThan(1)
       expect(layout.bounds.w).toBeGreaterThan(0)
       expect(layout.bounds.h).toBeGreaterThan(0)
+    })
+  })
+
+  it('连线布局 bounds 应包含正式标签位置', () => {
+    withDesigner(designer => {
+      const linker = createLinker({
+        id: 'view_linker_text_bounds',
+        name: 'view_linker_text_bounds',
+        linkerType: 'straight',
+        text: '标签',
+        textPosition: {
+          dx: 120,
+          dy: -40,
+        },
+        from: { id: null, x: 100, y: 100, binding: { type: 'free' } },
+        to: { id: null, x: 200, y: 100, binding: { type: 'free' } },
+      })
+      designer.edit.add([linker], { record: false, select: false })
+
+      const layout = designer.view.getLinkerLayout(linker)
+
+      expect(layout.bounds.x).toBeLessThanOrEqual(100)
+      expect(layout.bounds.y).toBeLessThan(100)
+      expect(layout.bounds.x + layout.bounds.w).toBeGreaterThan(250)
+    })
+  })
+
+  it('view bounds 应纳入远端连线标签', () => {
+    withDesigner(designer => {
+      const baseBounds = designer.view.bounds()
+      const linker = createLinker({
+        id: 'view_far_text_linker',
+        name: 'view_far_text_linker',
+        linkerType: 'straight',
+        text: '远端标签',
+        textPosition: {
+          dx: 2200,
+          dy: 1500,
+        },
+        from: { id: null, x: 100, y: 100, binding: { type: 'free' } },
+        to: { id: null, x: 200, y: 100, binding: { type: 'free' } },
+      })
+      designer.edit.add([linker], { record: false, select: false })
+
+      const nextBounds = designer.view.bounds()
+      expect(nextBounds.w).toBeGreaterThan(baseBounds.w)
+      expect(nextBounds.h).toBeGreaterThan(baseBounds.h)
     })
   })
 

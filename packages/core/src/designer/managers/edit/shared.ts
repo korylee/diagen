@@ -3,7 +3,7 @@ import { createStore, unwrap, type StoreSetter } from 'solid-js/store'
 import type { ElementManager } from '../element'
 import type { HistoryManager } from '../history'
 import type { SelectionManager } from '../selection'
-import { unwrapClone } from '../../../utils'
+import { unwrapClone } from '../../../_utils'
 
 export interface EditDeps {
   element: Pick<
