@@ -1,7 +1,7 @@
 import { createRoot } from 'solid-js'
 import { describe, expect, it } from 'vitest'
 import { createDesigner } from '../create'
-import { type Command, createCommand } from '../managers/history'
+import { type Command, createCommand } from './history'
 
 function withDesigner(run: (designer: ReturnType<typeof createDesigner>) => void) {
   createRoot(dispose => {

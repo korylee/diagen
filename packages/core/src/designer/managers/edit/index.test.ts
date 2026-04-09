@@ -1,8 +1,8 @@
 import { createRoot } from 'solid-js'
 import { produce } from 'solid-js/store'
 import { describe, expect, it } from 'vitest'
-import { createShape, ShapeElement } from '../../../../model'
-import { createDesigner } from '../../../create'
+import { createShape, ShapeElement } from '../../../model'
+import { createDesigner } from '../../create'
 
 function withDesigner(run: (designer: ReturnType<typeof createDesigner>) => void) {
   createRoot(dispose => {

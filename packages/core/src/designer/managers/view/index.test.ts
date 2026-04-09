@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { isIntersects } from '@diagen/shared'
 import { createLinker, createShape, type ShapeElement } from '../../../model'
 import { createDesigner } from '../../create'
-import * as routerUtils from '../../../_utils/router'
+import * as routerUtils from '../../../router'
 
 function withDesigner(run: (designer: ReturnType<typeof createDesigner>) => void) {
   createRoot(dispose => {

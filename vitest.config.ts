@@ -20,8 +20,8 @@ export default defineConfig({
     reporters: 'dot',
     exclude: ['**/node_modules/**', '**/dist/**'],
     coverage: {
-      include: ['packages/**/*.ts'],
-      exclude: ['**/.test/**', '**/dist/**', '**/types.ts', '**/*.config.ts'],
+      include: ['packages/**/*.{ts,tsx}'],
+      exclude: ['**/.test/**', '**/dist/**', '**/types.ts', '**/*.config.{ts,tsx}'],
     },
     projects: [
       'packages/*/vitest.config.ts',
@@ -31,8 +31,8 @@ export default defineConfig({
           name: 'unit',
           environment: 'jsdom',
           setupFiles: [resolve(import.meta.dirname, 'packages/.test/setup.ts')],
-          include: ['packages/**/*.{test,spec}.ts', 'test/*.{test,spec}.ts'],
-          exclude: ['packages/**/*.{browser,server}.{test,spec}.ts'],
+          include: ['packages/**/*.{test,spec}.{ts,tsx}', 'test/*.{test,spec}.{ts,tsx}'],
+          exclude: ['packages/**/*.{browser,server}.{test,spec}.{ts,tsx}'],
           server: {
             deps: {
               inline: ['solid-js'],
