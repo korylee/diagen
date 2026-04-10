@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { createLinker, createShape } from '../model'
-import { getShapeAnchorAngle, getShapeAnchorInfo, resolvePreferredCreateAnchor } from './index'
-import { calculateBasicLinkerRoute, calculateLinkerRoute } from '../router'
+import { getAnchorAngle, getAnchorInfo, resolveCreateAnchor } from './index'
+import { getBasicLinkerRoute, getLinkerRoute } from '../route'
 
 describe('anchors', () => {
-  describe('getShapeAnchorAngle - 路径边界法线', () => {
+  describe('getAnchorAngle - 路径边界法线', () => {
     it('应在无 direction 时返回边界外法线角', () => {
       const shape = createShape({
         id: 'shape_rect',
@@ -13,13 +13,13 @@ describe('anchors', () => {
         anchors: [{ x: 'w/2', y: '0' }],
       })
 
-      const angle = getShapeAnchorAngle(shape, 0)
+      const angle = getAnchorAngle(shape, 0)
       expect(angle).not.toBeNull()
       expect(angle ?? 0).toBeCloseTo(-Math.PI / 2, 2)
     })
   })
 
-  describe('getShapeAnchorInfo', () => {
+  describe('getAnchorInfo', () => {
     it('应在 direction 存在时按 direction + 图形旋转角计算锚点角度', () => {
       const shape = createShape({
         id: 'shape_a',
@@ -28,7 +28,7 @@ describe('anchors', () => {
         anchors: [{ id: 'top', x: 'w/2', y: '0', direction: 'top' }],
       })
 
-      const info = getShapeAnchorInfo(shape, 0)
+      const info = getAnchorInfo(shape, 0)
       expect(info).not.toBeNull()
       expect(info?.id).toBe('top')
       expect(info?.direction).toBe('top')
@@ -46,14 +46,14 @@ describe('anchors', () => {
         anchors: [{ x: 'w', y: 'h/2' }],
       })
 
-      const angle = getShapeAnchorAngle(shape, 0)
+      const angle = getAnchorAngle(shape, 0)
       expect(angle).not.toBeNull()
       // 右侧边界外法线为 0，旋转 90 度后应为 PI/2
       expect(angle ?? 0).toBeCloseTo(Math.PI / 2)
     })
   })
 
-  describe('resolvePreferredCreateAnchor', () => {
+  describe('resolveCreateAnchor', () => {
     it('应优先选择右侧固定锚点', () => {
       const shape = createShape({
         id: 'shape_preferred_right',
@@ -67,7 +67,7 @@ describe('anchors', () => {
         ],
       })
 
-      const anchor = resolvePreferredCreateAnchor(shape)
+      const anchor = resolveCreateAnchor(shape)
       expect(anchor).not.toBeNull()
       expect(anchor?.type).toBe('fixed')
       if (anchor?.type !== 'fixed') throw new Error('应返回 fixed 锚点')
@@ -88,7 +88,7 @@ describe('anchors', () => {
         ],
       })
 
-      const anchor = resolvePreferredCreateAnchor(shape)
+      const anchor = resolveCreateAnchor(shape)
       expect(anchor).not.toBeNull()
       expect(anchor?.type).toBe('fixed')
       if (anchor?.type !== 'fixed') throw new Error('应返回 fixed 锚点')
@@ -108,7 +108,7 @@ describe('anchors', () => {
         ],
       })
 
-      const anchor = resolvePreferredCreateAnchor(shape)
+      const anchor = resolveCreateAnchor(shape)
       expect(anchor).not.toBeNull()
       expect(anchor?.type).toBe('fixed')
       if (anchor?.type !== 'fixed') throw new Error('应返回 fixed 锚点')
@@ -126,7 +126,7 @@ describe('anchors', () => {
         anchors: [],
       })
 
-      const anchor = resolvePreferredCreateAnchor(shape)
+      const anchor = resolveCreateAnchor(shape)
       expect(anchor).not.toBeNull()
       expect(anchor?.type).toBe('perimeter')
       if (anchor?.type !== 'perimeter') throw new Error('应返回 perimeter 绑定')
@@ -135,7 +135,7 @@ describe('anchors', () => {
     })
   })
 
-  describe('calculateLinkerRoute', () => {
+  describe('getLinkerRoute', () => {
     it('应默认按 basic 策略计算端点角度', () => {
       const fromShape = createShape({
         id: 'from_shape',
@@ -159,7 +159,7 @@ describe('anchors', () => {
         to: { id: toShape.id, binding: { type: 'fixed', anchorId: 'left' }, x: 0, y: 0 },
       })
 
-      const route = calculateLinkerRoute(linker, id => {
+      const route = getLinkerRoute(linker, id => {
         if (id === fromShape.id) return fromShape
         if (id === toShape.id) return toShape
         return null
@@ -193,7 +193,7 @@ describe('anchors', () => {
         to: { id: toShape.id, binding: { type: 'fixed', anchorId: 'left' }, x: 0, y: 0 },
       })
 
-      const route = calculateLinkerRoute(
+      const route = getLinkerRoute(
         linker,
         id => {
           if (id === fromShape.id) return fromShape
@@ -213,7 +213,7 @@ describe('anchors', () => {
     })
   })
 
-  describe('calculateBasicLinkerRoute', () => {
+  describe('getBasicLinkerRoute', () => {
     it('应保留基础路由兼容入口', () => {
       const fromShape = createShape({
         id: 'from_shape_basic',
@@ -234,7 +234,7 @@ describe('anchors', () => {
         from: { id: fromShape.id, binding: { type: 'fixed', anchorId: 'right' }, x: 0, y: 0 },
         to: { id: toShape.id, binding: { type: 'fixed', anchorId: 'left' }, x: 0, y: 0 },
       })
-      const route = calculateBasicLinkerRoute(linker, id => {
+      const route = getBasicLinkerRoute(linker, id => {
         if (id === fromShape.id) return fromShape
         if (id === toShape.id) return toShape
         return null

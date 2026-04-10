@@ -6,8 +6,8 @@ import {
   type LinkerRoute,
   type ShapeElement,
 } from '@diagen/core'
-import { getLinkerTextBox } from './linkerText'
-import { resolvePathActions, type ResolvedPathAction, resolvePathValue } from '@diagen/core/path'
+import { resolveActions, type ResolvedAction, resolveValue } from '@diagen/core/path'
+import { getLinkerTextBox } from '@diagen/core/text'
 
 export function parseColor(color: string | undefined): string {
   if (!color) return 'rgba(0,0,0,1)'
@@ -81,7 +81,7 @@ export function applyFontStyle(ctx: CanvasRenderingContext2D, fontStyle: FontSty
   ctx.textBaseline = fontStyle.vAlign === 'top' ? 'top' : fontStyle.vAlign === 'bottom' ? 'bottom' : 'middle'
 }
 
-export function drawPath(ctx: CanvasRenderingContext2D, actions: ResolvedPathAction[]): void {
+export function drawPath(ctx: CanvasRenderingContext2D, actions: ResolvedAction[]): void {
   ctx.beginPath()
   for (const a of actions) {
     switch (a.action) {
@@ -201,7 +201,7 @@ export function renderShape(ctx: CanvasRenderingContext2D, shape: ShapeElement):
   }
 
   for (const pathDef of path) {
-    const actions = resolvePathActions(pathDef.actions, w, h)
+    const actions = resolveActions(pathDef.actions, w, h)
     drawPath(ctx, actions)
 
     const pf = pathDef.fillStyle || fillStyle
@@ -219,10 +219,10 @@ export function renderShape(ctx: CanvasRenderingContext2D, shape: ShapeElement):
 
   for (const block of textBlock) {
     const pos = block.position
-    const bx = resolvePathValue(pos.x, w, h)
-    const by = resolvePathValue(pos.y, w, h)
-    const bw = resolvePathValue(pos.w, w, h)
-    const bh = resolvePathValue(pos.h, w, h)
+    const bx = resolveValue(pos.x, w, h)
+    const by = resolveValue(pos.y, w, h)
+    const bw = resolveValue(pos.w, w, h)
+    const bh = resolveValue(pos.h, w, h)
     drawText(ctx, block.text, bx, by, bw, bh, block.fontStyle || fontStyle)
   }
 

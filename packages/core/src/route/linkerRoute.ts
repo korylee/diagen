@@ -1,9 +1,9 @@
 import type { Point } from '@diagen/shared'
 import type { LinkerType } from '../constants'
 import type { DiagramElement, LinkerElement, LinkerEndpoint, ShapeElement } from '../model'
-import { getShapeAnchorInfoById, resolveShapePerimeterInfo } from '../anchors'
-import type { Obstacle, RouterConfig } from './types'
-import { calculateObstacleRoute, createObstaclesFromElements, type RouterOptions } from './obstacleRoute'
+import { getAnchorInfoById, resolvePerimeterInfo } from '../anchors'
+import type { Obstacle, RouteConfig } from './types'
+import { getObstacleRoute, getObstacles, type RouteOptions } from './obstacleRoute'
 
 /**
  * 连线最终路由结果：
@@ -44,9 +44,9 @@ export interface LinkerRouteOptions {
   /** 构建障碍物时需要排除的元素 ID */
   excludeObstacleIds?: string[]
   /** 障碍规避路由基础配置 */
-  obstacleConfig?: Partial<RouterConfig>
+  obstacleConfig?: Partial<RouteConfig>
   /** 障碍规避路由算法配置 */
-  obstacleOptions?: RouterOptions
+  obstacleOptions?: RouteOptions
   /** 障碍规避失败时是否回退到 basic，默认 `true` */
   fallbackToBasic?: boolean
 }
@@ -61,7 +61,7 @@ interface ResolvedEndpoint {
  * - 保留原有 broken/orthogonal/curved 语义
  * - 不做障碍规避
  */
-export function calculateBasicLinkerRoute(
+export function getBasicLinkerRoute(
   linker: LinkerElement,
   getShapeById: (id: string) => ShapeElement | undefined | null,
 ): LinkerRoute {
@@ -85,7 +85,7 @@ export function calculateBasicLinkerRoute(
  * - 先做端点解析（point + angle）
  * - 再根据策略分发到 basic / obstacle
  */
-export function calculateLinkerRoute(
+export function getLinkerRoute(
   linker: LinkerElement,
   getShapeById: (id: string) => ShapeElement | undefined | null,
   options: LinkerRouteOptions = {},
@@ -104,7 +104,7 @@ export function calculateLinkerRoute(
 
   if (strategy === 'obstacle') {
     const obstacles = resolveLinkerObstacles(linker, options)
-    const obstacleRoute = calculateObstacleRoute(
+    const obstacleRoute = getObstacleRoute(
       endpoints.from.point,
       endpoints.to.point,
       obstacles,
@@ -160,7 +160,7 @@ function resolveLinkerObstacles(linker: LinkerElement, options: LinkerRouteOptio
   if (linker.from.id) excludeIds.add(linker.from.id)
   if (linker.to.id) excludeIds.add(linker.to.id)
 
-  return createObstaclesFromElements(options.obstacleElements ?? [], Array.from(excludeIds))
+  return getObstacles(options.obstacleElements ?? [], Array.from(excludeIds))
 }
 
 /**
@@ -243,7 +243,7 @@ function resolveEndpoint(
   if (binding.type === 'free') return fallback
 
   if (binding.type === 'fixed') {
-    const info = getShapeAnchorInfoById(shape, binding.anchorId)
+    const info = getAnchorInfoById(shape, binding.anchorId)
     if (!info) return fallback
     return {
       point: info.point,
@@ -251,7 +251,7 @@ function resolveEndpoint(
     }
   }
 
-  const info = resolveShapePerimeterInfo(shape, binding)
+  const info = resolvePerimeterInfo(shape, binding)
   if (!info) return fallback
   return {
     point: info.point,

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { isIntersects } from '@diagen/shared'
 import { createLinker, createShape, type ShapeElement } from '../../../model'
 import { createDesigner } from '../../create'
-import * as routerUtils from '../../../router'
+import * as routeUtils from '../../../route'
 
 function withDesigner(run: (designer: ReturnType<typeof createDesigner>) => void) {
   createRoot(dispose => {
@@ -404,7 +404,7 @@ describe('view manager', () => {
 
   it('重复读取同一连线布局时应复用跳线缓存', () => {
     withLineJumpDesigner(designer => {
-      const jumpsSpy = vi.spyOn(routerUtils, 'calculateLineJumps')
+      const jumpsSpy = vi.spyOn(routeUtils, 'calculateLineJumps')
 
       try {
         const { verticals, horizontal } = createDenseJumpLinkers([50])

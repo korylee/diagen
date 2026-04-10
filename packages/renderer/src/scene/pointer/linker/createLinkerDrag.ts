@@ -22,10 +22,10 @@ import { createDragSession } from '../shared/createDragSession'
 import type { CreatePointerDragTrackerOptions } from '../shared/createPointerDragTracker'
 import { createPointerDeltaState } from '../shared/createPointerDeltaState'
 import {
-  getShapeAnchorInfo,
-  getShapePerimeterInfo,
-  resolvePreferredCreateAnchor,
-  resolveShapePerimeterInfo,
+  getAnchorInfo,
+  getPerimeterInfo,
+  resolveCreateAnchor,
+  resolvePerimeterInfo,
 } from '@diagen/core/anchors'
 
 export type LinkerDragMode = 'from' | 'to' | 'control' | 'line' | 'text'
@@ -300,7 +300,7 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
 
       const fixedAnchors: FixedAnchorCandidate[] = []
       for (let index = 0; index < shape.anchors.length; index++) {
-        const info = getShapeAnchorInfo(shape, index)
+        const info = getAnchorInfo(shape, index)
         if (!info) continue
         fixedAnchors.push({
           id: info.id,
@@ -356,7 +356,7 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     }
 
     if (hit.binding.type === 'perimeter') {
-      const info = resolveShapePerimeterInfo(shape, hit.binding)
+      const info = resolvePerimeterInfo(shape, hit.binding)
       if (!info) return null
       return {
         shapeId: shape.id,
@@ -522,7 +522,7 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     const sourceShape = element.getElementById(options.shapeId)
     if (!sourceShape || sourceShape.type !== 'shape') return false
 
-    const preferredAnchor = resolvePreferredCreateAnchor(sourceShape)
+    const preferredAnchor = resolveCreateAnchor(sourceShape)
     if (!preferredAnchor) return false
 
     const fromBinding: LinkerEndpointBinding =
@@ -1090,7 +1090,7 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
         }
       }
 
-      const perimeter = getShapePerimeterInfo(shape, point)
+      const perimeter = getPerimeterInfo(shape, point)
       if (!perimeter || perimeter.distance > maxDistance) continue
 
       let score = perimeter.distance

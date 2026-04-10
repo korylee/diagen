@@ -1,9 +1,10 @@
 import { isLinker, isShape } from '@diagen/core'
-import type { Point } from '@diagen/shared'
+import { getLinkerTextBox, isPointInShapeTextBox } from '@diagen/core/text'
+import { isPointInBounds, type Point } from '@diagen/shared'
 import { createEffect, createMemo, createSignal } from 'solid-js'
-import { getLinkerTextBox, hitTestScene, isPointInLinkerTextBox, isPointInShapeTextBox } from '../../../utils'
 import { useDesigner } from '../../../context/DesignerProvider'
 import type { Interaction } from '../../../context/InteractionProvider'
+import { hitTestScene } from '../../../utils'
 
 export type TextEditorSession =
   | {
@@ -19,10 +20,7 @@ function isTextEditorTarget(target: EventTarget | null): boolean {
   return target instanceof Element && !!target.closest('[data-text-editor="true"]')
 }
 
-function shouldOpenTextEditor(params: {
-  sceneHit: ReturnType<typeof hitTestScene>
-  point: Point
-}): boolean {
+function shouldOpenTextEditor(params: { sceneHit: ReturnType<typeof hitTestScene>; point: Point }): boolean {
   const { sceneHit, point } = params
   if (!sceneHit) return false
 
@@ -35,7 +33,7 @@ function shouldOpenTextEditor(params: {
     textPosition: sceneHit.element.textPosition,
   })
   if (!box) return false
-  return isPointInLinkerTextBox(point, box)
+  return isPointInBounds(point, box)
 }
 
 export function createTextEditorControl(params: { interaction: Interaction }) {

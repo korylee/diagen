@@ -1,6 +1,6 @@
 import { isLinker, isShape, type FontStyle } from '@diagen/core'
+import { getLinkerTextBox, getShapeTextBox } from '@diagen/core/text'
 import { createEffect, createMemo, createSignal, type Accessor } from 'solid-js'
-import { getLinkerTextBox, getShapeTextBox } from '../../../utils'
 import { useDesigner } from '../../../context/DesignerProvider'
 import type { TextEditorSession } from './createTextEditorControl'
 

@@ -2,7 +2,7 @@ import { createRoot } from 'solid-js'
 import { describe, expect, it, vi } from 'vitest'
 import { createDesigner, createLinker, createShape, type LinkerElement } from '@diagen/core'
 import { createLinkerDrag } from './createLinkerDrag'
-import { getShapeAnchorInfo, getShapePerimeterInfo, resolvePreferredCreateAnchor } from '@diagen/core/anchors'
+import { getAnchorInfo, getPerimeterInfo, resolveCreateAnchor } from '@diagen/core/anchors'
 
 const testContext = vi.hoisted(() => ({
   designer: null as ReturnType<typeof createDesigner> | null,
@@ -615,8 +615,8 @@ describe('createLinkerDrag', () => {
       const targetShape = createShapeById('target_shape', 300, 0)
       designer.edit.add([sourceShape, targetShape], { record: false, select: false })
 
-      const sourceAnchor = resolvePreferredCreateAnchor(sourceShape)
-      const targetAnchor = getShapeAnchorInfo(targetShape, 3)
+      const sourceAnchor = resolveCreateAnchor(sourceShape)
+      const targetAnchor = getAnchorInfo(targetShape, 3)
 
       expect(sourceAnchor).not.toBeNull()
       expect(targetAnchor).not.toBeNull()
@@ -757,7 +757,7 @@ describe('createLinkerDrag', () => {
       const targetShape = createShapeById('fixed_target_shape', 300, 0)
       designer.edit.add([sourceShape, targetShape], { record: false, select: false })
 
-      const sourceAnchor = getShapeAnchorInfo(sourceShape, 1)
+      const sourceAnchor = getAnchorInfo(sourceShape, 1)
       expect(sourceAnchor).not.toBeNull()
 
       const linker = createLinker({
@@ -813,7 +813,7 @@ describe('createLinkerDrag', () => {
       const targetShape = createShapeById('perimeter_target_shape', 300, 0)
       designer.edit.add([sourceShape, targetShape], { record: false, select: false })
 
-      const sourcePerimeter = getShapePerimeterInfo(sourceShape, { x: 20, y: 0 })
+      const sourcePerimeter = getPerimeterInfo(sourceShape, { x: 20, y: 0 })
       expect(sourcePerimeter).not.toBeNull()
 
       const linker = createLinker({

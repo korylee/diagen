@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { createLinker, createShape } from '@diagen/core'
 import { rotatePoint } from '@diagen/shared'
 import { createRendererTestHarness } from '../.test/createRendererTestHarness'
-import { getLinkerTextBox } from '../utils'
-import { getShapePerimeterInfo, getShapeAnchorInfo } from '@diagen/core/anchors'
+import { getPerimeterInfo, getAnchorInfo } from '@diagen/core/anchors'
+import { getLinkerTextBox } from '@diagen/core/text'
 
 type RendererHarness = Awaited<ReturnType<typeof createRendererTestHarness>>
 
@@ -808,7 +808,7 @@ describe('Renderer', () => {
         throw new Error('shape_linker_fixed_source 未找到')
       }
 
-      const sourceAnchor = getShapeAnchorInfo(sourceShape, 1)
+      const sourceAnchor = getAnchorInfo(sourceShape, 1)
       expect(sourceAnchor).toBeTruthy()
       if (!sourceAnchor) {
         throw new Error('shape_linker_fixed_source 锚点未找到')
@@ -912,8 +912,8 @@ describe('Renderer', () => {
         throw new Error('perimeter 测试图形未找到')
       }
 
-      const sourcePerimeter = getShapePerimeterInfo(sourceShape, { x: 120, y: 100 })
-      const targetAnchor = getShapeAnchorInfo(targetShape, 3)
+      const sourcePerimeter = getPerimeterInfo(sourceShape, { x: 120, y: 100 })
+      const targetAnchor = getAnchorInfo(targetShape, 3)
       expect(sourcePerimeter).toBeTruthy()
       expect(targetAnchor).toBeTruthy()
       if (!sourcePerimeter || !targetAnchor) {

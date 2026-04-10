@@ -1,7 +1,7 @@
 import { createLinker } from '@diagen/core'
 import { describe, expect, it, vi } from 'vitest'
 import { renderLinker } from './render-utils'
-import { getLinkerTextBox } from './linkerText'
+import { getLinkerTextBox } from '@diagen/core/text'
 
 function createContextMock() {
   return {

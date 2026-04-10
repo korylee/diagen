@@ -1,29 +1,29 @@
 import { describe, expect, it } from 'vitest'
 import { Schema } from '../schema'
 import {
-  compilePathActions,
-  evaluateCompiledPathAction,
-  resolvePathActions,
-  resolvePathAnchors,
-  resolvePathPoint,
-  resolvePathValue,
+  compileActions,
+  evaluateAction,
+  resolveActions,
+  resolvePoints,
+  resolvePoint,
+  resolveValue,
 } from './index'
 
 describe('pathActions', () => {
-  describe('resolvePathValue', () => {
+  describe('resolveValue', () => {
     it('应该支持 undefined 与表达式求值', () => {
-      expect(resolvePathValue(undefined, 100, 50)).toBe(0)
-      expect(resolvePathValue(12, 100, 50)).toBe(12)
-      expect(resolvePathValue('w/2', 100, 50)).toBe(50)
-      expect(resolvePathValue('h-10', 100, 50)).toBe(40)
+      expect(resolveValue(undefined, 100, 50)).toBe(0)
+      expect(resolveValue(12, 100, 50)).toBe(12)
+      expect(resolveValue('w/2', 100, 50)).toBe(50)
+      expect(resolveValue('h-10', 100, 50)).toBe(40)
     })
   })
 
-  describe('resolvePathPoint 与 resolvePathAnchors', () => {
+  describe('resolvePoint 与 resolvePoints', () => {
     it('应该解析点与锚点数组', () => {
-      expect(resolvePathPoint('w/2', 'h/2', 100, 60)).toEqual({ x: 50, y: 30 })
+      expect(resolvePoint('w/2', 'h/2', 100, 60)).toEqual({ x: 50, y: 30 })
       expect(
-        resolvePathAnchors(
+        resolvePoints(
           [
             { x: 0, y: 0 },
             { x: 'w', y: 'h' },
@@ -38,9 +38,9 @@ describe('pathActions', () => {
     })
   })
 
-  describe('compilePathActions + evaluateCompiledPathAction', () => {
+  describe('compileActions + evaluateAction', () => {
     it('应该编译并执行路径动作参数', () => {
-      const [compiled] = compilePathActions([
+      const [compiled] = compileActions([
         {
           action: 'curve',
           x: 'w',
@@ -52,7 +52,7 @@ describe('pathActions', () => {
         },
       ])
 
-      expect(evaluateCompiledPathAction(compiled, 120, 80)).toEqual({
+      expect(evaluateAction(compiled, 120, 80)).toEqual({
         action: 'curve',
         x: 120,
         y: 80,
@@ -64,9 +64,9 @@ describe('pathActions', () => {
     })
   })
 
-  describe('resolvePathActions', () => {
+  describe('resolveActions', () => {
     it('应该支持直接动作数组解析', () => {
-      const result = resolvePathActions(
+      const result = resolveActions(
         [
           { action: 'move', x: 0, y: 0 },
           { action: 'line', x: 'w', y: 'h' },
@@ -88,7 +88,7 @@ describe('pathActions', () => {
         { action: 'line', x: 'w/2', y: 'h/2' },
       ])
 
-      const result = resolvePathActions({ ref }, 120, 80)
+      const result = resolveActions({ ref }, 120, 80)
       expect(result).toEqual([
         { action: 'move', x: 0, y: 0 },
         { action: 'line', x: 60, y: 40 },
@@ -96,7 +96,7 @@ describe('pathActions', () => {
     })
 
     it('ref 不存在时应该返回空数组', () => {
-      expect(resolvePathActions({ ref: '__path_actions_not_found__' }, 100, 50)).toEqual([])
+      expect(resolveActions({ ref: '__path_actions_not_found__' }, 100, 50)).toEqual([])
     })
   })
 })

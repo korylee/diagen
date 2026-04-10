@@ -3,7 +3,7 @@ import { isShape } from '../model'
 import type { DiagramElement } from '../model'
 import { aStarRoute, type AStarRouteOptions, createObstacleFromBounds } from './astar'
 import { orthogonalRoute, type OrthogonalRouteOptions } from './orthogonal'
-import type { Obstacle, RouteResult, RouterConfig } from './types'
+import type { Obstacle, RouteConfig, RouteResult } from './types'
 import { euclideanDistance } from './utils'
 
 /**
@@ -12,23 +12,23 @@ import { euclideanDistance } from './utils'
  * - `orthogonal`：正交优先，可读性更好
  * - `hybrid`：先正交后回退 A*
  */
-export type RouterAlgorithm = 'astar' | 'orthogonal' | 'hybrid'
+export type RouteAlgorithm = 'astar' | 'orthogonal' | 'hybrid'
 
 /**
  * 障碍路由参数。
  */
-export interface RouterOptions {
-  algorithm?: RouterAlgorithm
+export interface RouteOptions {
+  algorithm?: RouteAlgorithm
   astarOptions?: AStarRouteOptions
   orthogonalOptions?: OrthogonalRouteOptions
 }
 
 /**
  * 默认路由配置：
- * - 作为 `calculateObstacleRoute` 的基线
+ * - 作为 `getObstacleRoute` 的基线
  * - 调用方可通过 `config` 局部覆盖
  */
-export const DEFAULT_ROUTER_CONFIG: RouterConfig = {
+export const DEFAULT_ROUTE_CONFIG: RouteConfig = {
   gridSize: 10,
   padding: 15,
   maxIterations: 5000,
@@ -50,14 +50,14 @@ const HYBRID_FALLBACK_MAX_COST = 500
  * - 该入口只关心 point-to-point 路由，不处理 Linker 端点绑定语义
  * - Linker 语义分发由 `linkerRoute.ts` 承担
  */
-export function calculateObstacleRoute(
+export function getObstacleRoute(
   from: Point,
   to: Point,
   obstacles: Obstacle[],
-  config: Partial<RouterConfig> = {},
-  options: RouterOptions = {},
+  config: Partial<RouteConfig> = {},
+  options: RouteOptions = {},
 ): RouteResult {
-  const mergedConfig = { ...DEFAULT_ROUTER_CONFIG, ...config }
+  const mergedConfig = { ...DEFAULT_ROUTE_CONFIG, ...config }
   const algorithm = options.algorithm ?? 'hybrid'
 
   switch (algorithm) {
@@ -80,8 +80,8 @@ function calculateHybridObstacleRoute(
   from: Point,
   to: Point,
   obstacles: Obstacle[],
-  config: RouterConfig,
-  options: RouterOptions,
+  config: RouteConfig,
+  options: RouteOptions,
 ): RouteResult {
   const orthogonalResult = orthogonalRoute(from, to, obstacles, config, options.orthogonalOptions)
 
@@ -116,7 +116,7 @@ function shouldAcceptOrthogonalResult(from: Point, result: RouteResult): boolean
  * - 仅 shape 参与障碍建模
  * - 通过 `excludeIds` 可排除当前连线关联图元
  */
-export function createObstaclesFromElements(elements: DiagramElement[], excludeIds: string[] = []): Obstacle[] {
+export function getObstacles(elements: DiagramElement[], excludeIds: string[] = []): Obstacle[] {
   const obstacles: Obstacle[] = []
   const excludeSet = new Set(excludeIds)
 
@@ -140,12 +140,12 @@ export function createObstaclesFromElements(elements: DiagramElement[], excludeI
 /**
  * 便捷入口：直接用元素列表计算路径点。
  */
-export function calculateRoutePoints(
+export function getRoutePoints(
   from: Point,
   to: Point,
   elements: DiagramElement[],
-  options: RouterOptions = {},
+  options: RouteOptions = {},
 ): Point[] {
-  const obstacles = createObstaclesFromElements(elements)
-  return calculateObstacleRoute(from, to, obstacles, {}, options).points
+  const obstacles = getObstacles(elements)
+  return getObstacleRoute(from, to, obstacles, {}, options).points
 }

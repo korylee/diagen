@@ -1,16 +1,16 @@
-import {  isLinker, isShape } from '@diagen/core'
+import { isLinker, isShape } from '@diagen/core'
+import { getAnchorInfo } from '@diagen/core/anchors'
+import { getLinkerTextBox } from '@diagen/core/text'
 import { type Point } from '@diagen/shared'
 import { createMemo } from 'solid-js'
 import { useDesigner } from '../../../context/DesignerProvider'
 import { useInteraction } from '../../../context/InteractionProvider'
-import { getLinkerTextBox } from '../../../utils'
 import type { RectHighlightItem } from '../RectHighlightOverlay'
 import { createRoutePath } from './createRoutePath'
 import { LinkQuickCreatePanel } from './LinkQuickCreatePanel'
 import { LinkTargetHighlights } from './LinkTargetHighlights'
 import { SelectedLinkerOverlay } from './SelectedLinkerOverlay'
 import type { LinkerControlHandle, QuickCreateAction, QuickCreatePanel, QuickCreatePlacement } from './types'
-import { getShapeAnchorInfo } from '@diagen/core/anchors'
 
 import './index.scss'
 
@@ -213,7 +213,7 @@ export function LinkerOverlay() {
     const items: RectHighlightItem[] = []
 
     for (let index = 0; index < target.anchors.length; index++) {
-      const anchor = getShapeAnchorInfo(target, index)
+      const anchor = getAnchorInfo(target, index)
       if (!anchor) continue
       const screenPoint = coordinate.canvasToScreen(anchor.point)
       const isActive = candidate.anchorId === anchor.id

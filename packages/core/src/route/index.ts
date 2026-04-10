@@ -1,5 +1,5 @@
 /**
- * Router Public API
+ * Route Public API
  *
  * 设计原则：
  * - `linkerRoute` 处理 Linker 语义（端点绑定、角度、策略分发）
@@ -9,8 +9,8 @@
 
 // Linker 语义路由
 export {
-  calculateBasicLinkerRoute,
-  calculateLinkerRoute,
+  getBasicLinkerRoute,
+  getLinkerRoute,
   type LinkerRouteJump,
   type LinkerRoute,
   type LinkerRouteOptions,
@@ -20,15 +20,19 @@ export {
 export { calculateLineJumps, type CalculateLineJumpsOptions } from './lineJumps'
 // 障碍规避路由
 export {
-  calculateObstacleRoute, calculateRoutePoints, createObstaclesFromElements, DEFAULT_ROUTER_CONFIG, type RouterAlgorithm,
-  type RouterOptions
+  getObstacleRoute,
+  getRoutePoints,
+  getObstacles,
+  DEFAULT_ROUTE_CONFIG,
+  type RouteAlgorithm,
+  type RouteOptions
 } from './obstacleRoute'
 
 // 低层算法入口（保留对高级场景的直接访问）
-export { aStarRoute, findRoute } from './astar'
-export { findOrthogonalRoute, orthogonalRoute } from './orthogonal'
+export { aStarRoute } from './astar'
+export { orthogonalRoute } from './orthogonal'
 
 // 核心类型
 export type { AStarRouteOptions } from './astar'
 export type { OrthogonalRouteOptions } from './orthogonal'
-export type { Obstacle, RouterConfig, RouteResult } from './types'
+export type { Obstacle, RouteConfig, RouteContext, RouteResult } from './types'

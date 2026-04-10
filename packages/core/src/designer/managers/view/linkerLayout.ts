@@ -5,10 +5,10 @@ import { DEFAULTS } from '../../../constants'
 import { isLinker, isShape, type DiagramElement, type LinkerElement, type ShapeElement } from '../../../model'
 import {
   calculateLineJumps,
-  calculateLinkerRoute,
+  getLinkerRoute,
   type LinkerRoute,
   type LinkerRouteOptions,
-} from '../../../router'
+} from '../../../route'
 import type { LinkerRouteConfig } from '../../types'
 import type { ElementManager } from '../element'
 import { calculateLinkerBounds } from './shared'
@@ -122,7 +122,7 @@ export function createLinkerLayoutController(options: CreateLinkerLayoutControll
       }
     }
 
-    const route = calculateLinkerRoute(linker, getShapeById, resolveRouteOptions(linker))
+    const route = getLinkerRoute(linker, getShapeById, resolveRouteOptions(linker))
     const bounds = calculateLinkerBounds(linker, route)
 
     linkerLayoutCache.set(linker.id, {

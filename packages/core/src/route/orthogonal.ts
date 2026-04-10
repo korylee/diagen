@@ -1,5 +1,5 @@
 import type { Point, Bounds } from '@diagen/shared'
-import type { Obstacle, RouteResult, RouterConfig } from './types'
+import type { Obstacle, RouteConfig, RouteResult } from './types'
 import {
   calculateBounds,
   calculateRouteCost,
@@ -18,7 +18,7 @@ export function orthogonalRoute(
   from: Point,
   to: Point,
   obstacles: Obstacle[],
-  config: RouterConfig,
+  config: RouteConfig,
   options: OrthogonalRouteOptions = {}
 ): RouteResult {
   // 分层策略：从最便宜的候选开始尝试，逐步放宽到复杂绕行。
@@ -101,7 +101,7 @@ function tryComplexOrthogonal(
   from: Point,
   to: Point,
   obstacles: Obstacle[],
-  config: RouterConfig,
+  config: RouteConfig,
   options: OrthogonalRouteOptions
 ): RouteResult {
   // 第三层候选：通过逃逸点把路径先拉出拥挤区域，再回接到终点。
@@ -227,7 +227,7 @@ export function findOrthogonalRoute(
   obstacles: Obstacle[],
   options: OrthogonalRouteOptions = {}
 ): RouteResult {
-  const defaultConfig: RouterConfig = {
+  const defaultConfig: RouteConfig = {
     gridSize: 10,
     padding: 15,
     maxIterations: 5000,

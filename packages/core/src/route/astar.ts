@@ -1,6 +1,6 @@
 import type { Bounds, Point } from '@diagen/shared'
 import { createHeap, expandBounds } from '@diagen/shared'
-import type { Obstacle, RouteResult, RouterConfig } from './types'
+import type { Obstacle, RouteConfig, RouteResult } from './types'
 import { calculateBounds, simplifyOrthogonalPath } from './utils'
 
 interface AStarNode {
@@ -28,7 +28,7 @@ export function aStarRoute(
   from: Point,
   to: Point,
   obstacles: Obstacle[],
-  config: RouterConfig,
+  config: RouteConfig,
   options: AStarRouteOptions = {},
 ): RouteResult {
   const { heuristic = 'manhattan', bendPenalty = 20, weight = 1 } = options
@@ -288,9 +288,9 @@ export function findRoute(
   from: Point,
   to: Point,
   obstacles: Obstacle[],
-  config: Partial<RouterConfig> = {},
+  config: Partial<RouteConfig> = {},
 ): RouteResult {
-  const defaultConfig: RouterConfig = {
+  const defaultConfig: RouteConfig = {
     gridSize: 10,
     padding: 15,
     maxIterations: 5000,

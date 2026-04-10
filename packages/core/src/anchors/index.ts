@@ -9,7 +9,7 @@ import { evaluateExpression, resolvePoints } from '../expression'
 
 export type AnchorDirection = 'top' | 'right' | 'bottom' | 'left' | 'center'
 
-export interface ShapeAnchorInfo {
+export interface AnchorInfo {
   index: number
   id: string
   direction: AnchorDirection
@@ -17,19 +17,19 @@ export interface ShapeAnchorInfo {
   angle: number
 }
 
-export interface PreferredCreateFixedAnchorInfo extends ShapeAnchorInfo {
+export interface CreateFixedAnchorInfo extends AnchorInfo {
   type: 'fixed'
 }
 
-export type PreferredCreateAnchor = PreferredCreateFixedAnchorInfo | ShapePerimeterInfo
+export type CreateAnchor = CreateFixedAnchorInfo | PerimeterInfo
 
-export interface ResolvePreferredCreateAnchorOptions {
+export interface ResolveCreateAnchorOptions {
   preferredDirections?: AnchorDirection[]
 }
 
 type PerimeterBinding = Extract<LinkerEndpointBinding, { type: 'perimeter' }>
 
-export interface ShapePerimeterInfo extends PerimeterBinding {
+export interface PerimeterInfo extends PerimeterBinding {
   point: Point
   angle: number
   distance: number
@@ -128,7 +128,7 @@ function getAnchorId(shape: ShapeElement, anchorIndex: number): string {
   return shape.anchors[anchorIndex]?.id ?? String(anchorIndex)
 }
 
-export function getShapeAnchorIndexById(shape: ShapeElement, anchorId: string): number {
+export function getAnchorIndexById(shape: ShapeElement, anchorId: string): number {
   for (let i = 0; i < shape.anchors.length; i++) {
     if (getAnchorId(shape, i) === anchorId) return i
   }
@@ -138,7 +138,7 @@ export function getShapeAnchorIndexById(shape: ShapeElement, anchorId: string): 
 /**
  * 获取图形锚点的绝对坐标
  */
-export function getShapeAnchors(shape: ShapeElement): Point[] {
+export function getAnchors(shape: ShapeElement): Point[] {
   const { anchors, props } = shape
   const localAnchors = resolveAnchors(anchors, props.w, props.h)
   return localAnchors.map(anchor => {
@@ -154,7 +154,7 @@ export function getShapeAnchors(shape: ShapeElement): Point[] {
 /**
  * 获取图形指定锚点的绝对坐标
  */
-export function getShapeAnchorPosition(shape: ShapeElement, anchorIndex: number): Point | null {
+export function getAnchorPoint(shape: ShapeElement, anchorIndex: number): Point | null {
   if (!shape.anchors || anchorIndex < 0 || anchorIndex >= shape.anchors.length) return null
   const anchor = shape.anchors[anchorIndex]
   const { props } = shape
@@ -168,10 +168,10 @@ export function getShapeAnchorPosition(shape: ShapeElement, anchorIndex: number)
   }
 }
 
-export function getShapeAnchorPositionById(shape: ShapeElement, anchorId: string): Point | null {
-  const index = getShapeAnchorIndexById(shape, anchorId)
+export function getAnchorPointById(shape: ShapeElement, anchorId: string): Point | null {
+  const index = getAnchorIndexById(shape, anchorId)
   if (index < 0) return null
-  return getShapeAnchorPosition(shape, index)
+  return getAnchorPoint(shape, index)
 }
 
 function resolveShapePathPolylines(shape: ShapeElement): PathPolyline[] {
@@ -428,7 +428,7 @@ function buildPerimeterInfo(
   segment: ShapePerimeterSegment,
   t: number,
   distance: number,
-): ShapePerimeterInfo | null {
+): PerimeterInfo | null {
   const clampedT = Math.max(0, Math.min(1, t))
   const localPoint = {
     x: segment.fromLocal.x + (segment.toLocal.x - segment.fromLocal.x) * clampedT,
@@ -457,7 +457,7 @@ function buildPerimeterInfo(
   }
 }
 
-export function resolveShapePerimeterInfo(shape: ShapeElement, binding: PerimeterBinding): ShapePerimeterInfo | null {
+export function resolvePerimeterInfo(shape: ShapeElement, binding: PerimeterBinding): PerimeterInfo | null {
   const paths = resolveShapePathPolylines(shape)
   const segments = resolveShapePerimeterSegments(shape)
   const segment = segments.find(s => s.pathIndex === binding.pathIndex && s.segmentIndex === binding.segmentIndex)
@@ -465,7 +465,7 @@ export function resolveShapePerimeterInfo(shape: ShapeElement, binding: Perimete
   return buildPerimeterInfo(shape, paths, segment, binding.t, 0)
 }
 
-export function getShapePerimeterInfo(shape: ShapeElement, point: Point): ShapePerimeterInfo | null {
+export function getPerimeterInfo(shape: ShapeElement, point: Point): PerimeterInfo | null {
   const paths = resolveShapePathPolylines(shape)
   const segments = resolveShapePerimeterSegments(shape)
   if (segments.length === 0) return null
@@ -492,9 +492,9 @@ export function getShapePerimeterInfo(shape: ShapeElement, point: Point): ShapeP
  * 基于路径边界估算锚点法线角（局部坐标）
  * 参考 ProcessOn 的边界法线思想
  */
-export function getShapePathBoundaryNormalAngle(shape: ShapeElement, localPoint: Point): number | null {
+export function getBoundaryNormalAngle(shape: ShapeElement, localPoint: Point): number | null {
   const canvasPoint = localToCanvasPoint(shape, localPoint)
-  const perimeter = getShapePerimeterInfo(shape, canvasPoint)
+  const perimeter = getPerimeterInfo(shape, canvasPoint)
   return perimeter?.angle ?? null
 }
 
@@ -505,7 +505,7 @@ export function getShapePathBoundaryNormalAngle(shape: ShapeElement, localPoint:
  * - 否则使用路径边界外法线角
  * - 若无法从路径求解，则回退到径向角
  */
-export function getShapeAnchorAngle(shape: ShapeElement, anchorIndex: number): number | null {
+export function getAnchorAngle(shape: ShapeElement, anchorIndex: number): number | null {
   if (!shape.anchors || anchorIndex < 0 || anchorIndex >= shape.anchors.length) return null
 
   const anchorDef = shape.anchors[anchorIndex]
@@ -518,28 +518,28 @@ export function getShapeAnchorAngle(shape: ShapeElement, anchorIndex: number): n
     y: evaluateExpression(anchorDef.y, shape.props.w, shape.props.h),
   }
 
-  const boundaryAngle = getShapePathBoundaryNormalAngle(shape, localAnchor)
+  const boundaryAngle = getBoundaryNormalAngle(shape, localAnchor)
   if (boundaryAngle !== null) {
     return normalizeAngle(boundaryAngle)
   }
 
-  return normalizeAngle(getAnchorAngle(localAnchor, shape.props.w, shape.props.h) + toRadians(shape.props.angle))
+  return normalizeAngle(getRadialAngle(localAnchor, shape.props.w, shape.props.h) + toRadians(shape.props.angle))
 }
 
-export function getShapeAnchorAngleById(shape: ShapeElement, anchorId: string): number | null {
-  const index = getShapeAnchorIndexById(shape, anchorId)
+export function getAnchorAngleById(shape: ShapeElement, anchorId: string): number | null {
+  const index = getAnchorIndexById(shape, anchorId)
   if (index < 0) return null
-  return getShapeAnchorAngle(shape, index)
+  return getAnchorAngle(shape, index)
 }
 
 /**
  * 获取图形指定锚点的完整信息（位置 + 方向 + 角度）
  */
-export function getShapeAnchorInfo(shape: ShapeElement, anchorIndex: number): ShapeAnchorInfo | null {
+export function getAnchorInfo(shape: ShapeElement, anchorIndex: number): AnchorInfo | null {
   if (!shape.anchors || anchorIndex < 0 || anchorIndex >= shape.anchors.length) return null
 
-  const point = getShapeAnchorPosition(shape, anchorIndex)
-  const angle = getShapeAnchorAngle(shape, anchorIndex)
+  const point = getAnchorPoint(shape, anchorIndex)
+  const angle = getAnchorAngle(shape, anchorIndex)
   if (!point || angle === null) return null
 
   const anchorDef = shape.anchors[anchorIndex]
@@ -552,10 +552,10 @@ export function getShapeAnchorInfo(shape: ShapeElement, anchorIndex: number): Sh
   }
 }
 
-export function getShapeAnchorInfoById(shape: ShapeElement, anchorId: string): ShapeAnchorInfo | null {
-  const index = getShapeAnchorIndexById(shape, anchorId)
+export function getAnchorInfoById(shape: ShapeElement, anchorId: string): AnchorInfo | null {
+  const index = getAnchorIndexById(shape, anchorId)
   if (index < 0) return null
-  return getShapeAnchorInfo(shape, index)
+  return getAnchorInfo(shape, index)
 }
 
 function getCreateAnchorReferencePoint(shape: ShapeElement): Point {
@@ -565,23 +565,23 @@ function getCreateAnchorReferencePoint(shape: ShapeElement): Point {
   }
 }
 
-function toPreferredFixedAnchor(anchor: ShapeAnchorInfo): PreferredCreateFixedAnchorInfo {
+function toCreateFixedAnchor(anchor: AnchorInfo): CreateFixedAnchorInfo {
   return {
     type: 'fixed',
     ...anchor,
   }
 }
 
-function getFixedAnchorInfos(shape: ShapeElement): ShapeAnchorInfo[] {
-  const anchors: ShapeAnchorInfo[] = []
+function getFixedAnchorInfos(shape: ShapeElement): AnchorInfo[] {
+  const anchors: AnchorInfo[] = []
   for (let index = 0; index < shape.anchors.length; index++) {
-    const info = getShapeAnchorInfo(shape, index)
+    const info = getAnchorInfo(shape, index)
     if (info) anchors.push(info)
   }
   return anchors
 }
 
-function findAnchorByDirections(anchors: ShapeAnchorInfo[], directions: AnchorDirection[]): ShapeAnchorInfo | null {
+function findAnchorByDirections(anchors: AnchorInfo[], directions: AnchorDirection[]): AnchorInfo | null {
   for (const direction of directions) {
     const matched = anchors.find(anchor => anchor.direction === direction)
     if (matched) return matched
@@ -589,7 +589,7 @@ function findAnchorByDirections(anchors: ShapeAnchorInfo[], directions: AnchorDi
   return null
 }
 
-function comparePreferredFixedAnchors(a: ShapeAnchorInfo, b: ShapeAnchorInfo, reference: Point): number {
+function comparePreferredFixedAnchors(a: AnchorInfo, b: AnchorInfo, reference: Point): number {
   const aDistance = Math.hypot(a.point.x - reference.x, a.point.y - reference.y)
   const bDistance = Math.hypot(b.point.x - reference.x, b.point.y - reference.y)
   const distanceDiff = aDistance - bDistance
@@ -611,33 +611,33 @@ function comparePreferredFixedAnchors(a: ShapeAnchorInfo, b: ShapeAnchorInfo, re
  * - 否则选择最靠近图形右上参考点的固定锚点
  * - 最后回退到 perimeter 绑定
  */
-export function resolvePreferredCreateAnchor(
+export function resolveCreateAnchor(
   shape: ShapeElement,
-  options?: ResolvePreferredCreateAnchorOptions,
-): PreferredCreateAnchor | null {
+  options?: ResolveCreateAnchorOptions,
+): CreateAnchor | null {
   const directions = options?.preferredDirections ?? ['right', 'top']
   const reference = getCreateAnchorReferencePoint(shape)
   const fixedAnchors = getFixedAnchorInfos(shape)
   const matched = findAnchorByDirections(fixedAnchors, directions)
 
-  if (matched) return toPreferredFixedAnchor(matched)
-  if (fixedAnchors.length === 0) return getShapePerimeterInfo(shape, reference)
+  if (matched) return toCreateFixedAnchor(matched)
+  if (fixedAnchors.length === 0) return getPerimeterInfo(shape, reference)
 
   const bestAnchor = fixedAnchors.reduce(
     (best, anchor) => {
       if (!best) return anchor
       return comparePreferredFixedAnchors(anchor, best, reference) < 0 ? anchor : best
     },
-    null as ShapeAnchorInfo | null,
+    null as AnchorInfo | null,
   )
 
-  return bestAnchor ? toPreferredFixedAnchor(bestAnchor) : getShapePerimeterInfo(shape, reference)
+  return bestAnchor ? toCreateFixedAnchor(bestAnchor) : getPerimeterInfo(shape, reference)
 }
 
 /**
  * 计算锚点相对于图形中心的角度
  */
-export function getAnchorAngle(anchor: Point, w: number, h: number): number {
+export function getRadialAngle(anchor: Point, w: number, h: number): number {
   const cx = w / 2
   const cy = h / 2
   return Math.atan2(anchor.y - cy, anchor.x - cx)
@@ -654,7 +654,7 @@ export function getNearestAnchorIndex(angle: number, anchors: Anchor[], w: numbe
   let nearestIndex = 0
 
   for (let i = 0; i < resolvedAnchors.length; i++) {
-    const anchorAngle = getAnchorAngle(resolvedAnchors[i], w, h)
+    const anchorAngle = getRadialAngle(resolvedAnchors[i], w, h)
     let diff = Math.abs(angle - anchorAngle)
     if (diff > Math.PI) diff = 2 * Math.PI - diff
 

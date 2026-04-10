@@ -1,6 +1,6 @@
 import type { Point, Bounds } from '@diagen/shared'
 
-export interface RouterConfig {
+export interface RouteConfig {
   gridSize: number
   padding: number
   maxIterations: number
@@ -20,8 +20,8 @@ export interface RouteResult {
   cost?: number
 }
 
-export interface RouterContext {
+export interface RouteContext {
   obstacles: Obstacle[]
   bounds: Bounds
-  config: RouterConfig
+  config: RouteConfig
 }

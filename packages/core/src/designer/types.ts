@@ -1,7 +1,7 @@
 import type { Emitter, Point, Size } from '@diagen/shared'
 import type { LinkerType } from '../constants'
 import type { Diagram } from '../model'
-import type { LinkerRouteStrategy, RouterConfig, RouterOptions } from '../router'
+import type { LinkerRouteStrategy, RouteConfig, RouteOptions } from '../route'
 import type { Transform } from '../transform'
 import type { ElementEvents, HistoryEvents, SelectionEvents } from './managers'
 
@@ -27,9 +27,9 @@ export interface LinkerRouteConfig {
   /** 按连线类型分发主链路策略 */
   strategies: Record<LinkerType, LinkerRouteStrategy>
   /** 障碍规避的基础配置 */
-  obstacleConfig: Partial<RouterConfig>
+  obstacleConfig: Partial<RouteConfig>
   /** 障碍规避的算法选择与参数 */
-  obstacleOptions: RouterOptions
+  obstacleOptions: RouteOptions
   /** 跳线半径（canvas 坐标） */
   lineJumpRadius: number
 }

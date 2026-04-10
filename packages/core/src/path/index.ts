@@ -3,7 +3,7 @@ import type { PathAction, PathDefinition } from '../model'
 import { Schema } from '../schema'
 import { compileExpression, evaluateCompiled, evaluateExpression, type CompiledExpression } from '../expression'
 
-export interface ResolvedPathAction {
+export interface ResolvedAction {
   action: PathAction['action']
   x?: number
   y?: number
@@ -15,7 +15,7 @@ export interface ResolvedPathAction {
   y2?: number
 }
 
-export interface CompiledPathAction {
+export interface CompiledAction {
   action: PathAction['action']
   x?: CompiledExpression | number
   y?: CompiledExpression | number
@@ -35,29 +35,29 @@ function isPathActionRef(value: unknown): value is PathActionRef {
   return typeof value === 'object' && value !== null && 'ref' in value
 }
 
-export function resolvePathValue(value: number | string | undefined, w: number, h: number): number {
+export function resolveValue(value: number | string | undefined, w: number, h: number): number {
   if (value === undefined) return 0
   return evaluateExpression(value, w, h, 0)
 }
 
-export function resolvePathPoint(x: number | string, y: number | string, w: number, h: number): Point {
+export function resolvePoint(x: number | string, y: number | string, w: number, h: number): Point {
   return {
-    x: resolvePathValue(x, w, h),
-    y: resolvePathValue(y, w, h),
+    x: resolveValue(x, w, h),
+    y: resolveValue(y, w, h),
   }
 }
 
-export function resolvePathAnchors(
+export function resolvePoints(
   anchors: Array<{ x: number | string; y: number | string }>,
   w: number,
   h: number,
 ): Point[] {
-  return anchors.map(anchor => resolvePathPoint(anchor.x, anchor.y, w, h))
+  return anchors.map(anchor => resolvePoint(anchor.x, anchor.y, w, h))
 }
 
-export function compilePathActions(actions: PathDefinition['actions']): CompiledPathAction[] {
+export function compileActions(actions: PathDefinition['actions']): CompiledAction[] {
   return actions.map(action => {
-    const compiled: CompiledPathAction = { action: action.action }
+    const compiled: CompiledAction = { action: action.action }
     if (action.x !== undefined) {
       compiled.x = typeof action.x === 'number' ? action.x : (compileExpression(action.x) ?? 0)
     }
@@ -86,8 +86,8 @@ export function compilePathActions(actions: PathDefinition['actions']): Compiled
   })
 }
 
-export function evaluateCompiledPathAction(action: CompiledPathAction, w: number, h: number): ResolvedPathAction {
-  const resolved: ResolvedPathAction = { action: action.action }
+export function evaluateAction(action: CompiledAction, w: number, h: number): ResolvedAction {
+  const resolved: ResolvedAction = { action: action.action }
   if (action.x !== undefined) resolved.x = typeof action.x === 'number' ? action.x : evaluateCompiled(action.x, w, h, 0)
   if (action.y !== undefined) resolved.y = typeof action.y === 'number' ? action.y : evaluateCompiled(action.y, w, h, 0)
   if (action.w !== undefined) resolved.w = typeof action.w === 'number' ? action.w : evaluateCompiled(action.w, w, h, 0)
@@ -107,30 +107,30 @@ export function evaluateCompiledPathAction(action: CompiledPathAction, w: number
   return resolved
 }
 
-function resolveSinglePathAction(action: PathAction, w: number, h: number): ResolvedPathAction {
-  const resolved: ResolvedPathAction = { action: action.action }
-  if (action.x !== undefined) resolved.x = resolvePathValue(action.x, w, h)
-  if (action.y !== undefined) resolved.y = resolvePathValue(action.y, w, h)
-  if (action.w !== undefined) resolved.w = resolvePathValue(action.w, w, h)
-  if (action.h !== undefined) resolved.h = resolvePathValue(action.h, w, h)
-  if (action.x1 !== undefined) resolved.x1 = resolvePathValue(action.x1, w, h)
-  if (action.y1 !== undefined) resolved.y1 = resolvePathValue(action.y1, w, h)
-  if (action.x2 !== undefined) resolved.x2 = resolvePathValue(action.x2, w, h)
-  if (action.y2 !== undefined) resolved.y2 = resolvePathValue(action.y2, w, h)
+function resolveSingleAction(action: PathAction, w: number, h: number): ResolvedAction {
+  const resolved: ResolvedAction = { action: action.action }
+  if (action.x !== undefined) resolved.x = resolveValue(action.x, w, h)
+  if (action.y !== undefined) resolved.y = resolveValue(action.y, w, h)
+  if (action.w !== undefined) resolved.w = resolveValue(action.w, w, h)
+  if (action.h !== undefined) resolved.h = resolveValue(action.h, w, h)
+  if (action.x1 !== undefined) resolved.x1 = resolveValue(action.x1, w, h)
+  if (action.y1 !== undefined) resolved.y1 = resolveValue(action.y1, w, h)
+  if (action.x2 !== undefined) resolved.x2 = resolveValue(action.x2, w, h)
+  if (action.y2 !== undefined) resolved.y2 = resolveValue(action.y2, w, h)
   return resolved
 }
 
-export function resolvePathActions(
+export function resolveActions(
   actions: PathDefinition['actions'] | PathAction | PathActionRef,
   w: number,
   h: number,
-): ResolvedPathAction[] {
+): ResolvedAction[] {
   if (isPathActionRef(actions)) {
     const globalActions = Schema.getGlobalCommand(actions.ref)
     if (!Array.isArray(globalActions)) return []
-    return resolvePathActions(globalActions as PathAction[], w, h)
+    return resolveActions(globalActions as PathAction[], w, h)
   }
 
   const actionList = Array.isArray(actions) ? actions : [actions]
-  return actionList.map(action => resolveSinglePathAction(action, w, h))
+  return actionList.map(action => resolveSingleAction(action, w, h))
 }

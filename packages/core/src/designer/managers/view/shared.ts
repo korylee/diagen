@@ -7,8 +7,8 @@ import {
 } from '@diagen/shared'
 import { createRafLoop } from '@diagen/primitives'
 import { type LinkerElement, type ShapeElement } from '../../../model'
-import { getLinkerTextBox } from '../../../linkerText'
-import type { LinkerRoute } from '../../../router'
+import { getLinkerTextBox } from '../../../text'
+import type { LinkerRoute } from '../../../route'
 import type { AutoGrowConfig } from '../../types'
 
 interface ContainerSizeResolverOptions {

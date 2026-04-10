@@ -1,9 +1,9 @@
 import { type ShapeElement } from '@diagen/core'
-import { compilePathActions, type CompiledPathAction } from '@diagen/core/path'
+import { compileActions, type CompiledAction } from '@diagen/core/path'
 
 export interface CachedPath {
   pathId: string
-  compiledActions: CompiledPathAction[]
+  compiledActions: CompiledAction[]
   lastModified: number
 }
 
@@ -24,7 +24,7 @@ export function getOrCompileShapePaths(shape: ShapeElement): CachedPath[] {
       cachedPaths.push(cached)
     } else {
       const pathDef = shape.path[i]
-      const compiledActions = compilePathActions(pathDef.actions)
+      const compiledActions = compileActions(pathDef.actions)
       const newCached: CachedPath = {
         pathId,
         compiledActions,

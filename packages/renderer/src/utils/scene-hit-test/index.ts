@@ -1,7 +1,14 @@
+import {
+  isLinker,
+  isShape,
+  type DiagramElement,
+  type LinkerElement,
+  type LinkerRoute,
+  type ShapeElement,
+} from '@diagen/core'
 import { expandBounds, isPointInBounds, isPointInRotatedBounds, type Bounds, type Point } from '@diagen/shared'
-import { isLinker, isShape, type DiagramElement, type LinkerElement, type LinkerRoute, type ShapeElement } from '@diagen/core'
 import { hitTestLinker, type LinkerHit, type LinkerHitTestOptions } from '../linker-hit-test'
-import { getLinkerTextBox, isPointInLinkerTextBox } from '../linkerText'
+import { getLinkerTextBox } from '@diagen/core/text'
 
 const DEFAULT_ENDPOINT_TOLERANCE = 10
 const DEFAULT_CONTROL_TOLERANCE = 8
@@ -73,11 +80,12 @@ export function hitTestScene(
       textPosition: element.textPosition,
     })
     const isInRouteBounds = isPointInBounds(point, expandBounds(layout.bounds, linkerHitPadding))
-    const isInTextBox = textBox ? isPointInLinkerTextBox(point, textBox) : false
+    const isInTextBox = textBox ? isPointInBounds(point, textBox) : false
     if (!isInRouteBounds && !isInTextBox) continue
 
     const routeHit = hitTestLinker(element, layout.route, point, options)
-    const shouldPreferText = !routeHit || (routeHit.type !== 'from' && routeHit.type !== 'to' && routeHit.type !== 'control')
+    const shouldPreferText =
+      !routeHit || (routeHit.type !== 'from' && routeHit.type !== 'to' && routeHit.type !== 'control')
     const hit = isInTextBox && shouldPreferText ? { type: 'text' as const } : routeHit
     if (!hit) continue
 
