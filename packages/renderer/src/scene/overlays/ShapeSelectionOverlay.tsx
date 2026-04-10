@@ -1,5 +1,5 @@
-import { createMemo, For, Show } from 'solid-js'
 import { isShape } from '@diagen/core'
+import { createMemo, For, Show } from 'solid-js'
 import { useDesigner } from '../../context/DesignerProvider'
 import { useInteraction } from '../../context/InteractionProvider'
 
