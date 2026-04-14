@@ -11,29 +11,31 @@
 - designer 工厂：`packages/core/src/designer/create.ts`
 - history：`packages/core/src/designer/managers/history.ts`
 - clipboard：`packages/core/src/designer/managers/clipboard.ts`
-- renderer 主入口：`packages/renderer/src/components/Renderer/index.tsx`
-- 指针交互：`packages/renderer/src/components/Renderer/interaction/createPointerInteraction`
+- renderer 主入口：`packages/renderer/src/scene/Renderer.tsx`
+- 指针交互：`packages/renderer/src/scene/pointer/index.ts`
+- coordinate service：`packages/renderer/src/scene/services/createCoordinateService.ts`
+- scroll service：`packages/renderer/src/scene/services/createScrollService.ts`
 - toolbar bridge：`packages/ui/src/toolbar/createToolbarBridge.ts`
 - playground：`playgrounds/vite/src/App.tsx`
 
 ## 3. 定向测试建议
 
 ### 改动 `core` 数据模型、history、持久化时
-- `packages/core/src/designer/__tests__/historyManager.test.ts`
-- `packages/core/src/designer/managers/edit/__tests__/index.test.ts`
-- `packages/core/src/designer/__tests__/clipboardManager.test.ts`
+- `packages/core/src/designer/managers/history.test.ts`
+- `packages/core/src/designer/managers/edit/index.test.ts`
+- `packages/core/src/designer/managers/clipboard.test.ts`
 
 ### 改动 renderer 交互时
-- `packages/renderer/src/components/Renderer/index.test.ts`
-- `packages/renderer/src/components/Renderer/interaction/createPointerInteraction/index.test.ts`
-- `packages/renderer/src/components/Renderer/primitives/createAutoScroll.test.ts`
+- `packages/renderer/src/scene/Renderer.test.ts`
+- `packages/renderer/src/scene/pointer/machine.test.ts`
+- `packages/renderer/src/scene/services/createScrollService.test.ts`
 
 ### 改动路由与变换时
-- `packages/core/src/utils/__tests__/transform.test.ts`
-- `packages/core/src/utils/router/__tests__/router.test.ts`
+- `packages/core/src/transform/index.test.ts`
+- `packages/core/src/route/route.test.ts`
 
 ## 4. 当前测试覆盖判断
-`packages/renderer/src/components/Renderer/index.test.ts` 已覆盖：
+`packages/renderer/src/scene/Renderer.test.ts` 已覆盖：
 - box select
 - scroll 后框选
 - auto-scroll
@@ -46,6 +48,8 @@
 - clipboard 键盘快捷键
 - delete / select all / escape
 - context menu 上下文识别
+- 文本编辑（shape 与 linker）
+- linker 标签拖拽与 textPosition
 
 缺口主要转移到文档链路：
 - 序列化/反序列化协议测试
@@ -71,3 +75,39 @@
 3. 导入非法 JSON 时，有明确错误反馈且不会破坏当前文档。
 4. 拖拽、旋转、建线后自动保存不会造成卡顿。
 5. 导出 JSON 后再次导入，元素数量、顺序、page 设置保持一致。
+
+## 7. renderer 测试文件完整列表
+
+### scene/ 目录
+```
+packages/renderer/src/scene/Renderer.test.ts
+packages/renderer/src/scene/pointer/machine.test.ts
+packages/renderer/src/scene/pointer/shared/createDragSession.test.ts
+packages/renderer/src/scene/pointer/shared/createPointerDeltaState.test.ts
+packages/renderer/src/scene/pointer/shared/createPointerDragTracker.test.ts
+packages/renderer/src/scene/pointer/shape/createResize.test.ts
+packages/renderer/src/scene/pointer/shape/createShapeDrag.test.ts
+packages/renderer/src/scene/pointer/shape/createRotate.test.ts
+packages/renderer/src/scene/pointer/viewport/createBoxSelection.test.ts
+packages/renderer/src/scene/pointer/viewport/createPan.test.ts
+packages/renderer/src/scene/pointer/linker/createLinkerDrag.test.ts
+packages/renderer/src/scene/linker/normalizeManualPoints.test.ts
+packages/renderer/src/scene/overlays/LinkerOverlay/index.test.ts
+packages/renderer/src/scene/services/createCoordinateService.test.ts
+packages/renderer/src/scene/services/createScrollService.test.ts
+```
+
+### core/designer/ 目录
+```
+packages/core/src/designer/managers/clipboard.test.ts
+packages/core/src/designer/managers/edit/index.test.ts
+packages/core/src/designer/managers/element/index.test.ts
+packages/core/src/designer/managers/group.test.ts
+packages/core/src/designer/managers/history.test.ts
+packages/core/src/designer/managers/selection.test.ts
+packages/core/src/designer/managers/tool.test.ts
+packages/core/src/designer/managers/view/index.test.ts
+packages/core/src/designer/managers/view/shared.test.ts
+```
+
+最后更新：2026-04-11

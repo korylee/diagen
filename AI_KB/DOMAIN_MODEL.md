@@ -40,7 +40,7 @@ interface LocalSnapshot {
 ```
 
 理由：
-- 正式导入导出语义最自然的是“一张图文件”
+- 正式导入导出语义最自然的是"一张图文件"
 - `view / savedAt / activePageId` 属于宿主恢复需求，不属于正式交换格式
 - 这样可以同时保持 `core` 协议简洁和宿主恢复能力
 
@@ -60,7 +60,7 @@ interface LocalSnapshot {
 
 ## 4. 元素模型
 
-### 基类字段
+### 基类字段 `BaseElement`
 文件：`packages/core/src/model/types.ts`
 
 - `id`
@@ -71,8 +71,10 @@ interface LocalSnapshot {
 - `group`
 - `parent`
 - `children`
+- `category`：元素类别（新增）
+- `zIndex`：层级索引（新增）
 
-### Shape
+### Shape `ShapeElement`
 文件：`packages/core/src/model/shape.ts`
 
 - `props`
@@ -84,8 +86,13 @@ interface LocalSnapshot {
 - `anchors`
 - `path`
 - `attribute`
+- `title`：标题（新增）
+- `link`：超链接（新增）
+- `dataAttributes`：数据属性列表（新增）
+- `data`：自定义数据（新增）
+- `theme`：主题标识（新增）
 
-### Linker
+### Linker `LinkerElement`
 文件：`packages/core/src/model/linker.ts`
 
 - `from / to`
@@ -93,11 +100,17 @@ interface LocalSnapshot {
 - `routePoints`
 - `lineStyle`
 - `fontStyle`
+- `text`：连线标签文本（新增）
+- `textPosition`：标签位置偏移 `{ dx, dy }`（新增）
+- `linkerType`：连线类型（新增）
+- `dataAttributes`：数据属性列表（新增）
+- `data`：自定义数据（新增）
 
 ## 5. 不应持久化的状态
 文件：`packages/core/src/designer/types.ts`
 
 以下字段属于运行时状态：
+- `diagram`：图表数据（虽为文档态，但作为 state 的根字段）
 - `transform`
 - `viewportSize`
 - `worldSize`
@@ -153,8 +166,10 @@ interface DiagramPage {
 
 运行时建议：
 - `activePageId` 放在 `EditorState`
-- 是否持久化“上次打开页”由宿主层决定，不默认进入正式文件协议
+- 是否持久化"上次打开页"由宿主层决定，不默认进入正式文件协议
 
 导入导出建议：
 - 默认导入导出整份多 page `Diagram`
-- 若后续支持“导出当前页”，作为衍生能力处理，不改变正式文件根模型
+- 若后续支持"导出当前页"，作为衍生能力处理，不改变正式文件根模型
+
+最后更新：2026-04-11

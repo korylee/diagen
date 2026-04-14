@@ -19,6 +19,7 @@
   - `createdAt / updatedAt / version / properties`
 
 ### 编辑器运行态
+- `state.diagram`：持久化图表数据（文档态）
 - `state.transform`
 - `state.viewportSize`
 - `state.worldSize`
@@ -48,16 +49,22 @@
 - 未来持久化也应尽量挂在 designer 的 `Diagram` 文件边界上，而不是跨层直接读写 UI 状态。
 
 ## 4. 渲染与交互主链路
-文件：`packages/renderer/src/components/Renderer/index.tsx`
+文件：`packages/renderer/src/scene/Renderer.tsx`
 
 主链路：
-1. `Renderer` 初始化 `coordinate / pointer / keyboard / autoScroll`
+1. `Renderer` 初始化 `coordinate / pointer / keyboard / scrollService / rendererHover / textEditorControl`
 2. 事件经 `createCoordinateService` 统一转换到 canvas 坐标
 3. `createPointerInteraction` 决定当前进入哪类交互会话
 4. 通过 `edit / selection / view / history / clipboard / tool` 驱动 `core`
-5. `CanvasRenderer + InteractionOverlay` 根据状态重绘
+5. `CanvasRenderer + overlays` 根据状态重绘
 
-当前已经接上的键盘路径：
+服务层：
+- `createCoordinateService`：坐标转换
+- `createScrollService`：滚动与自动滚动（原 `createAutoScroll` 已合并）
+- `createRendererHover`：悬停光标检测（新增）
+- `createTextEditorControl`：文本编辑控件
+
+当前已经接上的键盘路径（来自 `@diagen/primitives` 的 `createKeyboard`）：
 - `delete`
 - `mod+a`
 - `escape`
@@ -70,7 +77,7 @@
 - `mod+d`
 
 ## 5. 视觉层分层
-文件：`packages/renderer/src/components/Renderer/index.tsx`
+文件：`packages/renderer/src/scene/Renderer.tsx`
 
 - world 层
   - 有 transform
@@ -138,7 +145,7 @@
 - 在全局 `elements` 上通过 `pageId` 做到处过滤
 
 原因：
-- 导入导出天然围绕“一个图文件”
+- 导入导出天然围绕"一个图文件"
 - 多 page 已经属于文档语义，不是单纯 UI 视图切换
 - history、selection、clipboard、跨页操作都需要 `core` 统一兜底
 
@@ -146,7 +153,7 @@
 - 正式导入：导入一份 `Diagram`
 - 正式导出：导出一份 `Diagram`
 - 未来若支持多 page，默认仍导入导出整份多 page `Diagram`
-- “导出当前页”属于后续衍生功能，不改变正式文件根格式
+- "导出当前页"属于后续衍生功能，不改变正式文件根格式
 - 本地自动保存可使用宿主快照结构，例如：
 
 ```ts
@@ -161,3 +168,5 @@ interface LocalSnapshot {
 约束：
 - `LocalSnapshot` 只存在于宿主层，不进入 `core` 正式协议
 - `core` 不为本地恢复需求污染正式导入导出格式
+
+最后更新：2026-04-11

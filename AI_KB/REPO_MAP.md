@@ -21,20 +21,23 @@
   - `types.ts`
   - `managers/`
 - `src/schema/`
-- `src/utils/`
+- `src/transform/`：变换计算（原 utils/transform）
+- `src/route/`：路由计算（原 utils/router）
 
 ### `packages/renderer`
-- `src/components/Renderer/index.tsx`
-  - 当前真实的交互主入口
-- `src/components/InteractionOverlay/`
-  - 选择框、guide、shape 选中态、linker 控件
-- `src/components/Renderer/interaction/createPointerInteraction/`
-  - 指针交互状态机与各类交互实现
-- `src/components/Renderer/primitives/`
-  - `createCoordinateService`
-  - `createAutoScroll`
-- `src/.test/createRendererTestHarness.ts`
-  - renderer 集成测试夹具
+- `src/scene/Renderer.tsx`：当前渲染与交互主入口
+- `src/scene/`
+  - `Renderer.test.ts`：集成测试
+  - `Renderer.scss`
+  - `controls/textEditor/`：文本编辑控件
+  - `events/`：事件处理（已内联部分逻辑）
+  - `linker/`：连线相关工具
+  - `overlays/`：覆盖层组件（框选、guide、选中态、连线控件）
+  - `pointer/`：指针交互状态机与各类交互实现
+  - `services/`：服务层
+- `src/canvas/`：Canvas 渲染器
+- `src/context/`：Context providers
+- `src/.test/createRendererTestHarness.ts`：renderer 集成测试夹具
 
 ### `packages/ui`
 - `src/editor/Editor.tsx`
@@ -47,12 +50,26 @@
 - history：`packages/core/src/designer/managers/history.ts`
 - clipboard：`packages/core/src/designer/managers/clipboard.ts`
 - group：`packages/core/src/designer/managers/group.ts`
-- renderer：`packages/renderer/src/components/Renderer/index.tsx`
-- pointer interaction：`packages/renderer/src/components/Renderer/interaction/createPointerInteraction/index.ts`
-- renderer 集成测试：`packages/renderer/src/components/Renderer/index.test.ts`
+- renderer：`packages/renderer/src/scene/Renderer.tsx`
+- pointer interaction：`packages/renderer/src/scene/pointer/index.ts`
+- coordinate service：`packages/renderer/src/scene/services/createCoordinateService.ts`
+- scroll service：`packages/renderer/src/scene/services/createScrollService.ts`
+- renderer 集成测试：`packages/renderer/src/scene/Renderer.test.ts`
 - playground 入口：`playgrounds/vite/src/App.tsx`
 
-## 4. 当前与旧文档的差异提醒
-- 当前交互入口是 `Renderer/index.tsx`，不是旧文档中的 `RendererContainer.tsx`
-- 坐标服务位于 `packages/renderer/src/components/Renderer/primitives/createCoordinateService.ts`
-- 快捷建线能力已并入 `InteractionOverlay + createPointerInteraction`，不再是独立老路径
+## 4. 路径变更提醒
+
+以下为近期重构变更，旧路径已失效：
+
+| 旧路径 | 新路径 | 说明 |
+|--------|--------|------|
+| `components/Renderer/index.tsx` | `scene/Renderer.tsx` | 渲染主入口 |
+| `components/Renderer/index.test.ts` | `scene/Renderer.test.ts` | 集成测试 |
+| `components/InteractionOverlay/` | `scene/overlays/` | 覆盖层 |
+| `components/Renderer/interaction/createPointerInteraction/` | `scene/pointer/` | 指针交互 |
+| `components/Renderer/primitives/createCoordinateService.ts` | `scene/services/createCoordinateService.ts` | 坐标服务 |
+| `components/Renderer/primitives/createAutoScroll.ts` | `scene/services/createScrollService.ts` | 滚动服务（改名） |
+| `utils/transform` | `transform/` | 变换计算（独立目录） |
+| `utils/router` | `route/` | 路由计算（独立目录） |
+
+最后更新：2026-04-11
