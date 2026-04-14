@@ -1,7 +1,6 @@
-import { MaybeAccessor } from 'packages/primitives/dist'
 import { createSignal } from 'solid-js'
 import { ConfigurableWindow, defaultWindow } from '../_configurable'
-import { access, tryOnCleanup } from '../helper'
+import { access, tryOnCleanup, type MaybeAccessor } from '../helper'
 
 export interface CreateRafLoopOptions extends ConfigurableWindow {
   /**

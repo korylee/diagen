@@ -98,9 +98,9 @@ export function deepMerge<T extends object, S extends object>(
   return result
 }
 
-export const pick = <T extends object, K extends keyof T>(obj: T, keys: K[]): Pick<T, K> => {
+export const pick = <T extends object, K extends keyof T>(obj: T, keys: K[] | readonly K[]): Pick<T, K> => {
   if (!obj) return {} as Pick<T, K>
-  return keys.reduce(
+  return (keys as K[]).reduce(
     (acc, key) => {
       if (hasOwn(obj, key)) acc[key] = obj[key]
       return acc
