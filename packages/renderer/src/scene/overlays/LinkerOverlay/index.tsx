@@ -90,27 +90,6 @@ export function LinkerOverlay() {
     }
   })
 
-  const sourceItems = createMemo(() => {
-    const shape = selectedQuickCreateShape()
-    if (!shape) return []
-
-    const bounds = coordinate.canvasToScreen(view.getShapeBounds(shape))
-    return [
-      {
-        id: `${shape.id}:link-source:armed:frame:0`,
-        bounds,
-        border: 'var(--dg-hl-custom-outline-active)',
-        background: 'var(--dg-hl-custom-bg-active)',
-        padding: 2,
-        dataAttrs: {
-          'data-shape-highlight-id': shape.id,
-          'data-shape-highlight-kind': 'link-source',
-          'data-shape-highlight-state': 'armed',
-        },
-      },
-    ]
-  })
-
   const startQuickCreate = (e: MouseEvent, shapeId: string, linkerId: string) => {
     e.preventDefault()
     e.stopPropagation()
@@ -300,8 +279,7 @@ export function LinkerOverlay() {
     <>
       <LinkTargetHighlights
         isLinkEndDragging={isLinkEndDragging()}
-        targetItems={targetItems()}
-        sourceItems={sourceItems()}
+        targets={targetItems()}
       />
 
       <LinkQuickCreatePanel panel={quickCreatePanel()} onStart={startQuickCreate} />

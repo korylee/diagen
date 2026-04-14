@@ -1,9 +1,9 @@
-import { describe, expect, it, vi } from 'vitest'
 import { createLinker, createShape } from '@diagen/core'
-import { rotatePoint } from '@diagen/shared'
-import { createRendererTestHarness } from '../.test/createRendererTestHarness'
-import { getPerimeterInfo, getAnchorInfo } from '@diagen/core/anchors'
+import { getAnchorInfo, getPerimeterInfo } from '@diagen/core/anchors'
 import { getLinkerTextBox } from '@diagen/core/text'
+import { rotatePoint } from '@diagen/shared'
+import { describe, expect, it, vi } from 'vitest'
+import { createRendererTestHarness } from '../.test/createRendererTestHarness'
 
 type RendererHarness = Awaited<ReturnType<typeof createRendererTestHarness>>
 
@@ -193,6 +193,26 @@ describe('Renderer', () => {
 
       expect(harness.designer.selection.selectedIds()).toEqual(['shape_scroll_a', 'shape_scroll_b'])
       expect(harness.getInteraction().pointer.machine.mode()).toBe('idle')
+    } finally {
+      harness.dispose()
+    }
+  })
+
+  it('滚动到远端图形后 ShapeCanvas 不应被误判为不可见', async () => {
+    const harness = await createRendererTestHarness({
+      pageWidth: 2400,
+      pageHeight: 1200,
+      shapes: [{ id: 'shape_scroll_visible', x: 1500, y: 120, w: 120, h: 90 }],
+    })
+
+    try {
+      const shapeCanvas = harness.sceneLayer.querySelector('canvas')?.parentElement as HTMLDivElement | null
+      expect(shapeCanvas).toBeTruthy()
+      expect(shapeCanvas?.style.display).toBe('none')
+
+      await harness.setScroll(1100, 0)
+
+      expect(shapeCanvas?.style.display).toBe('block')
     } finally {
       harness.dispose()
     }
@@ -1333,7 +1353,7 @@ describe('Renderer', () => {
     }
   })
 
-  it('单选可连线图形时应显示 quick-create 面板和源高亮', async () => {
+  it('单选可连线图形时应显示 quick-create 面板', async () => {
     const harness = await createRendererTestHarness({
       shapes: [{ id: 'shape_source_panel', x: 100, y: 100, w: 100, h: 80 }],
     })
@@ -1346,11 +1366,6 @@ describe('Renderer', () => {
 
       const buttons = panel?.querySelectorAll('button')
       expect(buttons).toHaveLength(3)
-
-      const sourceHighlight = harness.overlayLayer.querySelector(
-        '[data-shape-highlight-kind="link-source"][data-shape-highlight-id="shape_source_panel"][data-shape-highlight-state="armed"]',
-      )
-      expect(sourceHighlight).toBeTruthy()
     } finally {
       harness.dispose()
     }

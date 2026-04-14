@@ -36,9 +36,9 @@ function shouldOpenTextEditor(params: { sceneHit: ReturnType<typeof hitTestScene
   return isPointInBounds(point, box)
 }
 
-export function createTextEditorControl(params: { interaction: Interaction }) {
+export function createTextEditorControl(interaction: Interaction) {
   const designer = useDesigner()
-  const { interaction } = params
+  const { pointer, coordinate } = interaction
   const [session, setSession] = createSignal<TextEditorSession | null>(null)
   const [draft, setDraft] = createSignal('')
   const isEditing = createMemo(() => !!session())
@@ -121,10 +121,10 @@ export function createTextEditorControl(params: { interaction: Interaction }) {
   const onDoubleClick = (event: MouseEvent) => {
     if (session()) return
     if (event.button !== 0) return
-    if (!interaction.pointer.machine.isIdle()) return
+    if (!pointer.machine.isIdle()) return
     if (designer.tool.toolState().type !== 'idle') return
 
-    const canvasPosition = interaction.coordinate.eventToCanvas(event)
+    const canvasPosition = coordinate.eventToCanvas(event)
     const sceneHit = hitTestScene(designer.element.elements(), canvasPosition, {
       zoom: designer.view.transform().zoom,
       getLinkerLayout: linker => designer.view.getLinkerLayout(linker),

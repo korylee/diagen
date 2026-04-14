@@ -1,12 +1,29 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { calcStep, createAutoScroll, getEdgeDelta } from './createAutoScroll'
+import { calcStep, createScrollService, getEdgeDelta } from './createScrollService'
+
+const measure = vi.fn()
+
+vi.mock('@diagen/primitives', async importOriginal => {
+  const actual = await importOriginal<typeof import('@diagen/primitives')>()
+
+  return {
+    ...actual,
+    createScroll: vi.fn(() => ({
+      position: {
+        x: 0,
+        y: 0,
+      },
+      measure,
+    })),
+  }
+})
 
 const DEFAULT_OPTIONS = {
   edgeGap: 28,
   maxStep: 26,
 } as const
 
-describe('Renderer createAutoScroll', () => {
+describe('Renderer createScrollService', () => {
   const ctx = {
     viewportRect: vi.fn(() => ({
       left: 100,
@@ -56,18 +73,18 @@ describe('Renderer createAutoScroll', () => {
     } as unknown as HTMLDivElement
   }
 
-  function createInteraction() {
-    return {
-      coordinate: {
-        viewportRect: ctx.viewportRect,
-      },
+  function createController(viewport: HTMLDivElement, overrides: Partial<Record<'edgeGap' | 'maxStep', number>> = {}) {
+    return createScrollService({
+      viewportRef: () => viewport,
+      viewportRect: ctx.viewportRect,
       pointer: {
         machine: {
           move: ctx.movePointer,
           shouldAutoScroll: ctx.shouldAutoScroll,
         },
-      },
-    } as any
+      } as any,
+      ...overrides,
+    })
   }
 
   beforeEach(() => {
@@ -83,6 +100,7 @@ describe('Renderer createAutoScroll', () => {
     ctx.shouldAutoScroll.mockReturnValue(true)
 
     ctx.movePointer.mockReset()
+    measure.mockReset()
   })
 
   afterEach(() => {
@@ -144,13 +162,13 @@ describe('Renderer createAutoScroll', () => {
     expect(delta).toEqual({ dx: 0, dy: 0 })
   })
 
-  it('createAutoScroll 应在触边时立即滚动并启动续滚循环', () => {
+  it('createScrollService 应在触边时立即滚动并启动续滚循环', () => {
     const viewport = createViewportState()
     const scheduler = createFrameScheduler()
     vi.stubGlobal('requestAnimationFrame', scheduler.request)
     vi.stubGlobal('cancelAnimationFrame', scheduler.cancel)
 
-    const controller = createAutoScroll(() => viewport, createInteraction())
+    const controller = createController(viewport)
 
     controller.move(
       new MouseEvent('mousemove', {
@@ -163,17 +181,18 @@ describe('Renderer createAutoScroll', () => {
     expect(viewport.scrollLeft).toBe(75)
     expect(viewport.scrollTop).toBe(60)
     expect(ctx.movePointer).toHaveBeenCalledTimes(2)
+    expect(measure).toHaveBeenCalledTimes(1)
     expect(scheduler.request).toHaveBeenCalledTimes(1)
     expect(scheduler.pending()).toBe(1)
   })
 
-  it('createAutoScroll 应使用最后一次指针位置持续滚动直到无法继续', () => {
+  it('createScrollService 应使用最后一次指针位置持续滚动直到无法继续', () => {
     const viewport = createViewportState({ scrollLeft: 550 })
     const scheduler = createFrameScheduler()
     vi.stubGlobal('requestAnimationFrame', scheduler.request)
     vi.stubGlobal('cancelAnimationFrame', scheduler.cancel)
 
-    const controller = createAutoScroll(() => viewport, createInteraction())
+    const controller = createController(viewport)
 
     controller.move(
       new MouseEvent('mousemove', {
@@ -197,13 +216,13 @@ describe('Renderer createAutoScroll', () => {
     expect(scheduler.pending()).toBe(0)
   })
 
-  it('createAutoScroll reset 应取消挂起循环并清空指针快照', () => {
+  it('createScrollService reset 应取消挂起循环并清空指针快照', () => {
     const viewport = createViewportState()
     const scheduler = createFrameScheduler()
     vi.stubGlobal('requestAnimationFrame', scheduler.request)
     vi.stubGlobal('cancelAnimationFrame', scheduler.cancel)
 
-    const controller = createAutoScroll(() => viewport, createInteraction())
+    const controller = createController(viewport)
 
     controller.move(
       new MouseEvent('mousemove', {
@@ -222,13 +241,13 @@ describe('Renderer createAutoScroll', () => {
     expect(ctx.movePointer).toHaveBeenCalledTimes(2)
   })
 
-  it('createAutoScroll 应使用自定义 edgeGap 与 maxStep', () => {
+  it('createScrollService 应使用自定义 edgeGap 与 maxStep', () => {
     const viewport = createViewportState()
     const scheduler = createFrameScheduler()
     vi.stubGlobal('requestAnimationFrame', scheduler.request)
     vi.stubGlobal('cancelAnimationFrame', scheduler.cancel)
 
-    const controller = createAutoScroll(() => viewport, createInteraction(), {
+    const controller = createController(viewport, {
       edgeGap: 40,
       maxStep: 10,
     })
@@ -244,5 +263,17 @@ describe('Renderer createAutoScroll', () => {
     expect(viewport.scrollLeft).toBe(60)
     expect(ctx.movePointer).toHaveBeenCalledTimes(2)
     expect(scheduler.pending()).toBe(1)
+  })
+
+  it('syncOriginOffset 应按原点偏移增量补偿滚动位置', () => {
+    const viewport = createViewportState()
+    const controller = createController(viewport)
+
+    controller.syncOriginOffset({ x: 100, y: 80 })
+    controller.syncOriginOffset({ x: 130, y: 95 })
+
+    expect(viewport.scrollLeft).toBe(80)
+    expect(viewport.scrollTop).toBe(75)
+    expect(measure).toHaveBeenCalledTimes(1)
   })
 })

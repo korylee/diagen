@@ -1,9 +1,8 @@
 import type { LinkerElement } from '@diagen/core'
-import { isBoundsVisible } from '@diagen/core'
 import { createDevicePixelRatio } from '@diagen/primitives'
 import { expandBounds } from '@diagen/shared'
 import { createEffect, createMemo } from 'solid-js'
-import { useDesigner } from '../../context'
+import { useDesigner, useInteraction } from '../../context'
 import { renderLinker } from '../../utils'
 
 export interface LinkerCanvasProps {
@@ -11,7 +10,8 @@ export interface LinkerCanvasProps {
 }
 
 export function LinkerCanvas(props: LinkerCanvasProps) {
-  const { view } = useDesigner()
+  const { view, state } = useDesigner()
+  const { scroll } = useInteraction()
   const pixelRatio = createDevicePixelRatio()
   const layout = createMemo(() => view.getLinkerLayout(props.linker))
 
@@ -31,15 +31,23 @@ export function LinkerCanvas(props: LinkerCanvasProps) {
   const renderFrame = createMemo(() => {
     const currentTransform = view.transform()
     const vpSize = view.viewportSize()
+    const viewportScroll = scroll.position
     const route = layout().route
     const b = layout().bounds
     const rect = screenBounds()
+    const visibleLeft = viewportScroll.x - state.config.containerInset
+    const visibleTop = viewportScroll.y - state.config.containerInset
     const ratio = pixelRatio()
     const width = Math.max(1, Math.ceil(rect.w))
     const height = Math.max(1, Math.ceil(rect.h))
 
     return {
-      visible: isBoundsVisible(b, currentTransform, vpSize, view.originOffset()),
+      visible: !(
+        rect.x + rect.w < visibleLeft ||
+        rect.y + rect.h < visibleTop ||
+        rect.x > visibleLeft + vpSize.width ||
+        rect.y > visibleTop + vpSize.height
+      ),
       route,
       bounds: b,
       zoom: currentTransform.zoom,

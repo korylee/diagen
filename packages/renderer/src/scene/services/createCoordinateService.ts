@@ -1,13 +1,15 @@
 import { createElementRect } from '@diagen/primitives'
-import type { Point } from '@diagen/shared'
+import type { Bounds, Point } from '@diagen/shared'
 import type { Accessor } from 'solid-js'
-import { useDesigner } from '../..'
 
 export type EventToCanvas = (event: { clientX: number; clientY: number }) => Point
+type CoordinateTransform = <T extends Point | Bounds>(value: T) => T extends Bounds ? Bounds : Point
 
 export interface CreateCoordinateServiceOptions {
   viewportRef: Accessor<HTMLDivElement | null>
   sceneLayerRef: Accessor<HTMLDivElement | null>
+  screenToCanvas: CoordinateTransform
+  canvasToScreen: CoordinateTransform
 }
 
 /**
@@ -16,8 +18,7 @@ export interface CreateCoordinateServiceOptions {
  * - 交互与 services 仅依赖转换接口
  */
 export function createCoordinateService(options: CreateCoordinateServiceOptions) {
-  const { view } = useDesigner()
-  const { sceneLayerRef, viewportRef } = options
+  const { sceneLayerRef, viewportRef, screenToCanvas, canvasToScreen } = options
   const { rect: viewportRect } = createElementRect(viewportRef)
 
   const eventToScreen = (event: { clientX: number; clientY: number }): Point => {
@@ -40,7 +41,7 @@ export function createCoordinateService(options: CreateCoordinateServiceOptions)
   }
 
   const eventToCanvas: EventToCanvas = event => {
-    return view.toCanvas(eventToScreen(event))
+    return screenToCanvas(eventToScreen(event))
   }
 
   return {
@@ -48,8 +49,8 @@ export function createCoordinateService(options: CreateCoordinateServiceOptions)
 
     eventToCanvas,
     eventToScreen,
-    canvasToScreen: view.toScreen,
-    screenToCanvas: view.toCanvas,
+    canvasToScreen,
+    screenToCanvas,
   }
 }
 

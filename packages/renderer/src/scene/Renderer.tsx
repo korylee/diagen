@@ -1,24 +1,23 @@
-import { DesignerToolState } from '@diagen/core'
+import { DesignerToolState, Schema } from '@diagen/core'
 import { createEventListener, createKeyboard } from '@diagen/primitives'
 import { createDgBem, type Point } from '@diagen/shared'
-import { createEffect, createMemo, createSignal, JSX, onCleanup, onMount, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, JSX, onCleanup, Show } from 'solid-js'
 import { isServer } from 'solid-js/web'
-import { hitTestScene } from '../utils'
 import { CanvasRenderer } from '../canvas'
 import { InteractionProvider } from '../context'
 import { useDesigner } from '../context/DesignerProvider'
-import { TextEditorOverlay } from './controls/textEditor'
-import { createSceneContextMenu } from './events/createSceneContextMenu'
-import { createSceneMouseDown } from './events/createSceneMouseDown'
-import { createTextEditorControl } from './controls/textEditor'
-import { createPointerInteraction } from './pointer'
+import { hitTestScene, type SceneHit } from '../utils'
+import { createTextEditorControl, TextEditorOverlay } from './controls/textEditor'
 import { BoxSelectionOverlay } from './overlays/BoxSelectionOverlay'
 import { GuideOverlay } from './overlays/GuideOverlay'
 import { LinkerOverlay } from './overlays/LinkerOverlay'
 import { ShapeSelectionOverlay } from './overlays/ShapeSelectionOverlay'
 import { DesignerGrids } from './parts/DesignerGrids'
-import { createAutoScroll } from './services/createAutoScroll'
+import { createPointerInteraction } from './pointer'
 import { createCoordinateService } from './services/createCoordinateService'
+import { createRendererHover } from './services/createRendererHover'
+import { createScrollService } from './services/createScrollService'
+
 import './Renderer.scss'
 
 function getCursor(params: { isGrabbing: boolean; toolType: DesignerToolState['type']; hoverCursor: string | null }) {
@@ -35,6 +34,49 @@ function getCursor(params: { isGrabbing: boolean; toolType: DesignerToolState['t
 }
 
 const bem = createDgBem('renderer')
+
+function getSceneIntent(params: { tool: DesignerToolState; point: Point; sceneHit: SceneHit | null }) {
+  const { tool, point, sceneHit } = params
+
+  if (tool.type === 'create-shape') {
+    return {
+      type: 'create-shape',
+      point,
+      shapeId: tool.shapeId,
+      continuous: tool.continuous,
+    } as const
+  }
+
+  if (tool.type === 'create-linker') {
+    return {
+      type: 'create-linker',
+      point,
+      linkerId: tool.linkerId,
+      continuous: tool.continuous,
+      sceneHit,
+    } as const
+  }
+
+  if (sceneHit?.type === 'linker') {
+    return {
+      type: 'edit-linker',
+      point,
+      sceneHit,
+    } as const
+  }
+
+  if (sceneHit?.type === 'shape') {
+    return {
+      type: 'interact-shape',
+      point,
+      shapeId: sceneHit.element.id,
+    } as const
+  }
+
+  return { type: 'blank' } as const
+}
+
+type SceneIntent = ReturnType<typeof getSceneIntent>
 
 export interface RendererContextMenuRequest {
   event: MouseEvent
@@ -64,10 +106,11 @@ export function Renderer(props: {
   const [viewportRef, setViewportRef] = createSignal<HTMLDivElement | null>(null)
   const [containerRef, setContainerRef] = createSignal<HTMLDivElement | null>(null)
   const [sceneRef, setSceneRef] = createSignal<HTMLDivElement | null>(null)
-  const [hoverCursor, setHoverCursor] = createSignal<string | null>(null)
   const coordinate = createCoordinateService({
     viewportRef,
     sceneLayerRef: sceneRef,
+    screenToCanvas: view.toCanvas,
+    canvasToScreen: view.toScreen,
   })
   const pointer = createPointerInteraction({
     coordinate,
@@ -111,19 +154,201 @@ export function Renderer(props: {
     clipboard.duplicate(selection.selectedIds())
   })
 
+  const scroll = createScrollService({
+    viewportRef,
+    viewportRect: coordinate.viewportRect,
+    pointer,
+  })
+
   const interaction = {
     pointer,
     keyboard,
     coordinate,
+    scroll,
   }
-  const textEditor = createTextEditorControl({ interaction })
+  const textEditor = createTextEditorControl(interaction)
 
-  const autoScroll = createAutoScroll(viewportRef, interaction)
-  const onSceneMouseDown = createSceneMouseDown(interaction)
-  const sceneContextMenu = createSceneContextMenu({
-    interaction,
-    onRequest: props.onContextMenu,
+  const hitScene = (point: Point): SceneHit | null =>
+    hitTestScene(element.elements(), point, {
+      zoom: view.transform().zoom,
+      getLinkerLayout: linker => view.getLinkerLayout(linker),
+    })
+  const hover = createRendererHover({
+    getContainerEl: containerRef,
+    isPointerActive: pointer.machine.isActive,
+    isTextEditing: textEditor.isEditing,
+    isToolIdle: tool.isIdle,
+    hitTestHoverTarget: pointerSnapshot =>
+      hitScene(
+        coordinate.eventToCanvas({
+          clientX: pointerSnapshot.clientX,
+          clientY: pointerSnapshot.clientY,
+        }),
+      ),
   })
+  const selectByEvent = (id: string, event: MouseEvent): void => {
+    if (event.ctrlKey || event.metaKey) {
+      selection.isSelected(id) ? selection.deselect(id) : selection.select(id)
+      return
+    }
+
+    selection.replace([id])
+  }
+  const onCreateShapeDown = (event: MouseEvent, intent: Extract<SceneIntent, { type: 'create-shape' }>): boolean => {
+    const { shapeId, continuous, point } = intent
+    const definition = Schema.getShape(shapeId)
+    if (!definition) return false
+
+    const width = definition.props.w
+    const height = definition.props.h
+    const shape = Schema.createShape(shapeId, {
+      x: Math.round(point.x - width / 2),
+      y: Math.round(point.y - height / 2),
+      w: width,
+      h: height,
+      angle: 0,
+    })
+    if (!shape) return false
+
+    event.stopPropagation()
+    event.preventDefault()
+
+    edit.add([shape])
+    selection.replace([shape.id])
+    view.scheduleAutoGrow(view.getShapeBounds(shape))
+    view.flushAutoGrow()
+
+    if (!continuous) {
+      tool.setIdle()
+    }
+
+    return true
+  }
+  const onCreateLinkerDown = (event: MouseEvent, intent: Extract<SceneIntent, { type: 'create-linker' }>): boolean => {
+    const { point, linkerId, continuous, sceneHit } = intent
+    event.stopPropagation()
+    event.preventDefault()
+
+    const started = pointer.machine.beginLinkerCreate(event, {
+      linkerId,
+      from:
+        sceneHit?.type === 'shape'
+          ? {
+              type: 'shape',
+              shapeId: sceneHit.element.id,
+            }
+          : {
+              type: 'point',
+              point,
+            },
+    })
+
+    if (started && !continuous) {
+      tool.setIdle()
+    }
+
+    return started
+  }
+  const onLinkerDown = (event: MouseEvent, intent: Extract<SceneIntent, { type: 'edit-linker' }>): boolean => {
+    const { point, sceneHit } = intent
+    event.stopPropagation()
+    event.preventDefault()
+    selectByEvent(sceneHit.element.id, event)
+    return pointer.machine.beginLinkerEdit(event, {
+      linkerId: sceneHit.element.id,
+      point,
+      hit: sceneHit.hit,
+      route: sceneHit.route,
+    })
+  }
+  const onShapeDown = (event: MouseEvent, intent: Extract<SceneIntent, { type: 'interact-shape' }>): boolean => {
+    const { point, shapeId } = intent
+    event.stopPropagation()
+    event.preventDefault()
+
+    const resizeHit = pointer.resize.hitTest(point)
+    if (resizeHit) {
+      return pointer.machine.startResize(resizeHit.id, resizeHit.dir, event)
+    }
+
+    selectByEvent(shapeId, event)
+    return pointer.machine.startShapeDrag(event)
+  }
+  const onBlankDown = (event: MouseEvent): boolean => {
+    event.stopPropagation()
+    event.preventDefault()
+    selection.clear()
+    return pointer.machine.startBoxSelect(event)
+  }
+  const sceneMouseDownMap = {
+    'create-shape': onCreateShapeDown,
+    'create-linker': onCreateLinkerDown,
+    'edit-linker': onLinkerDown,
+    'interact-shape': onShapeDown,
+    blank: onBlankDown,
+  } as const
+  const onSceneMouseDown = (event: MouseEvent): boolean => {
+    if (textEditor.onMouseDown(event)) return false
+
+    if (event.button !== 0) return false
+    if (!pointer.machine.isIdle()) return false
+
+    const currentTool = tool.toolState()
+    const point = coordinate.eventToCanvas(event)
+    const sceneHit = currentTool.type === 'create-shape' ? null : hitScene(point)
+    const intent = getSceneIntent({
+      tool: currentTool,
+      point,
+      sceneHit,
+    })
+
+    const down = sceneMouseDownMap[intent.type]
+    if (!down) return false
+    return down(event, intent as never)
+  }
+  const sceneContextMenu = (event: MouseEvent): void => {
+    if (!props.onContextMenu) return
+
+    event.preventDefault()
+
+    if (!pointer.machine.isIdle()) {
+      return
+    }
+
+    const canvasPosition = coordinate.eventToCanvas(event)
+    const sceneHit = hitScene(canvasPosition)
+    const currentSelectionIds = selection.selectedIds()
+    let targetType: 'canvas' | 'shape' | 'linker' | 'selection' = 'canvas'
+    let targetId: string | null = null
+    let selectionIds = currentSelectionIds
+
+    if (sceneHit) {
+      const hitId = sceneHit.element.id
+      const isSelected = selection.isSelected(hitId)
+
+      // 右键上下文保持和常见编辑器一致：
+      // 如果命中了未选中元素，先对齐选中态，再构建菜单语义。
+      if (!isSelected) {
+        selection.replace([hitId])
+        selectionIds = [hitId]
+      }
+
+      targetId = hitId
+      targetType = isSelected && selectionIds.length > 1 ? 'selection' : sceneHit.type
+    }
+
+    props.onContextMenu({
+      event,
+      clientPosition: {
+        x: event.clientX,
+        y: event.clientY,
+      },
+      canvasPosition,
+      targetType,
+      targetId,
+      selectionIds,
+    })
+  }
   const onContextMenu = (event: MouseEvent) => {
     if (textEditor.onContextMenu(event)) return
     sceneContextMenu(event)
@@ -142,7 +367,7 @@ export function Renderer(props: {
       cursor: getCursor({
         isGrabbing: pointer.machine.shouldShowGrabbingCursor(),
         toolType: state.tool.type,
-        hoverCursor: hoverCursor(),
+        hoverCursor: hover.hoverCursor(),
       }),
     } as const
   })
@@ -182,56 +407,30 @@ export function Renderer(props: {
     } as const
   })
 
-  const onMouseDown = (e: MouseEvent) => {
-    if (textEditor.onMouseDown(e)) return
+  const onMouseDown = (event: MouseEvent) => {
+    if (textEditor.onMouseDown(event)) return
     // 平移检测
-    if (pointer.machine.startPan(e)) {
-      e.preventDefault()
+    if (pointer.machine.startPan(event)) {
+      event.preventDefault()
     }
   }
 
-  const onMouseMove = (e: MouseEvent) => {
-    autoScroll.move(e)
+  const onMouseMove = (event: MouseEvent) => {
+    scroll.move(event)
   }
   const onMouseUp = () => {
-    autoScroll.reset()
+    scroll.reset()
     pointer.machine.end()
   }
 
-  const onWheel = (e: WheelEvent) => {
+  const onWheel = (event: WheelEvent) => {
     if (textEditor.isEditing()) return
-    if (e.ctrlKey) {
-      e.preventDefault()
-      const delta = e.deltaY > 0 ? -0.1 : 0.1
+    if (event.ctrlKey) {
+      event.preventDefault()
+      const delta = event.deltaY > 0 ? -0.1 : 0.1
       const newZoom = Math.max(0.1, Math.min(5, view.transform().zoom + delta))
-      view.setZoom(newZoom, coordinate.eventToCanvas(e))
+      view.setZoom(newZoom, coordinate.eventToCanvas(event))
     }
-  }
-
-  const updateHoverCursor = (event: MouseEvent) => {
-    if (pointer.machine.isActive() || textEditor.isEditing() || !tool.isIdle()) {
-      setHoverCursor(null)
-      return
-    }
-
-    const container = containerRef()
-    if (!container) {
-      setHoverCursor(null)
-      return
-    }
-
-    const target = event.target
-    if (!(target instanceof Node) || !container.contains(target)) {
-      setHoverCursor(null)
-      return
-    }
-
-    const sceneHit = hitTestScene(element.elements(), coordinate.eventToCanvas(event), {
-      zoom: view.transform().zoom,
-      getLinkerLayout: linker => view.getLinkerLayout(linker),
-    })
-
-    setHoverCursor(sceneHit?.type === 'linker' && sceneHit.hit.type === 'text' ? 'move' : null)
   }
 
   if (!isServer) {
@@ -248,49 +447,12 @@ export function Renderer(props: {
     view.setViewportSize(width, height)
   })
 
-  onMount(() => {
-    const el = viewportRef()
-    if (!el) return
-    const transform = view.transform()
-    const containerInset = state.config.containerInset
-    const padding = 10
-    const initialScroll = {
-      // 初始滚动位置需要把运行时原点补偿一并算上，避免未来恢复态时出现首帧错位
-      left: Math.max(0, Math.round(containerInset + transform.x + state.originOffset.x - padding)),
-      top: Math.max(0, Math.round(containerInset + transform.y + state.originOffset.y - padding)),
-    }
-
-    el.scrollLeft = initialScroll.left
-    el.scrollTop = initialScroll.top
-  })
-
-  let lastOriginOffset: Point | null = null
   createEffect(() => {
-    const el = viewportRef()
-    const nextOffset = { ...view.originOffset() }
-
-    if (!el) {
-      lastOriginOffset = nextOffset
-      return
-    }
-
-    if (!lastOriginOffset) {
-      lastOriginOffset = nextOffset
-      return
-    }
-
-    const deltaX = nextOffset.x - lastOriginOffset.x
-    const deltaY = nextOffset.y - lastOriginOffset.y
-    if (deltaX === 0 && deltaY === 0) return
-
-    // 左/上自动扩展时同步补偿滚动位置，保证用户当前看到的画面不因原点平移而突跳
-    el.scrollLeft = Math.max(0, el.scrollLeft + deltaX)
-    el.scrollTop = Math.max(0, el.scrollTop + deltaY)
-    lastOriginOffset = { x: nextOffset.x, y: nextOffset.y }
+    scroll.syncOriginOffset(view.originOffset())
   })
 
   onCleanup(() => {
-    autoScroll.reset()
+    scroll.reset()
   })
 
   return (
@@ -316,14 +478,9 @@ export function Renderer(props: {
             ref={setSceneRef}
             class={bem('scene')}
             style={sceneStyle()}
-            onMouseMove={updateHoverCursor}
-            onMouseLeave={() => {
-              setHoverCursor(null)
-            }}
-            on:mousedown={e => {
-              if (textEditor.onMouseDown(e)) return
-              onSceneMouseDown(e)
-            }}
+            onMouseMove={hover.onSceneMouseMove}
+            onMouseLeave={hover.onMouseLeave}
+            on:mousedown={onSceneMouseDown}
             onDblClick={textEditor.onDoubleClick}
           >
             <CanvasRenderer />

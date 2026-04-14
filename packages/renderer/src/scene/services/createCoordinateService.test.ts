@@ -18,15 +18,6 @@ vi.mock('@diagen/primitives', () => ({
   })),
 }))
 
-vi.mock('../..', () => ({
-  useDesigner: () => ({
-    view: {
-      toCanvas: ctx.toCanvas,
-      toScreen: ctx.toScreen,
-    },
-  }),
-}))
-
 describe('createCoordinateService', () => {
   beforeEach(() => {
     ctx.rect.mockReset()
@@ -57,6 +48,8 @@ describe('createCoordinateService', () => {
     const coordinate = createCoordinateService({
       viewportRef: () => null,
       sceneLayerRef: () => sceneLayer,
+      screenToCanvas: ctx.toCanvas,
+      canvasToScreen: ctx.toScreen,
     })
 
     expect(
@@ -88,6 +81,8 @@ describe('createCoordinateService', () => {
     const coordinate = createCoordinateService({
       viewportRef: () => viewport,
       sceneLayerRef: () => null,
+      screenToCanvas: ctx.toCanvas,
+      canvasToScreen: ctx.toScreen,
     })
 
     expect(
@@ -106,6 +101,8 @@ describe('createCoordinateService', () => {
     const coordinate = createCoordinateService({
       viewportRef: () => null,
       sceneLayerRef: () => null,
+      screenToCanvas: ctx.toCanvas,
+      canvasToScreen: ctx.toScreen,
     })
 
     expect(
@@ -135,6 +132,8 @@ describe('createCoordinateService', () => {
     const coordinate = createCoordinateService({
       viewportRef: () => null,
       sceneLayerRef: () => sceneLayer,
+      screenToCanvas: ctx.toCanvas,
+      canvasToScreen: ctx.toScreen,
     })
 
     expect(

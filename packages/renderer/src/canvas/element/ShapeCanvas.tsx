@@ -1,9 +1,8 @@
 import type { ShapeElement } from '@diagen/core'
-import { isBoundsVisible } from '@diagen/core'
 import { createDevicePixelRatio } from '@diagen/primitives'
 import { expandBounds, getRotatedBounds } from '@diagen/shared'
 import { createEffect, createMemo } from 'solid-js'
-import { useDesigner } from '../../context'
+import { useDesigner, useInteraction } from '../../context'
 import { renderShape } from '../../utils'
 
 export interface ShapeCanvasProps {
@@ -14,7 +13,8 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
   let canvasRef: HTMLCanvasElement | undefined
   let containerRef: HTMLDivElement | undefined
 
-  const { selection, view } = useDesigner()
+  const { selection, view, state } = useDesigner()
+  const { scroll } = useInteraction()
   const pixelRatio = createDevicePixelRatio()
   const renderBounds = createMemo(() => getRotatedBounds(props.shape.props))
 
@@ -31,13 +31,21 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
   const renderFrame = createMemo(() => {
     const currentTransform = view.transform()
     const vpSize = view.viewportSize()
-    const bounds = getScreenBounds()
+    const viewportScrollPosition = scroll.position
+    const screenBounds = getScreenBounds()
     const rotatedBounds = renderBounds()
-    const width = Math.max(1, Math.ceil(bounds.w))
-    const height = Math.max(1, Math.ceil(bounds.h))
+    const visibleLeft = viewportScrollPosition.x - state.config.containerInset
+    const visibleTop = viewportScrollPosition.y - state.config.containerInset
+    const width = Math.max(1, Math.ceil(screenBounds.w))
+    const height = Math.max(1, Math.ceil(screenBounds.h))
 
     return {
-      visible: isBoundsVisible(rotatedBounds, currentTransform, vpSize, view.originOffset()),
+      visible: !(
+        screenBounds.x + screenBounds.w < visibleLeft ||
+        screenBounds.y + screenBounds.h < visibleTop ||
+        screenBounds.x > visibleLeft + vpSize.width ||
+        screenBounds.y > visibleTop + vpSize.height
+      ),
       zoom: currentTransform.zoom,
       ratio: pixelRatio(),
       pixelWidth: width * pixelRatio(),

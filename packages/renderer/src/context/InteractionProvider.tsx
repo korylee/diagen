@@ -2,10 +2,12 @@ import { createContext, JSX, useContext } from 'solid-js'
 import type { CreateKeyboard } from '@diagen/primitives'
 import type { CreatePointerInteraction } from '../scene/pointer'
 import type { CoordinateService } from '../scene/services/createCoordinateService'
+import type { ScrollService } from '../scene/services/createScrollService'
 
 export interface Interaction {
   pointer: CreatePointerInteraction
   coordinate: CoordinateService
+  scroll: ScrollService
   keyboard: CreateKeyboard
 }
 

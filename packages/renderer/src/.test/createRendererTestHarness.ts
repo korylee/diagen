@@ -374,6 +374,7 @@ export async function createRendererTestHarness(options: CreateRendererTestHarne
   async function setScroll(left: number, top: number): Promise<void> {
     viewport.scrollLeft = left
     viewport.scrollTop = top
+    viewport.dispatchEvent(new Event('scroll'))
     window.dispatchEvent(new Event('scroll'))
     await flushEffects()
   }
