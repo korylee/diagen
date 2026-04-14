@@ -102,13 +102,17 @@ export function resolveContainerSizeForContent(options: ContainerSizeResolverOpt
   const right = content.x + content.w
   const bottom = content.y + content.h
   // 左/上方向的自增不直接改内容坐标，而是先产出原点补偿量，交给 view 层后续统一消费
-  const offsetX =
-    content.x < -autoGrow.growPadding ? ceilByStep(Math.ceil(-content.x + autoGrow.growPadding), autoGrow.growStep) : 0
-  const offsetY =
-    content.y < -autoGrow.growPadding ? ceilByStep(Math.ceil(-content.y + autoGrow.growPadding), autoGrow.growStep) : 0
-  // 右/下方向的尺寸计算需要叠加左/上补偿量，这样容器总尺寸才能真实覆盖平移后的页面与内容
-  const requiredWidth = Math.max(page.width + offsetX, Math.ceil(right + offsetX + autoGrow.growPadding))
-  const requiredHeight = Math.max(page.height + offsetY, Math.ceil(bottom + offsetY + autoGrow.growPadding))
+  const offsetX = content.x < 0 ? ceilByStep(Math.ceil(-content.x + autoGrow.growPadding), autoGrow.growStep) : 0
+  const offsetY = content.y < 0 ? ceilByStep(Math.ceil(-content.y + autoGrow.growPadding), autoGrow.growStep) : 0
+  // 右/下方向只有在真实越过页面边界后才追加 growPadding，避免首次触发就无条件把整页提前扩大一圈
+  const requiredWidth =
+    right > page.width
+      ? Math.max(page.width + offsetX, Math.ceil(right + offsetX + autoGrow.growPadding))
+      : page.width + offsetX
+  const requiredHeight =
+    bottom > page.height
+      ? Math.max(page.height + offsetY, Math.ceil(bottom + offsetY + autoGrow.growPadding))
+      : page.height + offsetY
 
   return {
     width:

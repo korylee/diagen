@@ -226,7 +226,7 @@ export function createViewManager(
     const offsetChanged = nextOffset.x !== currentOffset.x || nextOffset.y !== currentOffset.y
 
     if (!sizeChanged && !offsetChanged) return false
-
+    
     batch(() => {
       if (sizeChanged) {
         setWorldSize(nextGrowth.width, nextGrowth.height)
@@ -249,7 +249,6 @@ export function createViewManager(
    * 在下一帧合并执行扩容，避免拖拽过程高频 setState
    */
   function scheduleAutoGrow(extraBounds?: Bounds): void {
-    if (!state.config.autoGrow.enabled) return
     autoGrowQueue.enqueue(extraBounds)
   }
 
@@ -312,13 +311,20 @@ export function createViewManager(
     })
   }
 
-  ;(['element:updated', 'element:added', 'element:removed'] as const).forEach(event => {
-    emitter.on(event, ({ elements }) => linkerLayout.markDirty(elements))
-  })
   ;(['element:updated', 'element:added'] as const).forEach(event => {
-    emitter.on(event, ({ elements }) => mergeBounds(getElementsBounds(elements)))
+    emitter.on(event, ({ elements }) => {
+      linkerLayout.markDirty(elements)
+      const nextBounds = getElementsBounds(elements)
+      mergeBounds(nextBounds)
+
+      scheduleAutoGrow(nextBounds ?? undefined)
+    })
   })
-  emitter.on('element:removed', ({ elements }) => linkerLayout.removeEntries(elements))
+  emitter.on('element:removed', ({ elements }) => {
+    // 删除 shape 后，相关连线（含 obstacle 路由）也需要失效重算。
+    linkerLayout.markDirty(elements)
+    linkerLayout.removeEntries(elements)
+  })
   emitter.on('element:cleared', () => linkerLayout.clear())
 
   return {

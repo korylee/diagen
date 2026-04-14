@@ -16,6 +16,28 @@ function withDesigner(run: (designer: ReturnType<typeof createDesigner>) => void
   })
 }
 
+async function withDesignerAsync(run: (designer: ReturnType<typeof createDesigner>) => Promise<void>) {
+  await new Promise<void>((resolve, reject) => {
+    createRoot(dispose => {
+      const designer = createDesigner()
+      Promise.resolve(run(designer))
+        .then(() => {
+          dispose()
+          resolve()
+        })
+        .catch(error => {
+          dispose()
+          reject(error)
+        })
+    })
+  })
+}
+
+async function waitNextFrame() {
+  await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+  await Promise.resolve()
+}
+
 function createShapeById(id: string, x: number, y: number, w = 100, h = 80) {
   return createShape({
     id,
@@ -157,6 +179,17 @@ describe('view manager', () => {
     })
   })
 
+  it('内容仍在页面内时 ensureContainerFits 不应提前扩容', () => {
+    withDesigner(designer => {
+      const before = { ...designer.view.worldSize() }
+      const changed = designer.view.ensureContainerFits({ x: 100, y: 100, w: 200, h: 120 })
+
+      expect(changed).toBe(false)
+      expect(designer.view.worldSize()).toEqual(before)
+      expect(designer.view.originOffset()).toEqual({ x: 0, y: 0 })
+    })
+  })
+
   it('ensureContainerFits 应在内容向左上越界时同步扩容并更新 originOffset', () => {
     withDesigner(designer => {
       const changed = designer.view.ensureContainerFits({ x: -260, y: -260, w: 300, h: 240 })
@@ -166,11 +199,27 @@ describe('view manager', () => {
         x: 600,
         y: 600,
       })
-      // ensureContainerFits 会把页面 bounds 与越界内容一起合并后再计算容器尺寸，
-      // 因此最终宽高需要覆盖“补偿后的整页内容”，而不是仅覆盖传入的 extraBounds。
+      // 左/上补偿后，容器只需要覆盖“补偿后的整页内容”；
+      // 右/下 growPadding 仅在真实越过页面边界时才额外追加。
       expect(designer.view.worldSize()).toEqual({
-        width: 2000,
-        height: 2000,
+        width: 1800,
+        height: 1600,
+      })
+    })
+  })
+
+  it('内容刚越过左上边界时也应立即扩容并补足 growPadding', () => {
+    withDesigner(designer => {
+      const changed = designer.view.ensureContainerFits({ x: -1, y: -1, w: 120, h: 90 })
+
+      expect(changed).toBe(true)
+      expect(designer.view.originOffset()).toEqual({
+        x: 400,
+        y: 400,
+      })
+      expect(designer.view.worldSize()).toEqual({
+        width: 1600,
+        height: 1400,
       })
     })
   })
@@ -187,6 +236,45 @@ describe('view manager', () => {
 
       const shapeBounds = designer.view.getShapeBounds(designer.getElementById<ShapeElement>(far.id) as ShapeElement)
       expect(shapeBounds).toEqual({ x: 2400, y: 1600, w: 120, h: 90 })
+    })
+  })
+
+  it('新增远端元素后 worldSize 也应自动扩张', async () => {
+    await withDesignerAsync(async designer => {
+      const baseWorldSize = { ...designer.view.worldSize() }
+      const far = createShapeById('view_far_world_size', 2400, 1600, 120, 90)
+
+      designer.edit.add([far], { record: false, select: false })
+      await waitNextFrame()
+
+      const nextWorldSize = designer.view.worldSize()
+      expect(nextWorldSize.width).toBeGreaterThan(baseWorldSize.width)
+      expect(nextWorldSize.height).toBeGreaterThan(baseWorldSize.height)
+    })
+  })
+
+  it('元素更新到左上越界后应自动扩张并更新 originOffset', async () => {
+    await withDesignerAsync(async designer => {
+      const shape = createShapeById('view_auto_grow_left_top', 40, 40, 120, 90)
+      designer.edit.add([shape], { record: false, select: false })
+      await waitNextFrame()
+
+      designer.edit.update(
+        shape.id,
+        'props',
+        current => ({
+          ...current,
+          x: -260,
+          y: -260,
+        }),
+        { record: false },
+      )
+      await waitNextFrame()
+
+      expect(designer.view.originOffset().x).toBeGreaterThan(0)
+      expect(designer.view.originOffset().y).toBeGreaterThan(0)
+      expect(designer.view.worldSize().width).toBeGreaterThan(1200)
+      expect(designer.view.worldSize().height).toBeGreaterThan(800)
     })
   })
 
@@ -332,6 +420,32 @@ describe('view manager', () => {
 
       expect(initialLayout.route.points).not.toEqual(layout.route.points)
       expect(intersects).toBe(false)
+    })
+  })
+
+  it('删除障碍物后 obstacle 连线布局缓存应自动失效', () => {
+    withDesigner(designer => {
+      const a = createShapeById('route_remove_dynamic_a', 0, 0, 100, 80)
+      const b = createShapeById('route_remove_dynamic_b', 320, 0, 100, 80)
+      const linker = createLinker({
+        id: 'route_remove_dynamic_linker',
+        name: 'route_remove_dynamic_linker',
+        linkerType: 'broken',
+        from: { id: a.id, x: a.props.x + a.props.w, y: a.props.y + a.props.h / 2, binding: { type: 'free' } },
+        to: { id: b.id, x: b.props.x, y: b.props.y + b.props.h / 2, binding: { type: 'free' } },
+      })
+      designer.edit.add([a, b, linker], { record: false, select: false })
+
+      const initialLayout = designer.view.getLinkerLayout(linker)
+      const blocker = createShapeById('route_remove_dynamic_blocker', 140, -20, 120, 120)
+      designer.edit.add([blocker], { record: false, select: false })
+
+      const blockedLayout = designer.view.getLinkerLayout(linker)
+      designer.edit.remove([blocker.id], { record: false })
+      const removedLayout = designer.view.getLinkerLayout(linker)
+
+      expect(blockedLayout.route.points).not.toEqual(initialLayout.route.points)
+      expect(removedLayout.route.points).toEqual(initialLayout.route.points)
     })
   })
 
