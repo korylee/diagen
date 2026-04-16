@@ -1,13 +1,12 @@
-import { createSignal, onCleanup } from 'solid-js'
 import { isShape, type ShapeElement } from '@diagen/core'
 import { calculateResizeGuideSnap, type GuideLine } from '@diagen/core/guide'
-import { getRotatedBounds } from '@diagen/shared'
 import type { Bounds, Point } from '@diagen/shared'
+import { createSignal, onCleanup } from 'solid-js'
 import { useDesigner } from '../../../context'
-import type { EventToCanvas } from '../../services/createCoordinateService'
+import type { CoordinateService } from '../../services/createCoordinateService'
 import { createDragSession } from '../shared/createDragSession'
-import type { CreatePointerDragTrackerOptions } from '../shared/createPointerDragTracker'
 import { createPointerDeltaState } from '../shared/createPointerDeltaState'
+import type { CreatePointerDragTrackerOptions } from '../shared/createPointerDragTracker'
 
 // ============================================================================
 // 调整大小 Hook - 与 Designer 集成
@@ -27,22 +26,21 @@ export interface ResizeDragState {
 }
 
 export function createResize(
+  coordinate: Pick<CoordinateService, 'eventToCanvas'>,
   options: CreatePointerDragTrackerOptions & {
     minWidth?: number
     minHeight?: number
-    eventToCanvas?: EventToCanvas
     guideTolerance?: number
   } = {},
 ) {
-  const { threshold = 0, minWidth = 20, minHeight = 20, eventToCanvas, guideTolerance } = options
+  const { threshold = 0, minWidth = 20, minHeight = 20, guideTolerance } = options
   const { element, history, selection, view, edit } = useDesigner()
   const transaction = history.transaction.createScope('调整尺寸')
-  const pointerDelta = createPointerDeltaState({ eventToCanvas })
+  const pointerDelta = createPointerDeltaState(coordinate)
   const [guides, setGuides] = createSignal<GuideLine[]>([])
   const session = createDragSession<{ id: string; dir: ResizeDirection; event: MouseEvent }, ResizeDragState>({
     threshold,
     transaction,
-    getEvent: input => input.event,
     setup: input => {
       const el = element.getElementById(input.id)
       if (!el || !isShape(el)) return null
@@ -99,22 +97,10 @@ export function createResize(
           h: snappedBounds.h,
         },
       })
-      view.scheduleAutoGrow(
-        getRotatedBounds({
-          x: snappedBounds.x,
-          y: snappedBounds.y,
-          w: snappedBounds.w,
-          h: snappedBounds.h,
-          angle: state.startProps.angle,
-        }),
-      )
     },
     reset: () => {
       setGuides([])
       pointerDelta.reset()
-    },
-    onCommit: () => {
-      view.flushAutoGrow()
     },
   })
 

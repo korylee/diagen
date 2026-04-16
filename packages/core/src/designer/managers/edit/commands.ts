@@ -1,11 +1,25 @@
-import { keys, type UnionKeyOf, type UnionNestedKeyOf, type UnionNestedValue } from '@diagen/shared'
+import {
+  isNonNullable,
+  keys,
+  type Bounds,
+  type UnionKeyOf,
+  type UnionNestedKeyOf,
+  type UnionNestedValue,
+} from '@diagen/shared'
 import { batch } from 'solid-js'
 import type { StoreSetter } from 'solid-js/store'
-import type { DiagramElement } from '../../../model'
+import type { DiagramElement, ShapeElement } from '../../../model'
 import { unwrapClone } from '../../../_internal'
+import {
+  resolveParenting,
+  type ParentingContainment,
+  type ResolveParentingOptions,
+  type ResolveParentingResult,
+} from '../element/parenting'
 import { type Command, createCommand } from '../history'
 import {
   type ChangeEntry,
+  type EditCreateOptions,
   type EditDeps,
   hasChanged,
   type LayerAction,
@@ -178,65 +192,175 @@ export function createUpdateCommand(deps: EditDeps, ids: string[], args: unknown
   throw new Error('edit.update 参数不合法')
 }
 
-export function createAddCommand(
-  deps: EditDeps,
-  elements: DiagramElement[],
-  options: { assumeCloned?: boolean } = {},
-) {
-  const { element } = deps
-  const name = 'add_els'
-  const { assumeCloned = false } = options
-  const snapshots = assumeCloned ? elements : elements.map(current => unwrapClone(current))
+function createParentingSnapshot(deps: EditDeps, result: ResolveParentingResult): ResolveParentingResult {
+  return {
+    parentUpdates: result.parentUpdates
+      .map(update => {
+        const element = deps.element.getElementById(update.id)
+        return element
+          ? {
+              id: update.id,
+              parent: element.parent,
+            }
+          : null
+      })
+      .filter(isNonNullable),
+    childrenUpdates: result.childrenUpdates
+      .map(update => {
+        const element = deps.element.getElementById(update.id)
+        return element
+          ? {
+              id: update.id,
+              children: [...element.children],
+            }
+          : null
+      })
+      .filter(isNonNullable),
+  }
+}
 
-  type AddCommand = Command & {
+function applyParenting(deps: EditDeps, result: ResolveParentingResult): void {
+  batch(() => {
+    for (const parentUpdate of result.parentUpdates) {
+      deps.element.update(parentUpdate.id, {
+        parent: parentUpdate.parent,
+      })
+    }
+
+    for (const childrenUpdate of result.childrenUpdates) {
+      deps.element.update(childrenUpdate.id, {
+        children: childrenUpdate.children,
+      })
+    }
+  })
+}
+
+export function createParentingCommand(
+  deps: EditDeps,
+  options: Pick<ResolveParentingOptions, 'targetIds' | 'containment' | 'canContain' | 'canBeContained'>,
+) {
+  const result = resolveParenting({
+    shapes: deps.element.shapes(),
+    targetIds: options.targetIds,
+    getBounds: deps.view.getShapeBounds,
+    containment: options.containment,
+    canContain: options.canContain,
+    canBeContained: options.canBeContained,
+  })
+  const isNoOp = !result.parentUpdates.length && !result.childrenUpdates.length
+
+  if (isNoOp) {
+    return createCommand({
+      name: 'el_parenting',
+      isNoOp: true,
+      execute() {},
+      undo() {},
+    })
+  }
+
+  const before = createParentingSnapshot(deps, result)
+
+  return createCommand({
+    name: 'el_parenting',
+    execute() {
+      if (isNoOp) return
+      applyParenting(deps, result)
+    },
+    undo() {
+      applyParenting(deps, before)
+    },
+  })
+}
+
+export function createInsertElementsCommand(
+  deps: Pick<EditDeps, 'element' | 'selection'>,
+  params: {
+    name: string
+    elements: DiagramElement[]
+    options?: Pick<EditCreateOptions, 'assumeCloned' | 'select'>
+  },
+) {
+  const { element, selection } = deps
+  const { name, elements, options = {} } = params
+  const { assumeCloned = false, select = true } = options
+  const snapshots = assumeCloned ? elements : elements.map(current => unwrapClone(current))
+  const addedIds = snapshots.map(current => current.id)
+  const beforeSelectionIds = selection.selectedIds().slice()
+
+  type InsertCommand = Command & {
     payload: DiagramElement[]
   }
 
-  return createCommand({
+  const command = createCommand({
     name,
     payload: snapshots,
     execute() {
-      element.add(snapshots.map(current => unwrapClone(current)))
+      batch(() => {
+        element.add(snapshots.map(current => unwrapClone(current)))
+        if (select) {
+          selection.replace(addedIds)
+        }
+      })
     },
     undo() {
-      element.remove(snapshots.map(current => current.id))
+      batch(() => {
+        element.remove(addedIds)
+        if (select) {
+          selection.replace(beforeSelectionIds)
+        }
+      })
     },
     canMergeWith(next: Command): boolean {
       return next.name === name && Date.now() - next.timestamp < 300
     },
-    merge<K extends Command>(next: K): K extends AddCommand ? AddCommand : null {
-      return (next.name !== name
-        ? null
-        : createAddCommand(deps, [...snapshots, ...(next as any).payload], { assumeCloned: true })) as any
+    merge<K extends Command>(next: K): K extends null | undefined ? InsertCommand : InsertCommand | null {
+      return (
+        next.name !== name
+          ? null
+          : createInsertElementsCommand(deps, {
+              name,
+              elements: [...snapshots, ...(next as any).payload],
+              options: {
+                assumeCloned: true,
+                select,
+              },
+            })
+      ) as any
     },
-  }) as AddCommand
+  }) as InsertCommand
+
+  return command
+}
+
+export function createAddCommand(
+  deps: EditDeps,
+  elements: DiagramElement[],
+  options: Pick<EditCreateOptions, 'assumeCloned' | 'select'> = {},
+) {
+  return createInsertElementsCommand(deps, {
+    name: 'add_els',
+    elements,
+    options,
+  })
 }
 
 export function createRemoveCommand(deps: EditDeps, elements: DiagramElement[]) {
   const { element, selection } = deps
+  const ids = elements.map(current => current.id)
+  const snapshotElements = unwrapClone(element.elementMap())
+  const snapshotOrderList = element.orderList().slice()
+  const previousSelectionIds = selection.selectedIds().slice()
+  const nextSelectionIds = previousSelectionIds.filter(selectedId => !ids.includes(selectedId))
   const name = 'remove_els'
-  const snapshots = elements.map(current => unwrapClone(current))
-
-  type RemoveCommand = Command & {
-    payload: DiagramElement[]
-  }
-
   return createCommand({
     name,
-    payload: snapshots,
     execute() {
-      const ids = snapshots.map(current => current.id)
       element.remove(ids)
-      selection.deselect(ids)
+      selection.replace(nextSelectionIds)
     },
     undo() {
-      element.add(snapshots.map(current => unwrapClone(current)))
-    },
-    canMergeWith(next: Command): boolean {
-      return next.name === name && Date.now() - next.timestamp < 300
-    },
-    merge<K extends Command>(next: K): K extends RemoveCommand ? RemoveCommand : null {
-      return (next.name !== name ? null : createRemoveCommand(deps, [...snapshots, ...(next as any).payload])) as any
+      element.load(unwrapClone(snapshotElements), snapshotOrderList.slice())
+      selection.replace(previousSelectionIds)
     },
   })
 }

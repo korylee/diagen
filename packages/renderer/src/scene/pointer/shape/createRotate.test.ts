@@ -32,14 +32,18 @@ function withRotate(
 
     testContext.designer = designer
 
-    const rotate = createRotate({
-      threshold: options.threshold,
-      snapStep: options.snapStep,
-      eventToCanvas: event => ({
-        x: event.clientX,
-        y: event.clientY,
-      }),
-    })
+    const rotate = createRotate(
+      {
+        eventToCanvas: event => ({
+          x: event.clientX,
+          y: event.clientY,
+        }),
+      },
+      {
+        threshold: options.threshold,
+        snapStep: options.snapStep,
+      },
+    )
 
     try {
       run({ designer, rotate })

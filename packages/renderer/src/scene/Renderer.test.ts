@@ -1,4 +1,4 @@
-import { createLinker, createShape } from '@diagen/core'
+import { createLinker, createShape, type ShapeElement } from '@diagen/core'
 import { getAnchorInfo, getPerimeterInfo } from '@diagen/core/anchors'
 import { getLinkerTextBox } from '@diagen/core/text'
 import { rotatePoint } from '@diagen/shared'
@@ -359,6 +359,119 @@ describe('Renderer', () => {
 
       await harness.dispatchWindowMouseUp()
       expect(harness.getInteraction().pointer.machine.mode()).toBe('idle')
+    } finally {
+      harness.dispose()
+    }
+  })
+
+  it('拖拽进入容器后应在一次事务内提交 parent 与 children', async () => {
+    const harness = await createRendererTestHarness({
+      shapes: [{ id: 'shape_drag_container_child', x: 360, y: 60, w: 80, h: 60 }],
+    })
+
+    try {
+      harness.designer.edit.add(
+        [
+          createShape({
+            id: 'shape_drag_container_parent',
+            name: 'shape_drag_container_parent',
+            attribute: {
+              ...createShape({}).attribute,
+              container: true,
+            },
+            props: { x: 0, y: 0, w: 280, h: 220, angle: 0 },
+          }),
+        ],
+        {
+          record: false,
+          select: false,
+        },
+      )
+      await Promise.resolve()
+
+      await harness.dispatchSceneMouseDownAtCanvas({ x: 400, y: 90 })
+      await harness.dispatchWindowMouseMoveAtCanvas({ x: 140, y: 110 })
+
+      const preview = harness.overlayLayer.querySelector(
+        '[data-container-preview="true"][data-container-preview-id="shape_drag_container_parent"]',
+      )
+      expect(preview).toBeTruthy()
+
+      await harness.dispatchWindowMouseUp()
+
+      expect(harness.overlayLayer.querySelector('[data-container-preview="true"]')).toBeNull()
+
+      const container = harness.designer.getElementById('shape_drag_container_parent')
+      const child = harness.designer.getElementById('shape_drag_container_child')
+      expect(container?.type).toBe('shape')
+      expect(child?.type).toBe('shape')
+
+      if (!container || container.type !== 'shape' || !child || child.type !== 'shape') {
+        throw new Error('容器拖拽测试元素不存在')
+      }
+
+      expect(child.parent).toBe(container.id)
+      expect(container.children).toEqual([child.id])
+      expect(harness.designer.history.undoStack()).toHaveLength(1)
+
+      harness.designer.undo()
+      expect(harness.designer.getElementById<ShapeElement>('shape_drag_container_child')?.parent ?? null).toBeNull()
+      expect(harness.designer.getElementById<ShapeElement>('shape_drag_container_parent')?.children ?? []).toEqual([])
+    } finally {
+      harness.dispose()
+    }
+  })
+
+  it('多选拖拽进入同一容器时，不应在 mousedown 时塌缩为单选', async () => {
+    const harness = await createRendererTestHarness({
+      shapes: [
+        { id: 'shape_drag_multi_a', x: 360, y: 60, w: 80, h: 60 },
+        { id: 'shape_drag_multi_b', x: 470, y: 60, w: 80, h: 60 },
+      ],
+    })
+
+    try {
+      harness.designer.edit.add(
+        [
+          createShape({
+            id: 'shape_drag_multi_container',
+            name: 'shape_drag_multi_container',
+            attribute: {
+              ...createShape({}).attribute,
+              container: true,
+            },
+            props: { x: 0, y: 0, w: 320, h: 240, angle: 0 },
+          }),
+        ],
+        {
+          record: false,
+          select: false,
+        },
+      )
+      harness.designer.selection.replace(['shape_drag_multi_a', 'shape_drag_multi_b'])
+      await Promise.resolve()
+
+      await harness.dispatchSceneMouseDownAtCanvas({ x: 400, y: 90 })
+      expect(harness.designer.selection.selectedIds()).toEqual(['shape_drag_multi_a', 'shape_drag_multi_b'])
+
+      await harness.dispatchWindowMouseMoveAtCanvas({ x: 140, y: 110 })
+
+      const preview = harness.overlayLayer.querySelector(
+        '[data-container-preview="true"][data-container-preview-id="shape_drag_multi_container"]',
+      )
+      expect(preview).toBeTruthy()
+
+      await harness.dispatchWindowMouseUp()
+
+      const container = harness.designer.getElementById<ShapeElement>('shape_drag_multi_container')
+      const shapeA = harness.designer.getElementById<ShapeElement>('shape_drag_multi_a')
+      const shapeB = harness.designer.getElementById<ShapeElement>('shape_drag_multi_b')
+
+      expect(container?.children).toEqual(['shape_drag_multi_a', 'shape_drag_multi_b'])
+      expect(shapeA?.parent).toBe(container?.id)
+      expect(shapeB?.parent).toBe(container?.id)
+      expect(harness.designer.history.undoStack()).toHaveLength(1)
+      expect(harness.designer.selection.selectedIds()).toEqual(['shape_drag_multi_a', 'shape_drag_multi_b'])
     } finally {
       harness.dispose()
     }

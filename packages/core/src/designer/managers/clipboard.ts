@@ -2,10 +2,11 @@ import { generateId, type Point } from '@diagen/shared'
 import { batch } from 'solid-js'
 import { type DiagramElement, isLinker, isShape, type LinkerEndpoint } from '../../model'
 import { unwrapClone } from '../../_internal'
+import { createInsertElementsCommand } from './edit/commands'
 import type { EditManager } from './edit'
 import type { ElementManager } from './element'
 import type { GroupManager } from './group'
-import type { HistoryManager } from './history'
+import { createCommand, type HistoryManager } from './history'
 import type { SelectionManager } from './selection'
 
 export interface ClipboardSnapshot {
@@ -16,11 +17,11 @@ export interface ClipboardSnapshot {
 }
 
 interface ClipboardDeps {
-  element: Pick<ElementManager, 'getElementsByIds'>
-  selection: Pick<SelectionManager, 'selectedIds' | 'replace'>
+  element: ElementManager
+  selection: SelectionManager
   group: Pick<GroupManager, 'resolveSelection'>
-  edit: Pick<EditManager, 'add' | 'remove'>
-  history: Pick<HistoryManager, 'isInTransaction' | 'transaction'>
+  edit: Pick<EditManager, 'remove'>
+  history: Pick<HistoryManager, 'execute'>
 }
 
 const DefaultPasteOffset = { x: 24, y: 24 } as const
@@ -60,25 +61,29 @@ function remapLinkerEndpoint(endpoint: LinkerEndpoint, idMap: Map<string, string
   }
 }
 
-function runInTransaction(history: ClipboardDeps['history'], name: string, fn: () => void): void {
-  if (history.isInTransaction()) {
-    fn()
-    return
-  }
+function createClipboardCutCommand(params: {
+  ids: string[]
+  edit: ClipboardDeps['edit']
+  element: ClipboardDeps['element']
+  selection: ClipboardDeps['selection']
+}) {
+  const { ids, edit, element, selection } = params
+  const snapshotElements = unwrapClone(element.elementMap())
+  const snapshotOrderList = element.orderList().slice()
+  const previousSelectionIds = selection.selectedIds().slice()
 
-  const scope = history.transaction.createScope(name)
-  if (!scope.begin()) {
-    fn()
-    return
-  }
-
-  try {
-    fn()
-    scope.commit()
-  } catch (error) {
-    scope.abort()
-    throw error
-  }
+  return createCommand({
+    name: 'clipboard_cut',
+    execute() {
+      edit.remove(ids, { record: false })
+    },
+    undo() {
+      batch(() => {
+        element.load(unwrapClone(snapshotElements), snapshotOrderList.slice())
+        selection.replace(previousSelectionIds)
+      })
+    },
+  })
 }
 
 export function createClipboardManager(deps: ClipboardDeps) {
@@ -190,9 +195,14 @@ export function createClipboardManager(deps: ClipboardDeps) {
     snapshot = nextSnapshot
     pasteCount = 0
 
-    runInTransaction(history, 'clipboard_cut', () => {
-      edit.remove(nextSnapshot.orderedIds)
-    })
+    history.execute(
+      createClipboardCutCommand({
+        ids: nextSnapshot.orderedIds,
+        edit,
+        element,
+        selection,
+      }),
+    )
     return true
   }
 
@@ -203,12 +213,22 @@ export function createClipboardManager(deps: ClipboardDeps) {
     const pastedElements = cloneElementsForPaste(snapshot.elements, delta)
     const pastedIds = pastedElements.map(element => element.id)
 
-    runInTransaction(history, 'clipboard_paste', () => {
-      batch(() => {
-        edit.add(pastedElements, { record: true, select: false, assumeCloned: true })
-        selection.replace(pastedIds)
-      })
-    })
+    history.execute(
+      createInsertElementsCommand(
+        {
+          element,
+          selection,
+        },
+        {
+          name: 'clipboard_paste',
+          elements: pastedElements,
+          options: {
+            assumeCloned: true,
+            select: true,
+          },
+        },
+      ),
+    )
 
     pasteCount += 1
     return pastedIds
@@ -221,12 +241,22 @@ export function createClipboardManager(deps: ClipboardDeps) {
     const duplicatedElements = cloneElementsForPaste(source.elements, { ...DefaultPasteOffset })
     const duplicatedIds = duplicatedElements.map(element => element.id)
 
-    runInTransaction(history, 'clipboard_duplicate', () => {
-      batch(() => {
-        edit.add(duplicatedElements, { record: true, select: false, assumeCloned: true })
-        selection.replace(duplicatedIds)
-      })
-    })
+    history.execute(
+      createInsertElementsCommand(
+        {
+          element,
+          selection,
+        },
+        {
+          name: 'clipboard_duplicate',
+          elements: duplicatedElements,
+          options: {
+            assumeCloned: true,
+            select: true,
+          },
+        },
+      ),
+    )
 
     return duplicatedIds
   }

@@ -96,4 +96,34 @@ describe('selection manager', () => {
       expect(designer.selection.selectedIds()).toEqual([])
     })
   })
+
+  it('选中容器时不应自动补齐子元素', () => {
+    withDesigner(designer => {
+      const container = createShape({
+        id: 'sel_container',
+        name: 'sel_container',
+        parent: null,
+        children: ['sel_child'],
+        attribute: {
+          ...createShape({}).attribute,
+          container: true,
+        },
+        props: { x: 0, y: 0, w: 260, h: 180, angle: 0 },
+        group: null,
+      })
+      const child = createShape({
+        id: 'sel_child',
+        name: 'sel_child',
+        parent: container.id,
+        props: { x: 40, y: 40, w: 80, h: 60, angle: 0 },
+        group: null,
+      })
+
+      designer.edit.add([container, child], { record: false, select: false })
+      designer.selection.replace([container.id])
+
+      expect(designer.selection.selectedIds()).toEqual([container.id])
+      expect(designer.selection.isSelected(child.id)).toBe(false)
+    })
+  })
 })

@@ -163,7 +163,7 @@ export function createDesigner(options: DesignerOptions = {}) {
   const history = createHistoryManager(ctx)
   const selection = createSelectionManager(ctx, { element })
   const view = createViewManager(ctx, { element, selection })
-  const edit = createEditManager(ctx, { element, selection, history })
+  const edit = createEditManager(ctx, { element, selection, history, view })
   const group = createGroupManager(ctx, { edit, element, selection })
   const clipboard = createClipboardManager({ element, selection, group, edit, history })
   const tool = createToolManager(ctx)
@@ -172,8 +172,8 @@ export function createDesigner(options: DesignerOptions = {}) {
     return serializeDesignerDiagram(state.diagram)
   }
 
-  function loadFromJSON(json: string, options: { recordHistory?: boolean } = {}): void {
-    const { recordHistory = false } = options
+  function loadFromJSON(json: string, options: { record?: boolean } = {}): void {
+    const { record = false } = options
     const previousDiagram = cloneDesignerDiagram(state.diagram)
     const nextDiagram = loadDesignerDiagram(json)
 
@@ -200,7 +200,7 @@ export function createDesigner(options: DesignerOptions = {}) {
       },
     }
 
-    if (recordHistory) {
+    if (record) {
       history.execute(command)
     } else {
       command.execute()
@@ -250,3 +250,5 @@ export function createDesigner(options: DesignerOptions = {}) {
 }
 
 export type Designer = ReturnType<typeof createDesigner>
+
+export type { TransactionScope } from './managers'

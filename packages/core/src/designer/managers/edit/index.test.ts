@@ -16,6 +16,41 @@ function withDesigner(run: (designer: ReturnType<typeof createDesigner>) => void
 }
 
 describe('edit manager', () => {
+  it('parenting 应支持 undo/redo', () => {
+    withDesigner(designer => {
+      const container = createShape({
+        id: 'shape_parenting_container',
+        name: 'shape_parenting_container',
+        group: null,
+        attribute: {
+          ...createShape({}).attribute,
+          container: true,
+        },
+        props: { x: 0, y: 0, w: 220, h: 180, angle: 0 },
+      })
+      const shape = createShape({
+        id: 'shape_parenting_target',
+        name: 'shape_parenting_target',
+        group: null,
+        props: { x: 60, y: 50, w: 80, h: 60, angle: 0 },
+      })
+
+      designer.edit.add([container, shape], { record: false, select: false })
+      designer.edit.parenting([shape.id], current => current.props)
+
+      expect(designer.getElementById<ShapeElement>(shape.id)?.parent).toBe(container.id)
+      expect(designer.getElementById<ShapeElement>(container.id)?.children).toEqual([shape.id])
+
+      designer.undo()
+      expect(designer.getElementById<ShapeElement>(shape.id)?.parent).toBeNull()
+      expect(designer.getElementById<ShapeElement>(container.id)?.children).toEqual([])
+
+      designer.redo()
+      expect(designer.getElementById<ShapeElement>(shape.id)?.parent).toBe(container.id)
+      expect(designer.getElementById<ShapeElement>(container.id)?.children).toEqual([shape.id])
+    })
+  })
+
   it('patch 更新应支持 undo/redo', () => {
     withDesigner(designer => {
       const shape = createShape({

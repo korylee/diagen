@@ -44,11 +44,28 @@ function withSelection(
   })
 }
 
-function createShapeById(id: string, x: number, y: number, w = 100, h = 80) {
+function createShapeById(
+  id: string,
+  x: number,
+  y: number,
+  w = 100,
+  h = 80,
+  options: {
+    parent?: string | null
+    children?: string[]
+    container?: boolean
+  } = {},
+) {
   return createShape({
     id,
     name: id,
     group: null,
+    parent: options.parent ?? null,
+    children: options.children ?? [],
+    attribute: {
+      ...createShape({}).attribute,
+      container: options.container ?? false,
+    },
     props: { x, y, w, h, angle: 0 },
   })
 }
@@ -75,6 +92,44 @@ describe('createBoxSelection', () => {
       expect(designer.selection.selectedIds()).toEqual([shapeA.id])
       expect(selectionBox.isActive()).toBe(false)
       expect(selectionBox.bounds()).toBeNull()
+    })
+  })
+
+  it('框选命中容器与子元素时，应保持实际命中的元素集合', () => {
+    withSelection({ minSize: 5 }, ({ designer, selectionBox }) => {
+      const container = createShapeById('container_box', 0, 0, 260, 180, {
+        container: true,
+        children: ['container_box_child'],
+      })
+      const child = createShapeById('container_box_child', 40, 40, 80, 60, {
+        parent: container.id,
+      })
+      designer.edit.add([container, child], { record: false, select: false })
+
+      expect(selectionBox.start({ x: 20, y: 20 })).toBe(true)
+      selectionBox.move({ x: 140, y: 120 })
+      selectionBox.end()
+
+      expect(designer.selection.selectedIds()).toEqual([container.id, child.id])
+    })
+  })
+
+  it('框选仅命中容器时，不应自动补选子元素', () => {
+    withSelection({ minSize: 5 }, ({ designer, selectionBox }) => {
+      const container = createShapeById('container_only_box', 0, 0, 260, 180, {
+        container: true,
+        children: ['container_only_box_child'],
+      })
+      const child = createShapeById('container_only_box_child', 120, 80, 80, 60, {
+        parent: container.id,
+      })
+      designer.edit.add([container, child], { record: false, select: false })
+
+      expect(selectionBox.start({ x: 0, y: 0 })).toBe(true)
+      selectionBox.move({ x: 70, y: 50 })
+      selectionBox.end()
+
+      expect(designer.selection.selectedIds()).toEqual([container.id])
     })
   })
 })

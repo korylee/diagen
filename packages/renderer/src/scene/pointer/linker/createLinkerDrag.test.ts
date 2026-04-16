@@ -1,8 +1,9 @@
+import { createDesigner, createLinker, createShape, type LinkerElement } from '@diagen/core'
+import { getAnchorInfo, getPerimeterInfo, resolveCreateAnchor } from '@diagen/core/anchors'
 import { createRoot } from 'solid-js'
 import { describe, expect, it, vi } from 'vitest'
-import { createDesigner, createLinker, createShape, type LinkerElement } from '@diagen/core'
+import { CoordinateService } from '../../services/createCoordinateService'
 import { createLinkerDrag } from './createLinkerDrag'
-import { getAnchorInfo, getPerimeterInfo, resolveCreateAnchor } from '@diagen/core/anchors'
 
 const testContext = vi.hoisted(() => ({
   designer: null as ReturnType<typeof createDesigner> | null,
@@ -41,13 +42,9 @@ function withLinkerDrag(
 
     testContext.designer = designer
 
-    const linkerDrag = createLinkerDrag({
+    const linkerDrag = createLinkerDrag(coordinate, {
       threshold: options.threshold ?? 0,
       allowSelfConnect: options.allowSelfConnect,
-      eventToCanvas: event => ({
-        x: event.clientX,
-        y: event.clientY,
-      }),
     })
 
     try {
@@ -92,6 +89,13 @@ function createFreeLinkerById(id: string, from: { x: number; y: number }, to: { 
       binding: { type: 'free' },
     },
   })
+}
+
+const coordinate: Pick<CoordinateService, 'eventToCanvas'> = {
+  eventToCanvas: event => ({
+    x: event.clientX,
+    y: event.clientY,
+  }),
 }
 
 describe('createLinkerDrag', () => {
@@ -696,13 +700,9 @@ describe('createLinkerDrag', () => {
       })
       testContext.designer = designer
 
-      const linkerDrag = createLinkerDrag({
+      const linkerDrag = createLinkerDrag(coordinate, {
         threshold: 0,
         allowSelfConnect: false,
-        eventToCanvas: event => ({
-          x: event.clientX,
-          y: event.clientY,
-        }),
       })
 
       try {

@@ -39,6 +39,7 @@ export function createViewManager(
     isLineJumpsEnabled: () => diagramPage().lineJumps,
   })
   const [bounds, setBounds] = createSignal<Bounds>(getContentBounds())
+  let isAutoGrowFlushScheduled = false
   const selectionBounds = createMemo((): Bounds | null => {
     const ids = selection.selectedIds()
     return getElementsBounds(element.getElementsByIds(ids))
@@ -259,6 +260,16 @@ export function createViewManager(
     return autoGrowQueue.flush(extraBounds)
   }
 
+  function scheduleFlushAutoGrow(): void {
+    if (isAutoGrowFlushScheduled) return
+    isAutoGrowFlushScheduled = true
+
+    queueMicrotask(() => {
+      isAutoGrowFlushScheduled = false
+      flushAutoGrow()
+    })
+  }
+
   function getLinkerRoute(linker: LinkerElement): LinkerRoute {
     return linkerLayout.getRoute(linker)
   }
@@ -326,6 +337,9 @@ export function createViewManager(
     linkerLayout.removeEntries(elements)
   })
   emitter.on('element:cleared', () => linkerLayout.clear())
+  emitter.on('history:committed', () => scheduleFlushAutoGrow())
+  emitter.on('history:redo', () => scheduleFlushAutoGrow())
+  emitter.on('history:undo', () => scheduleFlushAutoGrow())
 
   return {
     page: diagramPage,

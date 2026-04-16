@@ -9,6 +9,7 @@ import { useDesigner } from '../context/DesignerProvider'
 import { hitTestScene, type SceneHit } from '../utils'
 import { createTextEditorControl, TextEditorOverlay } from './controls/textEditor'
 import { BoxSelectionOverlay } from './overlays/BoxSelectionOverlay'
+import { ContainerPreviewOverlay } from './overlays/ContainerPreviewOverlay'
 import { GuideOverlay } from './overlays/GuideOverlay'
 import { LinkerOverlay } from './overlays/LinkerOverlay'
 import { ShapeSelectionOverlay } from './overlays/ShapeSelectionOverlay'
@@ -112,8 +113,7 @@ export function Renderer(props: {
     screenToCanvas: view.toCanvas,
     canvasToScreen: view.toScreen,
   })
-  const pointer = createPointerInteraction({
-    coordinate,
+  const pointer = createPointerInteraction(coordinate, {
     panButton: 1,
     shapeDragThreshold: 3,
     shapeGuideTolerance: props.shapeGuideTolerance,
@@ -215,8 +215,6 @@ export function Renderer(props: {
 
     edit.add([shape])
     selection.replace([shape.id])
-    view.scheduleAutoGrow(view.getShapeBounds(shape))
-    view.flushAutoGrow()
 
     if (!continuous) {
       tool.setIdle()
@@ -271,7 +269,12 @@ export function Renderer(props: {
       return pointer.machine.startResize(resizeHit.id, resizeHit.dir, event)
     }
 
-    selectByEvent(shapeId, event)
+    const shouldKeepSelection =
+      !event.ctrlKey && !event.metaKey && selection.hasMultiple() && selection.isSelected(shapeId)
+
+    if (!shouldKeepSelection) {
+      selectByEvent(shapeId, event)
+    }
     return pointer.machine.startShapeDrag(event)
   }
   const onBlankDown = (event: MouseEvent): boolean => {
@@ -491,6 +494,7 @@ export function Renderer(props: {
             <Show when={!textEditor.isEditing()}>
               <BoxSelectionOverlay />
               <GuideOverlay />
+              <ContainerPreviewOverlay />
               <LinkerOverlay />
               <ShapeSelectionOverlay />
             </Show>

@@ -1,20 +1,30 @@
 import {
   ensureArray,
+  type Bounds,
   type MaybeArray,
   type UnionKeyOf,
   type UnionNestedKeyOf,
   type UnionNestedValue,
   type UnionValue,
 } from '@diagen/shared'
+import { batch } from 'solid-js'
 import type { StoreSetter } from 'solid-js/store'
-import type { DiagramElement } from '../../../model'
+import type { DiagramElement, ShapeElement } from '../../../model'
 import type { CreateMethods } from '../element'
+import {
+  resolveParentPreview,
+  resolveParenting,
+  type ParentingContainment,
+  type ResolveParentingOptions,
+  type ResolveParentingResult,
+} from '../element/parenting'
 import type { DesignerContext } from '../types'
 import {
   createAddCommand,
   createClearCommand,
   createLayerCommand,
   createMoveCommand,
+  createParentingCommand,
   createRemoveCommand,
   createUpdateCommand,
 } from './commands'
@@ -27,7 +37,23 @@ import {
 } from './shared'
 
 export function createEditManager(_ctx: DesignerContext, deps: EditDeps) {
-  const { element, selection, history } = deps
+  const { element, selection, history, view } = deps
+
+  function applyParenting(result: ResolveParentingResult): void {
+    batch(() => {
+      for (const parentUpdate of result.parentUpdates) {
+        element.update(parentUpdate.id, {
+          parent: parentUpdate.parent,
+        })
+      }
+
+      for (const childrenUpdate of result.childrenUpdates) {
+        element.update(childrenUpdate.id, {
+          children: childrenUpdate.children,
+        })
+      }
+    })
+  }
 
   function add(elements: DiagramElement[], options: EditCreateOptions = {}): void {
     const { record = true, select = true, assumeCloned = false } = options
@@ -37,7 +63,7 @@ export function createEditManager(_ctx: DesignerContext, deps: EditDeps) {
       return
     }
 
-    history.execute(createAddCommand(deps, elements, { assumeCloned }))
+    history.execute(createAddCommand(deps, elements, { assumeCloned, select }))
   }
 
   function create<T extends keyof CreateMethods>(
@@ -123,6 +149,53 @@ export function createEditManager(_ctx: DesignerContext, deps: EditDeps) {
     history.execute(createMoveCommand(deps, elements, dx, dy))
   }
 
+  function parenting(
+    targetIds: string[],
+    options: EditOptions & Pick<ResolveParentingOptions, 'containment' | 'canContain' | 'canBeContained'> = {},
+  ): void {
+    const { record = true, containment, canContain, canBeContained } = options
+    if (targetIds.length === 0) return
+
+    if (!record) {
+      const result = resolveParenting({
+        shapes: element.shapes(),
+        targetIds,
+        getBounds: view.getShapeBounds,
+        containment,
+        canContain,
+        canBeContained,
+      })
+      if (result.parentUpdates.length === 0 && result.childrenUpdates.length === 0) return
+      applyParenting(result)
+      return
+    }
+
+    history.execute(
+      createParentingCommand(deps, {
+        targetIds,
+        containment,
+        canContain,
+        canBeContained,
+      }),
+    )
+  }
+
+  function previewParenting(
+    targetIds: string[],
+    options: Pick<ResolveParentingOptions, 'containment' | 'canContain' | 'canBeContained'> = {},
+  ): string | null {
+    if (targetIds.length === 0) return null
+
+    return resolveParentPreview({
+      shapes: element.shapes(),
+      targetIds,
+      getBounds: view.getShapeBounds,
+      containment: options.containment,
+      canContain: options.canContain,
+      canBeContained: options.canBeContained,
+    })
+  }
+
   function toFront(ids: string[], options: EditOptions = {}): void {
     const { record = true } = options
     if (!record) {
@@ -170,6 +243,8 @@ export function createEditManager(_ctx: DesignerContext, deps: EditDeps) {
     update,
     clear,
     move,
+    parenting,
+    previewParenting,
     toFront,
     toBack,
     moveForward,

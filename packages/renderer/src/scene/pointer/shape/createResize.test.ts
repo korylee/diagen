@@ -34,16 +34,20 @@ function withResize(
 
     testContext.designer = designer
 
-    const resize = createResize({
-      threshold: options.threshold,
-      guideTolerance: options.guideTolerance,
-      minWidth: options.minWidth,
-      minHeight: options.minHeight,
-      eventToCanvas: event => ({
-        x: event.clientX,
-        y: event.clientY,
-      }),
-    })
+    const resize = createResize(
+      {
+        eventToCanvas: event => ({
+          x: event.clientX,
+          y: event.clientY,
+        }),
+      },
+      {
+        threshold: options.threshold,
+        guideTolerance: options.guideTolerance,
+        minWidth: options.minWidth,
+        minHeight: options.minHeight,
+      },
+    )
 
     try {
       run({ designer, resize })

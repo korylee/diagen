@@ -1,5 +1,6 @@
 import {
   ensureArray,
+  isNonNullable,
   keys,
   type MaybeArray,
   type UnionKeyOf,
@@ -9,18 +10,11 @@ import {
 } from '@diagen/shared'
 import { createMemo } from 'solid-js'
 import { produce, type StoreSetter } from 'solid-js/store'
-import {
-  isLinker,
-  isShape,
-} from '../../../model'
+import { isLinker, isShape } from '../../../model'
 import type { BoxProps, DiagramElement, LinkerElement, LinkerEndpoint, ShapeElement } from '../../../model'
 import { Schema } from '../../../schema'
 import type { DesignerContext } from '../types'
-import {
-  createElementArrangeActions,
-  type ElementAlignType,
-  type ElementDistributeType,
-} from './arrange'
+import { createElementArrangeActions, type ElementAlignType, type ElementDistributeType } from './arrange'
 import { createElementIndexes } from './indexes'
 
 const CreateMethods = {
@@ -62,10 +56,7 @@ export const createElementManager = (ctx: DesignerContext) => {
     elementMap,
   })
 
-  function replaceCurrentDocument(next: {
-    elements?: Record<string, DiagramElement>
-    orderList?: string[]
-  }): void {
+  function replaceCurrentDocument(next: { elements?: Record<string, DiagramElement>; orderList?: string[] }): void {
     setState('diagram', current => {
       // 单页文档下直接替换根模型字段，减少无语义的转发层。
       return {
@@ -80,38 +71,61 @@ export const createElementManager = (ctx: DesignerContext) => {
     const elements = ensureArray(els)
     const ids: string[] = []
 
-    setState('diagram', produce(diagram => {
-      const nextElements = diagram.elements
-      const nextOrderList = diagram.orderList
+    setState(
+      'diagram',
+      produce(diagram => {
+        const nextElements = diagram.elements
+        const nextOrderList = diagram.orderList
 
-      for (const element of elements) {
-        nextElements[element.id] = element
-        ids.push(element.id)
-      }
+        for (const element of elements) {
+          nextElements[element.id] = element
+          ids.push(element.id)
+        }
 
-      // 当前阶段仍为单页文档，新增元素直接追加到根 orderList。
-      nextOrderList.push(...ids)
-    }))
+        // 当前阶段仍为单页文档，新增元素直接追加到根 orderList。
+        nextOrderList.push(...ids)
+      }),
+    )
 
     emitter.emit('element:added', { elements })
   }
 
   function remove(els: MaybeArray<string | DiagramElement>) {
-    const ids = ensureArray(els).map(el => (typeof el === 'string' ? el : el.id))
-    const idsSet = new Set(ids)
-    const elements = getElementsByIds(ids)
-
-    setState('diagram', produce(diagram => {
-      const nextElements = diagram.elements
-      const nextOrderList = diagram.orderList
-
-      for (const id of ids) {
-        delete nextElements[id]
+    const existingIdsSet = ensureArray(els).reduce((set, el) => {
+      const id = typeof el === 'string' ? el : el.id
+      if (id && getElementById(id)) {
+        set.add(id)
       }
+      return set
+    }, new Set<string>())
+    if (!existingIdsSet.size) return
+    const existingIds = Array.from(existingIdsSet)
+    const elements = existingIds.map(id => getElementById(id)!)
 
-      const filtered = nextOrderList.filter(id => !idsSet.has(id))
-      nextOrderList.splice(0, nextOrderList.length, ...filtered)
-    }))
+    setState(
+      'diagram',
+      produce(diagram => {
+        const nextElements = diagram.elements
+        const nextOrderList = diagram.orderList
+
+        for (const id of existingIds) {
+          delete nextElements[id]
+        }
+
+        for (const id in nextElements) {
+          const nextElement = nextElements[id]
+          if (nextElement.parent && existingIdsSet.has(nextElement.parent)) {
+            nextElement.parent = null
+          }
+          if (nextElement.children.length > 0) {
+            nextElement.children = nextElement.children.filter(childId => !existingIdsSet.has(childId))
+          }
+        }
+
+        const filtered = nextOrderList.filter(id => !existingIdsSet.has(id))
+        nextOrderList.splice(0, nextOrderList.length, ...filtered)
+      }),
+    )
 
     emitter.emit('element:removed', { elements })
   }

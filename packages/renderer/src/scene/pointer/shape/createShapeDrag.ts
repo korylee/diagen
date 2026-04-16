@@ -1,16 +1,15 @@
 import { isShape, type ShapeElement } from '@diagen/core'
 import { calculateMoveGuideSnap, type GuideLine } from '@diagen/core/guide'
 import type { Bounds, Point } from '@diagen/shared'
-import { getRotatedBounds, unionBounds } from '@diagen/shared'
+import { unionBounds } from '@diagen/shared'
 import { batch, createSignal, onCleanup } from 'solid-js'
 import { useDesigner } from '../../../context'
-import type { EventToCanvas } from '../../services/createCoordinateService'
+import type { CoordinateService } from '../../services/createCoordinateService'
 import { createDragSession } from '../shared/createDragSession'
 import { createPointerDeltaState } from '../shared/createPointerDeltaState'
 import { type CreatePointerDragTrackerOptions } from '../shared/createPointerDragTracker'
 
 export interface CreateShapeDragOptions extends CreatePointerDragTrackerOptions {
-  eventToCanvas?: EventToCanvas
   guideTolerance?: number
 }
 
@@ -25,16 +24,19 @@ interface DragStartContext {
   guideCandidates: Bounds[]
 }
 
-export function createShapeDrag(options: CreateShapeDragOptions = {}) {
-  const { threshold = 3, eventToCanvas, guideTolerance } = options
+export function createShapeDrag(
+  coordinate: Pick<CoordinateService, 'eventToCanvas'>,
+  options: CreateShapeDragOptions = {},
+) {
+  const { threshold = 3, guideTolerance } = options
   const { history, view, element, edit, selection } = useDesigner()
   const transaction = history.transaction.createScope('拖拽图形')
-  const pointerDelta = createPointerDeltaState({ eventToCanvas })
+  const pointerDelta = createPointerDeltaState(coordinate)
   const [guides, setGuides] = createSignal<GuideLine[]>([])
+  const [previewParentId, setPreviewParentId] = createSignal<string | null>(null)
   const session = createDragSession<{ event: MouseEvent; ids?: string[] }, DragStartContext>({
     threshold,
     transaction,
-    getEvent: input => input.event,
     setup: input => {
       const targetIds = input.ids ?? selection.selectedIds()
       if (targetIds.length === 0) return null
@@ -43,6 +45,7 @@ export function createShapeDrag(options: CreateShapeDragOptions = {}) {
       if (!context) return null
 
       setGuides([])
+      setPreviewParentId(null)
       pointerDelta.begin(input.event)
       return context
     },
@@ -63,15 +66,17 @@ export function createShapeDrag(options: CreateShapeDragOptions = {}) {
       const appliedDelta = snapped?.delta ?? delta
       setGuides(snapped?.guides ?? [])
 
-      const movedBounds = applyDraggedShapeUpdates(state.targets, appliedDelta)
-      view.scheduleAutoGrow(movedBounds ?? undefined)
+      applyDraggedShapeUpdates(state.targets, appliedDelta)
+      setPreviewParentId(edit.previewParenting(state.targets.map(target => target.id)))
+    },
+    finalize: ({ state, shouldCommit }) => {
+      if (!shouldCommit || !state) return
+      edit.parenting(state.targets.map(target => target.id))
     },
     reset: () => {
       setGuides([])
+      setPreviewParentId(null)
       pointerDelta.reset()
-    },
-    onCommit: () => {
-      view.flushAutoGrow()
     },
   })
 
@@ -123,9 +128,7 @@ export function createShapeDrag(options: CreateShapeDragOptions = {}) {
       .map(shape => view.getShapeBounds(shape))
   }
 
-  function applyDraggedShapeUpdates(targets: DragTarget[], delta: Point): Bounds | null {
-    let movedBounds: Bounds | null = null
-
+  function applyDraggedShapeUpdates(targets: DragTarget[], delta: Point): void {
     batch(() => {
       for (const target of targets) {
         const nextX = target.startProps.x + delta.x
@@ -138,19 +141,8 @@ export function createShapeDrag(options: CreateShapeDragOptions = {}) {
             y: nextY,
           },
         })
-
-        const shapeBounds: Bounds = getRotatedBounds({
-          x: nextX,
-          y: nextY,
-          w: target.startProps.w,
-          h: target.startProps.h,
-          angle: target.startProps.angle,
-        })
-        movedBounds = movedBounds ? unionBounds(movedBounds, shapeBounds) : shapeBounds
       }
     })
-
-    return movedBounds
   }
 
   onCleanup(() => {
@@ -162,6 +154,7 @@ export function createShapeDrag(options: CreateShapeDragOptions = {}) {
     isPending: session.isPending,
     delta: session.delta,
     guides,
+    previewParentId,
     start,
     move,
     end,

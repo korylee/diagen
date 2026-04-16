@@ -82,6 +82,52 @@ describe('element manager', () => {
     })
   })
 
+  it('remove 应同步清理父子层级引用', () => {
+    withDesigner(designer => {
+      const container = createShape({
+        id: 'el_remove_container',
+        name: 'el_remove_container',
+        group: null,
+        children: ['el_remove_child'],
+        attribute: {
+          ...createShape({}).attribute,
+          container: true,
+        },
+        props: { x: 0, y: 0, w: 220, h: 180, angle: 0 },
+      })
+      const child = createShape({
+        id: 'el_remove_child',
+        name: 'el_remove_child',
+        group: null,
+        parent: container.id,
+        props: { x: 40, y: 40, w: 80, h: 60, angle: 0 },
+      })
+
+      designer.element.add([container, child])
+      designer.element.remove(child.id)
+      expect(designer.element.getElementById<ShapeElement>(container.id)?.children).toEqual([])
+
+      designer.element.add(child)
+      designer.element.remove(container.id)
+      expect(designer.element.getElementById<ShapeElement>(child.id)?.parent).toBeNull()
+    })
+  })
+
+  it('remove 应忽略重复和不存在的 id', () => {
+    withDesigner(designer => {
+      const a = createShapeById('el_remove_dedupe_a', 0, 0)
+      const b = createShapeById('el_remove_dedupe_b', 100, 0)
+      designer.element.add([a, b])
+
+      designer.element.remove([a.id, a.id, 'missing-remove-id'])
+
+      expect(designer.element.getElementById(a.id)).toBeUndefined()
+      expect(designer.element.getElementById(b.id)).toBeDefined()
+      expect(designer.element.orderList()).toEqual([b.id])
+      expect(designer.element.elementCount()).toBe(1)
+    })
+  })
+
   it('update 应支持根级/路径/嵌套路径三种写法', () => {
     withDesigner(designer => {
       const a = createShapeById('el_update', 0, 0)

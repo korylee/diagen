@@ -80,7 +80,7 @@ export interface HistoryState {
 }
 
 export interface HistoryEvents {
-  'history:execute': Command
+  'history:committed': Command
   'history:undo': Command
   'history:redo': Command
   'history:clear': void
@@ -133,7 +133,7 @@ export function createHistoryManager(ctx: DesignerContext) {
 
   // ==================== 命令合并逻辑 ====================
 
-  function tryMerge(command: Command & CommandMeta): boolean {
+  function tryMerge(command: Command & CommandMeta): Command | null {
     const lastCommand = state.undoStack[state.undoStack.length - 1]
     if (
       !shouldMergeCommand({
@@ -142,7 +142,7 @@ export function createHistoryManager(ctx: DesignerContext) {
         mergeWindow: state.mergeWindow,
       })
     ) {
-      return false
+      return null
     }
 
     if (lastCommand.canMergeWith?.(command)) {
@@ -151,17 +151,18 @@ export function createHistoryManager(ctx: DesignerContext) {
         updateHistoryState(s => {
           s.undoStack[s.undoStack.length - 1] = merged
         })
-        return true
+        return merged
       }
     }
-    return false
+    return null
   }
 
   // ==================== 核心操作 ====================
 
   function pushCommand(command: Command & CommandMeta) {
-    if (tryMerge(command)) {
-      if (!command.silent) emit('history:execute', command)
+    const mergedCommand = tryMerge(command)
+    if (mergedCommand) {
+      emit('history:committed', mergedCommand)
       return
     }
 
@@ -171,7 +172,7 @@ export function createHistoryManager(ctx: DesignerContext) {
       s.redoStack = []
     })
 
-    if (!command.silent) emit('history:execute', command)
+    emit('history:committed', command)
   }
 
   function execute(command: Command, meta?: CommandMeta) {
@@ -291,7 +292,7 @@ export function createHistoryManager(ctx: DesignerContext) {
     }
   }
 
-  function transaction<T>(name: string, fn: () => Promise<T> | T): Promise<T> {
+  const transaction = function transaction<T>(name: string, fn: () => Promise<T> | T): Promise<T> {
     const scope = createTransactionScope(name)
     return scope.run(fn)
   }

@@ -1,13 +1,28 @@
 import { createRoot } from 'solid-js'
 import { describe, expect, it } from 'vitest'
+import { createEmitter } from '@diagen/shared'
 import { createDesigner } from '../create'
-import { type Command, createCommand } from './history'
+import { type Command, createCommand, createHistoryManager } from './history'
 
 function withDesigner(run: (designer: ReturnType<typeof createDesigner>) => void) {
   createRoot(dispose => {
     const designer = createDesigner()
     try {
       run(designer)
+    } finally {
+      dispose()
+    }
+  })
+}
+
+function withHistory(
+  run: (history: ReturnType<typeof createHistoryManager>, emitter: ReturnType<typeof createEmitter>) => void,
+) {
+  createRoot(dispose => {
+    const emitter = createEmitter()
+    const history = createHistoryManager({ emitter } as any)
+    try {
+      run(history, emitter)
     } finally {
       dispose()
     }
@@ -49,6 +64,38 @@ function createMergeCommand(counter: { value: number }, delta: number) {
 }
 
 describe('history manager', () => {
+  it('history:committed', () => {
+    withHistory((history, emitter) => {
+      const counter = { value: 0 }
+      const committed: string[] = []
+      const replayed: Array<'undo' | 'redo'> = []
+
+      emitter.on('history:committed', command => {
+        committed.push(command.name)
+      })
+
+      emitter.on('history:redo', command => {
+        replayed.push('redo')
+      })
+      emitter.on('history:undo', command => {
+        replayed.push('undo')
+      })
+      history.execute(createDeltaCommand('plus_one', counter, 1))
+      const txId = history.transaction.begin('批量变更')
+      expect(txId).not.toBeNull()
+
+      history.execute(createDeltaCommand('add_1', counter, 1))
+      history.execute(createDeltaCommand('add_2', counter, 2))
+      history.transaction.commit(txId || undefined)
+
+      history.undo()
+      history.redo()
+
+      expect(committed).toEqual(['plus_one', '批量变更'])
+      expect(replayed).toEqual(['undo', 'redo'])
+    })
+  })
+
   it('execute/undo/redo 应正确维护计数与栈状态', () => {
     withDesigner(designer => {
       const counter = { value: 0 }

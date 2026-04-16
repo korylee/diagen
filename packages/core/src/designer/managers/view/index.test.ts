@@ -38,6 +38,10 @@ async function waitNextFrame() {
   await Promise.resolve()
 }
 
+async function waitMicrotask() {
+  await Promise.resolve()
+}
+
 function createShapeById(id: string, x: number, y: number, w = 100, h = 80) {
   return createShape({
     id,
@@ -246,6 +250,40 @@ describe('view manager', () => {
 
       designer.edit.add([far], { record: false, select: false })
       await waitNextFrame()
+
+      const nextWorldSize = designer.view.worldSize()
+      expect(nextWorldSize.width).toBeGreaterThan(baseWorldSize.width)
+      expect(nextWorldSize.height).toBeGreaterThan(baseWorldSize.height)
+    })
+  })
+
+  it('记录型新增远端元素后应在提交边界自动 flush autoGrow', async () => {
+    await withDesignerAsync(async designer => {
+      const baseWorldSize = { ...designer.view.worldSize() }
+      const far = createShapeById('view_far_world_size_committed', 2400, 1600, 120, 90)
+
+      designer.edit.add([far], { select: false })
+      await waitMicrotask()
+
+      const nextWorldSize = designer.view.worldSize()
+      expect(nextWorldSize.width).toBeGreaterThan(baseWorldSize.width)
+      expect(nextWorldSize.height).toBeGreaterThan(baseWorldSize.height)
+    })
+  })
+
+  it('事务提交前仅 schedule，提交后应自动 flush autoGrow', async () => {
+    await withDesignerAsync(async designer => {
+      const baseWorldSize = { ...designer.view.worldSize() }
+      const far = createShapeById('view_far_world_size_transaction', 2600, 1800, 120, 90)
+      const txId = designer.history.transaction.begin('view_auto_grow_transaction')
+
+      expect(txId).not.toBeNull()
+
+      designer.edit.add([far], { select: false })
+      expect(designer.view.worldSize()).toEqual(baseWorldSize)
+
+      designer.history.transaction.commit(txId || undefined)
+      await waitMicrotask()
 
       const nextWorldSize = designer.view.worldSize()
       expect(nextWorldSize.width).toBeGreaterThan(baseWorldSize.width)

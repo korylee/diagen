@@ -1,32 +1,16 @@
 import { ensureArray, isObject, shallowEqual, type MaybeArray } from '@diagen/shared'
 import { createStore, unwrap, type StoreSetter } from 'solid-js/store'
+import { unwrapClone } from '../../../_internal'
 import type { ElementManager } from '../element'
 import type { HistoryManager } from '../history'
 import type { SelectionManager } from '../selection'
-import { unwrapClone } from '../../../_internal'
+import { ViewManager } from '../view'
 
 export interface EditDeps {
-  element: Pick<
-    ElementManager,
-    | 'create'
-    | 'add'
-    | 'remove'
-    | 'update'
-    | 'clear'
-    | 'move'
-    | 'toFront'
-    | 'toBack'
-    | 'moveForward'
-    | 'moveBackward'
-    | 'setOrderList'
-    | 'getElementsByIds'
-    | 'getElementById'
-    | 'elementMap'
-    | 'orderList'
-    | 'load'
-  >
+  element: ElementManager
   selection: SelectionManager
   history: HistoryManager
+  view: ViewManager
 }
 
 export interface EditOptions {
@@ -37,6 +21,10 @@ export interface EditOptions {
 }
 
 export interface EditCreateOptions extends EditOptions {
+  /**
+   * 新增后是否替换为当前新增元素选区。
+   * @default true
+   */
   select?: boolean
   /**
    * 内部优化：调用方已提供稳定快照时，可跳过命令创建阶段的额外 clone。

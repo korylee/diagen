@@ -1,9 +1,9 @@
-import { onCleanup } from 'solid-js'
 import { isRotatable, isShape } from '@diagen/core'
 import type { Point } from '@diagen/shared'
-import { getRotatedBounds, getAngle } from '@diagen/shared'
+import { getAngle } from '@diagen/shared'
+import { onCleanup } from 'solid-js'
 import { useDesigner } from '../../../context'
-import type { EventToCanvas } from '../../services/createCoordinateService'
+import type { CoordinateService } from '../../services/createCoordinateService'
 import { createDragSession } from '../shared/createDragSession'
 import type { CreatePointerDragTrackerOptions } from '../shared/createPointerDragTracker'
 
@@ -15,7 +15,6 @@ export interface RotateDragState {
 }
 
 export interface CreateRotateOptions extends CreatePointerDragTrackerOptions {
-  eventToCanvas?: EventToCanvas
   snapStep?: number
 }
 
@@ -29,15 +28,15 @@ function normalizeDeltaAngle(delta: number): number {
   return val
 }
 
-export function createRotate(options: CreateRotateOptions = {}) {
-  const { threshold = 2, snapStep = 15, eventToCanvas } = options
-  const { element, edit, view, history } = useDesigner()
+export function createRotate(coordinate: Pick<CoordinateService, 'eventToCanvas'>, options: CreateRotateOptions = {}) {
+  const { eventToCanvas } = coordinate
+  const { threshold = 2, snapStep = 15 } = options
+  const { element, edit, history } = useDesigner()
   const transaction = history.transaction.createScope('旋转图形')
   let session!: ReturnType<typeof createDragSession<{ id: string; event: MouseEvent }, RotateDragState>>
   session = createDragSession({
     threshold,
     transaction,
-    getEvent: input => input.event,
     setup: input => {
       const shape = element.getElementById(input.id)
       if (!shape || !isShape(shape) || !isRotatable(shape)) return null
@@ -83,11 +82,6 @@ export function createRotate(options: CreateRotateOptions = {}) {
         angle: nextAngle,
       }
       edit.update(state.targetId, 'props', b)
-
-      view.scheduleAutoGrow(getRotatedBounds(b))
-    },
-    onCommit: () => {
-      view.flushAutoGrow()
     },
   })
 

@@ -1,7 +1,7 @@
 import type { LinkerElement, LinkerType } from '@diagen/core'
-import { isSameNumber, isSamePoint, type Point } from '@diagen/shared'
+import { isSameNumber, isSamePoint, KeyOf, type Point } from '@diagen/shared'
 
-type Axis = 'x' | 'y'
+type Axis = KeyOf<Point>
 
 export function supportsManualControlPoints(linkerType: LinkerType): boolean {
   return linkerType === 'broken' || linkerType === 'orthogonal'
@@ -43,7 +43,7 @@ function resolveOrthogonalAxis(from: Point, to: Point): Axis | null {
 }
 
 function isAlignedOnAxis(a: Point, b: Point, axis: Axis): boolean {
-  return axis === 'x' ? isSameNumber(a.x, b.x) : isSameNumber(a.y, b.y)
+  return isSameNumber(a[axis], b[axis])
 }
 
 function simplifyCollinearPoints(path: Point[]): Point[] {

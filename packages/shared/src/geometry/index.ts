@@ -35,6 +35,15 @@ export function isPointInBounds(point: Point, b: Bounds): boolean {
   return point.x >= b.x && point.x <= b.x + b.w && point.y >= b.y && point.y <= b.y + b.h
 }
 
+export function isBoundsInBounds(inner: Bounds, outer: Bounds): boolean {
+  return (
+    inner.x >= outer.x &&
+    inner.y >= outer.y &&
+    inner.x + inner.w <= outer.x + outer.w &&
+    inner.y + inner.h <= outer.y + outer.h
+  )
+}
+
 function toRadians(angle: number): number {
   return (angle * Math.PI) / 180
 }

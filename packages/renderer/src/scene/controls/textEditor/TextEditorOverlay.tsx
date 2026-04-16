@@ -2,15 +2,8 @@ import { isLinker, isShape, type FontStyle } from '@diagen/core'
 import { getLinkerTextBox, getShapeTextBox } from '@diagen/core/text'
 import { createEffect, createMemo, createSignal, type Accessor } from 'solid-js'
 import { useDesigner } from '../../../context/DesignerProvider'
+import { parseColor } from '../../../utils/render-utils'
 import type { TextEditorSession } from './createTextEditorControl'
-
-function toCssColor(color: string | undefined): string {
-  if (!color) return 'rgb(50,50,50)'
-  if (color.startsWith('#') || color.startsWith('rgb')) return color
-  const parts = color.split(',')
-  if (parts.length >= 3) return `rgb(${parts[0]},${parts[1]},${parts[2]})`
-  return color
-}
 
 const BasePaddingX = 6
 const BasePaddingY = 4
@@ -189,8 +182,8 @@ export function TextEditorOverlay(props: {
       'border-radius': '4px',
       'box-sizing': 'border-box',
       'background-color': 'rgba(255,255,255,0.96)',
-      color: toCssColor(current.fontStyle.color),
-      'caret-color': toCssColor(current.fontStyle.color),
+      color: parseColor(current.fontStyle.color, 'rgb(50,50,50)'),
+      'caret-color': parseColor(current.fontStyle.color, 'rgb(50,50,50)'),
       'font-family': current.fontStyle.fontFamily,
       'font-size': `${(current.fontStyle.size ?? 13) * zoom()}px`,
       'font-weight': current.fontStyle.bold ? '700' : '400',

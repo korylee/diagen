@@ -1,32 +1,27 @@
-import { createSignal, onCleanup } from 'solid-js'
 import {
   isLinker,
   type LinkerElement,
-  type LinkerEndpointBinding,
   type LinkerEndpoint,
+  type LinkerEndpointBinding,
   type LinkerRoute,
   type ShapeElement,
 } from '@diagen/core'
+import { getAnchorInfo, getPerimeterInfo, resolveCreateAnchor, resolvePerimeterInfo } from '@diagen/core/anchors'
 import type { Point } from '@diagen/shared'
-import { getDistance, isSameNumber } from '@diagen/shared'
+import { getDistance, isSameNumber, pick } from '@diagen/shared'
+import { createSignal, onCleanup } from 'solid-js'
 import { useDesigner } from '../../../context'
-import { hitTestLinker, type LinkerHit } from '../../../utils'
+import { hitTestLinkerGeometry, type LinkerHit } from '../../../utils'
 import {
   areSamePoints,
   normalizeLinkerManualPoints,
   removeControlPointAt,
   supportsManualControlPoints,
 } from '../../linker/normalizeManualPoints'
-import type { EventToCanvas } from '../../services/createCoordinateService'
+import type { CoordinateService } from '../../services/createCoordinateService'
 import { createDragSession } from '../shared/createDragSession'
-import type { CreatePointerDragTrackerOptions } from '../shared/createPointerDragTracker'
 import { createPointerDeltaState } from '../shared/createPointerDeltaState'
-import {
-  getAnchorInfo,
-  getPerimeterInfo,
-  resolveCreateAnchor,
-  resolvePerimeterInfo,
-} from '@diagen/core/anchors'
+import type { CreatePointerDragTrackerOptions } from '../shared/createPointerDragTracker'
 
 export type LinkerDragMode = 'from' | 'to' | 'control' | 'line' | 'text'
 type LinkerEndpointMode = Extract<LinkerDragMode, 'from' | 'to'>
@@ -61,6 +56,26 @@ interface LinkerDragStartInput {
   state: DragState
   createContext?: CreateContext | null
   prepare?: () => void
+}
+
+interface LinkerEditStateOptions {
+  linker: LinkerElement
+  point: Point
+  hit: LinkerHit
+  route: LinkerRoute
+}
+
+interface LinkerEditStateResult {
+  state: DragState
+  shouldInsertSegmentControl: boolean
+}
+
+interface SegmentDragState {
+  controlIndex: number
+  controlIndices?: number[]
+  orthogonalMoveAxis?: Axis
+  startControl: Point
+  startPoints: Point[]
 }
 
 export interface AnchorHit {
@@ -101,7 +116,6 @@ export interface BeginLinkerCreateOptions {
 }
 
 export interface CreateLinkerDragOptions extends CreatePointerDragTrackerOptions {
-  eventToCanvas?: EventToCanvas
   endpointTolerance?: number
   lineTolerance?: number
   controlTolerance?: number
@@ -176,10 +190,12 @@ function resolveOrthogonalAxis(from: Point, to: Point): Axis | null {
   return null
 }
 
-export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
+export function createLinkerDrag(
+  coordinate: Pick<CoordinateService, 'eventToCanvas'>,
+  options: CreateLinkerDragOptions = {},
+) {
   const {
     threshold = 3,
-    eventToCanvas,
     endpointTolerance = 10,
     lineTolerance = 8,
     controlTolerance = 8,
@@ -195,17 +211,15 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
 
   const { edit, view, element, history, selection } = useDesigner()
   const transaction = history.transaction.createScope('拖拽连线')
-  const pointerDelta = createPointerDeltaState({ eventToCanvas })
+  const pointerDelta = createPointerDeltaState(coordinate)
 
   const [snapTarget, setSnapTarget] = createSignal<AnchorHit | null>(null)
   const [createContext, setCreateContext] = createSignal<CreateContext | null>(null)
   let snapCandidates: SnapCandidateCollection = createEmptySnapCandidates()
-  let session!: ReturnType<typeof createDragSession<LinkerDragStartInput, DragState>>
-  session = createDragSession({
+  const session: ReturnType<typeof createDragSession<LinkerDragStartInput, DragState>> = createDragSession({
     threshold,
     transaction,
     transactionMode: 'on-begin',
-    getEvent: input => input.event,
     setup: input => {
       input.prepare?.()
       setCreateContext(input.createContext ?? null)
@@ -251,17 +265,12 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
       if (!shouldCommit || !state) return
       if (state.mode === 'control') {
         normalizeControlPoints(state.linkerId)
-        scheduleLinkerAutoGrow(state.linkerId)
         return
       }
-      if (state.mode === 'text') {
-        scheduleLinkerAutoGrow(state.linkerId)
-        return
-      }
+      if (state.mode === 'text') return
       if (!isEndpointMode(state.mode)) return
 
       snapEndpoint(state, state.mode)
-      scheduleLinkerAutoGrow(state.linkerId)
     },
     reset: () => {
       setSnapTarget(null)
@@ -270,8 +279,6 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
       pointerDelta.reset()
     },
     onCommit: () => {
-      view.flushAutoGrow()
-
       const currentCreateContext = createContext()
       if (currentCreateContext) {
         selection.replace([currentCreateContext.createdLinkerId])
@@ -374,9 +381,9 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     return null
   }
 
-  function getHitWithRoute(linker: LinkerElement, point: Point): { hit: LinkerHit | null; route: LinkerRoute } {
+  function resolveLinkerHit(linker: LinkerElement, point: Point): { hit: LinkerHit | null; route: LinkerRoute } {
     const route = view.getLinkerRoute(linker)
-    const hit = hitTestLinker(linker, route, point, {
+    const hit = hitTestLinkerGeometry(linker, route, point, {
       zoom: view.transform().zoom,
       endpointTolerance,
       controlTolerance,
@@ -393,11 +400,93 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
   function hitTestWithRoute(linkerId: string, point: Point): { hit: LinkerHit; route: LinkerRoute } | null {
     const el = element.getElementById(linkerId)
     if (!el || !isLinker(el)) return null
-    const result = getHitWithRoute(el, point)
+    const result = resolveLinkerHit(el, point)
     if (!result.hit) return null
     return {
       hit: result.hit,
       route: result.route,
+    }
+  }
+
+  function resolveSegmentDragState(
+    linker: LinkerElement,
+    route: LinkerRoute,
+    point: Point,
+    segmentIndex: number,
+  ): SegmentDragState {
+    const startPoints = linker.points.map(p => ({ x: p.x, y: p.y }))
+    const orthogonalState =
+      linker.linkerType === 'orthogonal' ? prepareOrthogonalSegmentDragState(route, segmentIndex) : null
+
+    if (orthogonalState) {
+      return {
+        controlIndex: orthogonalState.controlIndex,
+        controlIndices: orthogonalState.controlIndices,
+        orthogonalMoveAxis: orthogonalState.moveAxis,
+        startControl: orthogonalState.points[orthogonalState.controlIndex],
+        startPoints: orthogonalState.points,
+      }
+    }
+
+    const insertionIndex =
+      startPoints.length === 0 ? 0 : Math.max(0, Math.min(startPoints.length, segmentIndex ?? startPoints.length))
+    const insertedPoint = { x: point.x, y: point.y }
+    const nextPoints = [...startPoints]
+    nextPoints.splice(insertionIndex, 0, insertedPoint)
+
+    return {
+      controlIndex: insertionIndex,
+      startControl: insertedPoint,
+      startPoints: nextPoints,
+    }
+  }
+
+  function resolveBeginEditState(options: LinkerEditStateOptions): LinkerEditStateResult {
+    const { linker, point, hit, route } = options
+    let mode: LinkerDragMode = 'line'
+    let controlIndex: number = (hit as any).controlIndex
+    let controlIndices: number[] | undefined
+    let orthogonalMoveAxis: Axis | undefined
+    let startControl: Point | undefined
+    let startPoints = linker.points.map(p => ({ x: p.x, y: p.y }))
+
+    if (hit.type === 'from' || hit.type === 'to') {
+      mode = hit.type
+    } else if (hit.type === 'text') {
+      mode = 'text'
+    } else if (hit.type === 'control') {
+      mode = 'control'
+      startControl = controlIndex !== undefined ? linker.points[controlIndex] : undefined
+    } else if (hit.type === 'segment') {
+      mode = 'control'
+      const segmentState = resolveSegmentDragState(linker, route, point, hit.segmentIndex ?? 0)
+      controlIndex = segmentState.controlIndex
+      controlIndices = segmentState.controlIndices
+      orthogonalMoveAxis = segmentState.orthogonalMoveAxis
+      startControl = segmentState.startControl
+      startPoints = segmentState.startPoints
+    }
+
+    return {
+      state: {
+        linkerId: linker.id,
+        mode,
+        controlIndex,
+        controlIndices,
+        orthogonalMoveAxis,
+        oppositeShapeId: (mode === 'from' ? linker.to.id : mode === 'to' ? linker.from.id : null) ?? null,
+        startFrom: route.points[0],
+        startTo: route.points[route.points.length - 1],
+        startControl,
+        startRawFrom: { ...linker.from },
+        startRawTo: { ...linker.to },
+        startPoints,
+        startTextPosition: {
+          dx: linker.textPosition?.dx ?? 0,
+          dy: linker.textPosition?.dy ?? 0,
+        },
+      },
+      shouldInsertSegmentControl: hit.type === 'segment',
     }
   }
 
@@ -406,72 +495,22 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     const el = element.getElementById(linkerId)
     if (!el || !isLinker(el)) return false
 
-    const fallback = presetHit ? null : getHitWithRoute(el, point)
+    const fallback = presetHit ? null : resolveLinkerHit(el, point)
     const hit = presetHit ?? fallback?.hit
     if (!hit) return false
 
     const route = presetRoute ?? fallback?.route ?? view.getLinkerRoute(el)
-    let mode: LinkerDragMode = 'line'
-    let controlIndex = hit.controlIndex
-    let controlIndices: number[] | undefined
-    let orthogonalMoveAxis: Axis | undefined
-    let startControl: Point | undefined
-    let startPoints = el.points.map(p => ({ x: p.x, y: p.y }))
+    const editState = resolveBeginEditState({
+      linker: el,
+      point,
+      hit,
+      route,
+    })
 
-    if (hit.type === 'from' || hit.type === 'to') {
-      mode = hit.type
-    } else if (hit.type === 'text') {
-      mode = 'text'
-    } else if (hit.type === 'control') {
-      mode = 'control'
-      startControl = controlIndex !== undefined ? el.points[controlIndex] : undefined
-    } else if (hit.type === 'segment') {
-      mode = 'control'
-      const segmentState =
-        el.linkerType === 'orthogonal' ? prepareOrthogonalSegmentDragState(route, hit.segmentIndex ?? 0) : null
-
-      if (segmentState) {
-        startPoints = segmentState.points
-        controlIndex = segmentState.controlIndex
-        controlIndices = segmentState.controlIndices
-        orthogonalMoveAxis = segmentState.moveAxis
-        startControl = segmentState.points[segmentState.controlIndex]
-      } else {
-        const insertionIndex =
-          startPoints.length === 0
-            ? 0
-            : Math.max(0, Math.min(startPoints.length, hit.segmentIndex ?? startPoints.length))
-        const insertedPoint = { x: point.x, y: point.y }
-        startPoints = [...startPoints]
-        startPoints.splice(insertionIndex, 0, insertedPoint)
-        controlIndex = insertionIndex
-        startControl = insertedPoint
-      }
-    }
-
-    const state: DragState = {
-      linkerId,
-      mode,
-      controlIndex,
-      controlIndices,
-      orthogonalMoveAxis,
-      oppositeShapeId: (mode === 'from' ? el.to.id : mode === 'to' ? el.from.id : null) ?? null,
-      startFrom: route.points[0],
-      startTo: route.points[route.points.length - 1],
-      startControl,
-      startRawFrom: { ...el.from },
-      startRawTo: { ...el.to },
-      startPoints,
-      startTextPosition: {
-        dx: el.textPosition?.dx ?? 0,
-        dy: el.textPosition?.dy ?? 0,
-      },
-    }
-
-    return beginSession(e, state, {
+    return beginSession(e, editState.state, {
       prepare: () => {
-        if (hit.type === 'segment') {
-          edit.update(linkerId, { points: startPoints })
+        if (editState.shouldInsertSegmentControl) {
+          edit.update(linkerId, { points: editState.state.startPoints })
         }
       },
     })
@@ -588,8 +627,8 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
       linkerId: linker.id,
       mode: 'to',
       oppositeShapeId,
-      startFrom: { x: linker.from.x, y: linker.from.y },
-      startTo: { x: linker.to.x, y: linker.to.y },
+      startFrom: pick(linker.from, ['x', 'y']),
+      startTo: pick(linker.to, ['x', 'y']),
       startRawFrom: { ...linker.from },
       startRawTo: { ...linker.to },
       startPoints: [],
@@ -646,7 +685,6 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
       },
       points: state.startPoints.map(p => ({ x: p.x + delta.x, y: p.y + delta.y })),
     })
-    scheduleLinkerAutoGrow(state.linkerId)
   }
 
   function moveText(state: DragState, delta: Point, linkerElement: LinkerElement): void {
@@ -668,7 +706,6 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     edit.update(state.linkerId, {
       textPosition: textOffset,
     })
-    scheduleLinkerAutoGrow(state.linkerId)
   }
 
   function moveControl(
@@ -685,7 +722,6 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
         const nextPoints = resolveOrthogonalSegmentPoints(state, delta)
         if (nextPoints) {
           edit.update(state.linkerId, { points: nextPoints })
-          scheduleLinkerAutoGrow(state.linkerId)
           return
         }
       }
@@ -693,7 +729,6 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
       const nextPoints = resolveOrthogonalControlPoints(state, delta, controlIndex, startControl)
       if (nextPoints) {
         edit.update(state.linkerId, { points: nextPoints })
-        scheduleLinkerAutoGrow(state.linkerId)
         return
       }
     }
@@ -704,7 +739,6 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
       y: startControl.y + delta.y,
     }
     edit.update(state.linkerId, { points: nextPoints })
-    scheduleLinkerAutoGrow(state.linkerId)
   }
 
   function commitControlPoints(
@@ -712,7 +746,6 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     nextPoints: Point[],
     options: {
       normalize?: boolean
-      flushAutoGrow?: boolean
     } = {},
   ): boolean {
     const linker = element.getElementById(linkerId)
@@ -723,11 +756,6 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     if (areSamePoints(linker.points, resolvedPoints)) return false
 
     edit.update(linkerId, { points: resolvedPoints })
-    scheduleLinkerAutoGrow(linkerId)
-
-    if (options.flushAutoGrow) {
-      view.flushAutoGrow()
-    }
 
     return true
   }
@@ -768,7 +796,8 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
     }
 
     if (segmentIndex === route.points.length - 2) {
-      points.push({ x: route.points[route.points.length - 1].x, y: route.points[route.points.length - 1].y })
+      const lastPoint = route.points[route.points.length - 1]
+      points.push({ ...lastPoint })
       return {
         points,
         controlIndex: points.length - 2,
@@ -835,11 +864,7 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
       )
     }
 
-    if (
-      (prevAxis === null && nextAxis === null) ||
-      (prevAxis === null && nextAxis !== null) ||
-      (prevAxis !== null && nextAxis === null)
-    ) {
+    if (prevAxis == null || nextAxis == null) {
       return null
     }
 
@@ -905,7 +930,6 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
 
     return commitControlPoints(linkerId, nextPoints, {
       normalize: true,
-      flushAutoGrow: true,
     })
   }
 
@@ -934,13 +958,8 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
 
     edit.update(
       state.linkerId,
-      buildEndpointPatch(
-        mode,
-        getEndpointByMode(linkerElement, mode),
-        resolveMoveEndpointTarget(target, oppositePoint, nextSnapTarget),
-      ),
+      buildEndpointPatch(mode, linkerElement[mode], resolveMoveEndpointTarget(target, oppositePoint, nextSnapTarget)),
     )
-    scheduleLinkerAutoGrow(state.linkerId)
   }
 
   function end(): void {
@@ -969,18 +988,11 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
       })
     if (!target) return
 
-    edit.update(state.linkerId, buildEndpointPatch(mode, getEndpointByMode(el, mode), target))
+    edit.update(state.linkerId, buildEndpointPatch(mode, el[mode], target))
   }
 
   function isEndpointMode(mode: LinkerDragMode): mode is LinkerEndpointMode {
     return mode === 'from' || mode === 'to'
-  }
-
-  function getEndpointByMode(
-    linker: LinkerElement,
-    mode: LinkerEndpointMode,
-  ): LinkerElement['from'] | LinkerElement['to'] {
-    return mode === 'from' ? linker.from : linker.to
   }
 
   function resolveMoveEndpointTarget(
@@ -1032,13 +1044,6 @@ export function createLinkerDrag(options: CreateLinkerDragOptions = {}) {
 
     return mode === 'from' ? { from: nextEndpoint } : { to: nextEndpoint }
   }
-
-  function scheduleLinkerAutoGrow(linkerId: string): void {
-    const linker = element.getElementById(linkerId)
-    if (!linker || !isLinker(linker)) return
-    view.scheduleAutoGrow(view.getLinkerBounds(linker))
-  }
-
   function findNearestAnchor(
     point: Point,
     options: {

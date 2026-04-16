@@ -8,7 +8,6 @@ import { createShapeDrag } from './shape/createShapeDrag'
 import type { CoordinateService } from '../services/createCoordinateService'
 
 export interface CreatePointerInteractionOptions {
-  coordinate: CoordinateService
   panButton?: number
   shapeDragThreshold?: number
   shapeGuideTolerance?: number
@@ -31,9 +30,8 @@ export interface CreatePointerInteractionOptions {
  * - 统一持有坐标服务和交互状态机
  * - 内部组合所有鼠标相关交互模块
  */
-export function createPointerInteraction(options: CreatePointerInteractionOptions) {
+export function createPointerInteraction(coordinate: CoordinateService, options: CreatePointerInteractionOptions = {}) {
   const {
-    coordinate,
     panButton = 1,
     shapeDragThreshold = 3,
     shapeGuideTolerance,
@@ -51,14 +49,12 @@ export function createPointerInteraction(options: CreatePointerInteractionOption
     rotateSnapStep = 15,
   } = options
 
-  const shapeDrag = createShapeDrag({
+  const shapeDrag = createShapeDrag(coordinate, {
     threshold: shapeDragThreshold,
-    eventToCanvas: coordinate.eventToCanvas,
     guideTolerance: shapeGuideTolerance,
   })
-  const linkerDrag = createLinkerDrag({
+  const linkerDrag = createLinkerDrag(coordinate, {
     threshold: linkerDragThreshold,
-    eventToCanvas: coordinate.eventToCanvas,
     snapDistance: linkerSnapDistance,
     snapOnMove: linkerSnapOnMove,
     snapStickDistance: linkerSnapStickDistance,
@@ -66,15 +62,13 @@ export function createPointerInteraction(options: CreatePointerInteractionOption
     allowSelfConnect: linkerAllowSelfConnect,
   })
   const pan = createPan({ button: panButton })
-  const resize = createResize({
+  const resize = createResize(coordinate, {
     minWidth: resizeMinWidth,
     minHeight: resizeMinHeight,
-    eventToCanvas: coordinate.eventToCanvas,
     guideTolerance: resizeGuideTolerance,
   })
-  const rotate = createRotate({
+  const rotate = createRotate(coordinate, {
     threshold: rotateThreshold,
-    eventToCanvas: coordinate.eventToCanvas,
     snapStep: rotateSnapStep,
   })
   const boxSelect = createBoxSelection({ minSize: boxSelectMinSize })

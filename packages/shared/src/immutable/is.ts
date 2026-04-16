@@ -6,7 +6,9 @@ export const toRawType = (value: unknown): string => toTypeString(value).slice(8
 
 export const isPlainObject = (v: any): v is Record<string, any> => isObject(v) && toTypeString(v) === '[object Object]'
 
-export const isNil = (v: unknown) => v == null
+export const isNil = (v: unknown): v is null | undefined => v == null
+
+export const isNonNullable = <T = any>(val?: T | null | undefined): val is T => val != null
 
 export const isFunction = (val: unknown): val is Function => typeof val === 'function'
 

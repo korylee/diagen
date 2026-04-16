@@ -9,8 +9,8 @@ import {
 import { resolveActions, type ResolvedAction, resolveValue } from '@diagen/core/path'
 import { getLinkerTextBox } from '@diagen/core/text'
 
-export function parseColor(color: string | undefined): string {
-  if (!color) return 'rgba(0,0,0,1)'
+export function parseColor(color: string | undefined, fallback = 'rgba(0,0,0,1)'): string {
+  if (!color) return fallback
   if (color.startsWith('#') || color.startsWith('rgb')) return color
   const parts = color.split(',')
   if (parts.length >= 3) return `rgb(${parts[0]},${parts[1]},${parts[2]})`

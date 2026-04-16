@@ -25,7 +25,6 @@ describe('createDragSession', () => {
         threshold: 3,
         transaction,
         transactionMode: 'on-begin',
-        getEvent: input => input.event,
         setup: () => null,
         update: () => {},
       })
@@ -48,7 +47,6 @@ describe('createDragSession', () => {
         threshold: 3,
         transaction,
         transactionMode: 'on-begin',
-        getEvent: input => input.event,
         setup: () => ({ id: 'drag-session' }),
         update: () => {},
         onAbort,
@@ -77,7 +75,6 @@ describe('createDragSession', () => {
         threshold: 3,
         transaction,
         transactionMode: 'on-drag-start',
-        getEvent: input => input.event,
         setup: () => ({ id: 'drag-session' }),
         update,
         onCommit,

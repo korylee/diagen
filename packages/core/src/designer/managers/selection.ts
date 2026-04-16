@@ -20,7 +20,8 @@ export function createSelectionManager(
   const { element } = deps
   const [selected, setSelected] = createStore<Record<string, boolean>>({})
 
-  const isSelected = (id: string): boolean => selected[id]
+  const isSelected = (id: string): boolean => !!selected[id]
+  const hasElement = (id: string): boolean => !!element.getElementById(id)
   const selectedIds = createMemo(() => keys(selected))
   const selectedCount = createMemo(() => selectedIds().length)
   const isEmpty = createMemo(() =>selectedCount() === 0)
@@ -107,6 +108,7 @@ export function createSelectionManager(
     hasMultiple,
     isEmpty,
     isSelected,
+    hasElement,
 
     replace,
     select,

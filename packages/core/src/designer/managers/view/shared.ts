@@ -1,10 +1,4 @@
-import {
-  normalizeBounds,
-  pick,
-  unionBounds,
-  type Bounds,
-  type Size,
-} from '@diagen/shared'
+import { normalizeBounds, pick, unionBounds, type Bounds, type Size } from '@diagen/shared'
 import { createRafLoop } from '@diagen/primitives'
 import { type LinkerElement, type ShapeElement } from '../../../model'
 import { getLinkerTextBox } from '../../../text'
@@ -53,7 +47,7 @@ export function calculateLinkerBounds(linker: LinkerElement, route: LinkerRoute)
   return textBounds ? unionNormalizedBounds(routeBounds, textBounds) : routeBounds
 }
 
-export function calculateLinkerBoundsFromRoute(route: LinkerRoute): Bounds {
+function calculateLinkerBoundsFromRoute(route: LinkerRoute): Bounds {
   if (route.points.length === 0) {
     return { x: 0, y: 0, w: 1, h: 1 }
   }

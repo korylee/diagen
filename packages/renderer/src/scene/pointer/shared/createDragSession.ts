@@ -4,16 +4,13 @@ import {
   type CreatePointerDragTrackerOptions,
   type PointerDragMoveState,
 } from './createPointerDragTracker'
+import { TransactionScope } from '@diagen/core/designer'
 
-interface PointerEventLike {
-  clientX: number
-  clientY: number
-}
-
-interface TransactionScopeLike {
-  begin: () => boolean
-  commit: () => boolean
-  abort: () => boolean
+interface BaseTStartInput {
+  event: {
+    clientX: number
+    clientY: number
+  }
 }
 
 export type DragTransactionMode = 'on-begin' | 'on-drag-start'
@@ -31,21 +28,21 @@ export interface DragSessionFinalizeContext<TState> {
 }
 
 export interface CreateDragSessionOptions<TStartInput, TState> extends CreatePointerDragTrackerOptions {
-  getEvent: (input: TStartInput) => PointerEventLike
   setup: (input: TStartInput) => TState | null
   update: (context: DragSessionUpdateContext<TState>) => void
   finalize?: (context: DragSessionFinalizeContext<TState>) => void
   reset?: () => void
-  transaction?: TransactionScopeLike
+  transaction?: Pick<TransactionScope, 'begin' | 'commit' | 'abort'>
   transactionMode?: DragTransactionMode
   onCommit?: (state: TState | null) => void
   onAbort?: (state: TState | null) => void
 }
 
-export function createDragSession<TStartInput, TState>(options: CreateDragSessionOptions<TStartInput, TState>) {
+export function createDragSession<TStartInput extends BaseTStartInput, TState>(
+  options: CreateDragSessionOptions<TStartInput, TState>,
+) {
   const {
     threshold = 3,
-    getEvent,
     setup,
     update,
     finalize,
@@ -77,7 +74,7 @@ export function createDragSession<TStartInput, TState>(options: CreateDragSessio
       }
 
       setState(() => nextState)
-      const event = getEvent(input)
+      const event = input.event
       tracker.begin({ x: event.clientX, y: event.clientY })
       return true
     } catch (error) {
@@ -205,4 +202,6 @@ export function createDragSession<TStartInput, TState>(options: CreateDragSessio
   }
 }
 
-export type CreateDragSession<TStartInput, TState> = ReturnType<typeof createDragSession<TStartInput, TState>>
+export type CreateDragSession<TStartInput extends BaseTStartInput, TState> = ReturnType<
+  typeof createDragSession<TStartInput, TState>
+>
