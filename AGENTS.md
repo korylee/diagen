@@ -14,6 +14,36 @@
    - `playgrounds/vite`：本地调试 playground
 3. 改动时要先判断问题属于模型层、几何层、渲染层还是 UI 层，避免职责漂移
 
+## 知识库索引（由 docs/INDEX.md 合并而来）
+
+### 当前知识库阅读顺序
+1. `docs/PROJECT_OVERVIEW.md`：项目定位、当前阶段、主要缺口与后续路线
+2. `docs/CURRENT_PLAN.md`：当前执行阶段的唯一实施口径
+3. `docs/CAPABILITY_PRIORITIES.md`：对标 `draw.io / ProcessOn` 的长期优先级排序
+4. `docs/REPO_MAP.md`：仓库结构与关键入口文件
+5. `docs/DEV_GUIDE.md`：当前阶段仍有效的开发与验证指引
+6. `docs/ARCHITECTURE.md` / `docs/DOMAIN_MODEL.md`：架构与模型边界背景
+
+### 文档职责边界
+- `PROJECT_OVERVIEW.md`：项目现状、当前阶段、主要缺口
+- `CURRENT_PLAN.md`：当前阶段唯一执行方案
+- `CAPABILITY_PRIORITIES.md`：长期能力排序，不等于当前执行阶段
+- `REPO_MAP.md`：路径事实源
+- `DEV_GUIDE.md`：当前可执行的开发/测试指引
+- `.processon/`：历史参考资料，不作为当前事实来源
+
+### 维护规则
+- 目录入口变化：更新 `docs/REPO_MAP.md`
+- 能力与优先级变化：更新 `docs/PROJECT_OVERVIEW.md` 与 `docs/CAPABILITY_PRIORITIES.md`
+- 执行阶段变化：更新 `docs/CURRENT_PLAN.md`
+- 模型字段变化：更新 `docs/DOMAIN_MODEL.md`
+- 测试入口变化：更新 `docs/DEV_GUIDE.md`
+
+### 当前阶段摘要
+- 连线编辑成熟度阶段已完成，不再作为当前执行阶段。
+- 当前执行阶段是“容器与层级语义”。
+- 当前最重要的不是 page、持久化、导入导出，而是继续补齐真正影响编辑可用性的核心能力。
+
 ## 工程与命令约定
 
 1. 包管理器使用 `pnpm`

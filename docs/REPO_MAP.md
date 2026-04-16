@@ -1,7 +1,7 @@
 # 仓库结构速览
 
 ## 1. 根目录
-- `AI_KB/`：当前知识库
+- `docs/`：当前知识库
 - `packages/`：各业务包
 - `playgrounds/vite/`：当前唯一正式联调入口
 - `.processon/`：历史参考资料

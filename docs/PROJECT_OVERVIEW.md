@@ -3,7 +3,7 @@
 ## 1. 项目定位
 
 - Diagen 是一个基于 SolidJS 的图编辑内核与 UI 组合库。
-- 当前主目标已从"补齐基础交互"转向"补齐真正决定可用性的核心编辑能力"，优先级参考 `draw.io / ProcessOn` 的能力差距。
+- 当前主目标已从“补齐基础交互”转向“补齐真正决定可用性的核心编辑能力”，优先级参考 `draw.io / ProcessOn` 的能力差距。
 - `.processon/` 仅作为历史参考资料，不属于运行时代码和当前知识库主线。
 - 项目当前未对外发布，因此不以兼容旧设计为目标，而以最佳结构设计为目标。
 
@@ -33,7 +33,7 @@
 - shape / linker 文本编辑已进入正式主链路，具备双击进入、提交/取消、selection/history 协同与定位基础
 - `clipboard manager` 已支持 `copy / cut / paste / duplicate`，并保持事务化 history 语义
 - `edit manager` 已统一 `patch / setter / nested setter` 的命令快照逻辑
-- **连线编辑成熟度阶段已完成**：端点重连、控制点编辑、正交线路调整、连线文字定位、line jump
+- 连线编辑成熟度阶段已完成：端点重连、控制点编辑、正交线路调整、连线文字定位、line jump 已进入正式能力集合
 
 ## 5. 当前主要缺口
 
@@ -42,21 +42,30 @@
 - 持久化尚未形成完整的宿主接入闭环
 - 导入导出尚未接入 UI 动作体系
 - 多 page 分页能力尚未正式建模
-- UI 层缺少"保存 / 另存 / 导入 / 导出"等产品入口
+- UI 层缺少“保存 / 另存 / 导入 / 导出”等产品入口
 
-## 6. 开发路线图（未来 4-8 周）
+## 6. 当前阶段与开发路线图
+
+### 长期优先级说明
+- 长期优先级见 `docs/CAPABILITY_PRIORITIES.md`
+- 当前执行阶段不等于长期排序中的第一项，而是综合已完成阶段、当前代码基础与返工成本后的落点
 
 ### 当前阶段：P1 容器与层级语义
 
-**目标**：让 `parent / child / container` 成为正式编辑语义
+**阶段切换原因**：
+- 连线编辑成熟度已完成当前阶段验收，不再继续占用主执行阶段。
+- 目前最直接影响 Diagen 接近 `draw.io / ProcessOn` 的真实短板，已经转移到容器与层级语义。
+- 只有把 `parent / child / container` 变成正式编辑语义，后续样式体系、多 page、持久化与导入导出才有稳定基础。
 
-任务：
+**当前目标**：让 `parent / child / container` 成为正式编辑语义
+
+**当前任务**：
 1. 明确容器命中、收纳、脱离与嵌套规则
 2. 收口拖拽进入容器、拖出容器与跨容器移动
 3. 收口容器选择、框选与批量操作
 4. 梳理容器相关 history / clipboard / selection 语义
 
-**实施入口**：见 `AI_KB/CURRENT_PLAN.md`
+**实施入口**：见 `docs/CURRENT_PLAN.md`
 
 ### 后续阶段
 
@@ -64,8 +73,8 @@
 |--------|------|----------|
 | P1 | 样式体系与导航效率 | 默认样式、批量应用、主题 preset、space 平移、zoom preset、minimap 评估 |
 | P2 | 多 Page 分页 | Diagram 升级为多 page 文件根模型、page manager、最小分页 UI |
-| P3 | 正式持久化与导入导出 | serializeDiagram / parseDiagram / loadDiagram、LocalSnapshot、UI 动作入口 |
-| P4 | 保存体验与工作流 | dirty 状态、自动保存、恢复提示、未保存变更警告 |
+| P2 | 正式持久化与导入导出 | serializeDiagram / parseDiagram / loadDiagram、LocalSnapshot、UI 动作入口 |
+| P3 | 保存体验与工作流 | dirty 状态、自动保存、恢复提示、未保存变更警告 |
 
 ### 范围控制
 
@@ -88,8 +97,12 @@
 
 ## 9. 测试计划要点
 
-必须新增：
+当前阶段必须新增：
 - 容器/层级语义测试
+- 容器与 selection / history / clipboard 组合语义测试
+- 容器反馈与提交边界测试
+
+后续阶段再补：
 - 样式批量应用与导航效率测试
 - page 切换、新建、删除、重命名的 `core` 语义测试
 - `serializeDiagram -> parseDiagram -> loadDiagram` 往返测试
@@ -97,4 +110,4 @@
 
 ---
 
-最后更新：2026-04-11
+最后更新：2026-04-15

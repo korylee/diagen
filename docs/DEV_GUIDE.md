@@ -1,5 +1,13 @@
 # 开发与运行
 
+## 0. 使用范围说明
+
+本文件只描述**当前阶段仍有效**的开发与验证指引。
+
+注意：
+- 持久化 / 导入导出 / 自动保存 / 刷新恢复 等“文档链路/宿主工作流”能力目前尚未形成产品闭环（见 `docs/PROJECT_OVERVIEW.md`）。
+- 因此，这些能力的手工回归项会被放在“后续阶段回归清单”，不作为当前阶段的默认验收门槛。
+
 ## 1. 基础命令
 - 安装依赖：`pnpm install`
 - 构建所有包：`pnpm run build:packages`
@@ -20,10 +28,12 @@
 
 ## 3. 定向测试建议
 
-### 改动 `core` 数据模型、history、持久化时
+### 改动 `core` 数据模型、history、manager 语义时
 - `packages/core/src/designer/managers/history.test.ts`
 - `packages/core/src/designer/managers/edit/index.test.ts`
 - `packages/core/src/designer/managers/clipboard.test.ts`
+- `packages/core/src/designer/managers/selection.test.ts`
+- `packages/core/src/designer/managers/group.test.ts`
 
 ### 改动 renderer 交互时
 - `packages/renderer/src/scene/Renderer.test.ts`
@@ -34,7 +44,8 @@
 - `packages/core/src/transform/index.test.ts`
 - `packages/core/src/route/route.test.ts`
 
-## 4. 当前测试覆盖判断
+## 4. 当前测试覆盖判断（可执行口径）
+
 `packages/renderer/src/scene/Renderer.test.ts` 已覆盖：
 - box select
 - scroll 后框选
@@ -51,10 +62,9 @@
 - 文本编辑（shape 与 linker）
 - linker 标签拖拽与 textPosition
 
-缺口主要转移到文档链路：
-- 序列化/反序列化协议测试
-- 导入异常测试
-- 自动保存去抖测试
+当前阶段（容器与层级语义）重点缺口：
+- 容器收纳/脱离/跨容器移动的组合语义测试
+- 容器与 selection / history / clipboard 的一致性回归
 
 ## 5. 开发注意事项
 
@@ -63,20 +73,25 @@
 - 不要把 Solid proxy、draft 或共享对象引用写入 history。
 - 整对象、nested setter、produce 更新都要回归 undo/redo。
 
-### 关于持久化
-- 只持久化正式 `Diagram` 文件语义，不要持久化 `tool / originOffset / viewportSize` 等运行时字段。
-- 自动保存应监听稳定的文档变更，不要直接监听组件层事件。
-- 导入要经过统一校验与装载，不要在 UI 层直接 `JSON.parse + setState`。
-- 当前阶段不需要为了兼容旧格式保留双轨逻辑；协议变更时同步修改测试与宿主接线。
+## 6. 当前阶段手工回归清单（容器与层级语义）
 
-## 6. 手工回归清单
+1. 单个 shape 拖入容器：commit 后 `parent / children` 正确。
+2. 单个 shape 拖出容器：commit 后 `parent = null`，并从旧容器 `children` 移除。
+3. 跨容器移动：旧容器移除 + 新容器加入 + shape.parent 更新在同一事务内完成。
+4. 多选拖拽进入同一容器：所有元素层级一致且只产生一个 undo 单元。
+5. undo / redo 后 `parent / children / selection` 仍保持一致。
+
+## 7. 后续阶段回归清单（文档链路/宿主工作流）
+
+以下能力目前未闭环，不作为当前阶段默认验收项，但后续进入持久化与导入导出阶段时必须补齐：
+
 1. 页面刷新后文档能恢复。
 2. 导入合法 JSON 后，画布、选择和历史状态符合预期。
 3. 导入非法 JSON 时，有明确错误反馈且不会破坏当前文档。
 4. 拖拽、旋转、建线后自动保存不会造成卡顿。
 5. 导出 JSON 后再次导入，元素数量、顺序、page 设置保持一致。
 
-## 7. renderer 测试文件完整列表
+## 8. renderer 测试文件完整列表
 
 ### scene/ 目录
 ```
@@ -110,4 +125,6 @@ packages/core/src/designer/managers/view/index.test.ts
 packages/core/src/designer/managers/view/shared.test.ts
 ```
 
-最后更新：2026-04-11
+---
+
+最后更新：2026-04-15
