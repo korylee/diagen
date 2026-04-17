@@ -3,16 +3,17 @@ import { reconcile } from 'solid-js/store'
 import type { DesignerContext } from './types'
 import type { DesignerToolState } from '../types'
 
-export interface SetShapeToolOptions {
+interface SetToolOptions {
   continuous?: boolean
 }
 
-export interface SetLinkerToolOptions {
-  continuous?: boolean
-}
+export interface SetShapeToolOptions extends SetToolOptions {}
+
+export interface SetLinkerToolOptions extends SetToolOptions {}
 
 export function createToolManager(ctx: DesignerContext) {
   const toolState = createMemo<DesignerToolState>(() => ctx.state.tool)
+  const isIdle = createMemo(() => toolState().type === 'idle')
 
   function setIdle(): void {
     ctx.setState('tool', reconcile({ type: 'idle' }))
@@ -58,13 +59,9 @@ export function createToolManager(ctx: DesignerContext) {
     setCreateLinker(linkerId, options)
   }
 
-  function isIdle(): boolean {
-    return toolState().type === 'idle'
-  }
-
   return {
     toolState,
-    
+
     isIdle,
     setIdle,
     clear: setIdle,

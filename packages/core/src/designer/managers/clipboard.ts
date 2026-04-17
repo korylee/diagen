@@ -1,9 +1,9 @@
 import { generateId, type Point } from '@diagen/shared'
 import { batch } from 'solid-js'
-import { type DiagramElement, isLinker, isShape, type LinkerEndpoint } from '../../model'
 import { unwrapClone } from '../../_internal'
-import { createInsertElementsCommand } from './edit/commands'
+import { type DiagramElement, isLinker, isShape, type LinkerEndpoint } from '../../model'
 import type { EditManager } from './edit'
+import { createInsertElementsCommand } from './edit/commands'
 import type { ElementManager } from './element'
 import type { GroupManager } from './group'
 import { createCommand, type HistoryManager } from './history'
@@ -32,17 +32,6 @@ interface ClipboardSource {
   sourceSelectionIds: string[]
 }
 
-function normalizeIds(ids: string[]): string[] {
-  const seen = new Set<string>()
-  const result: string[] = []
-  for (const id of ids) {
-    if (seen.has(id)) continue
-    seen.add(id)
-    result.push(id)
-  }
-  return result
-}
-
 function offsetPoint(point: Point, delta: Point): Point {
   return {
     x: point.x + delta.x,
@@ -61,13 +50,8 @@ function remapLinkerEndpoint(endpoint: LinkerEndpoint, idMap: Map<string, string
   }
 }
 
-function createClipboardCutCommand(params: {
-  ids: string[]
-  edit: ClipboardDeps['edit']
-  element: ClipboardDeps['element']
-  selection: ClipboardDeps['selection']
-}) {
-  const { ids, edit, element, selection } = params
+function createClipboardCutCommand(deps: ClipboardDeps, ids: string[]) {
+  const { edit, element, selection } = deps
   const snapshotElements = unwrapClone(element.elementMap())
   const snapshotOrderList = element.orderList().slice()
   const previousSelectionIds = selection.selectedIds().slice()
@@ -91,12 +75,8 @@ export function createClipboardManager(deps: ClipboardDeps) {
   let snapshot: ClipboardSnapshot | null = null
   let pasteCount = 0
 
-  function resolveSourceSelection(ids?: string[]): string[] {
-    return normalizeIds(ids ?? selection.selectedIds())
-  }
-
   function resolveClipboardSource(ids?: string[]): ClipboardSource | null {
-    const sourceSelectionIds = resolveSourceSelection(ids)
+    const sourceSelectionIds = ids ?? selection.selectedIds()
     if (sourceSelectionIds.length === 0) return null
 
     const orderedIds = group.resolveSelection(sourceSelectionIds, { includeInternalLinkers: true })
@@ -195,14 +175,7 @@ export function createClipboardManager(deps: ClipboardDeps) {
     snapshot = nextSnapshot
     pasteCount = 0
 
-    history.execute(
-      createClipboardCutCommand({
-        ids: nextSnapshot.orderedIds,
-        edit,
-        element,
-        selection,
-      }),
-    )
+    history.execute(createClipboardCutCommand(deps, nextSnapshot.orderedIds))
     return true
   }
 

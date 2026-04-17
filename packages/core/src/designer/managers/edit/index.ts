@@ -1,22 +1,20 @@
 import {
   ensureArray,
-  type Bounds,
   type MaybeArray,
   type UnionKeyOf,
   type UnionNestedKeyOf,
   type UnionNestedValue,
-  type UnionValue,
+  type UnionValue
 } from '@diagen/shared'
 import { batch } from 'solid-js'
 import type { StoreSetter } from 'solid-js/store'
-import type { DiagramElement, ShapeElement } from '../../../model'
+import type { DiagramElement } from '../../../model'
 import type { CreateMethods } from '../element'
 import {
   resolveParentPreview,
   resolveParenting,
-  type ParentingContainment,
   type ResolveParentingOptions,
-  type ResolveParentingResult,
+  type ResolveParentingResult
 } from '../element/parenting'
 import type { DesignerContext } from '../types'
 import {
@@ -29,11 +27,11 @@ import {
   createUpdateCommand,
 } from './commands'
 import {
+  normalizeIds,
+  takeEditOptions,
   type EditCreateOptions,
   type EditDeps,
   type EditOptions,
-  normalizeIds,
-  takeEditOptions,
 } from './shared'
 
 export function createEditManager(_ctx: DesignerContext, deps: EditDeps) {

@@ -1,4 +1,4 @@
-import { ensureArray, keys, Point } from '@diagen/shared'
+import { ensureArray, keys } from '@diagen/shared'
 import { createMemo } from 'solid-js'
 import { createStore, produce } from 'solid-js/store'
 import type { ElementManager } from './element'
@@ -27,7 +27,7 @@ export function createSelectionManager(
   const isEmpty = createMemo(() =>selectedCount() === 0)
   const hasMultiple = createMemo(() =>selectedCount() > 1)
 
-  function replace(ids: string[], anchorPoint?: Point) {
+  function replace(ids: string[]) {
     const previous = selectedIds().slice()
     setSelected(
       produce(selected => {
@@ -45,7 +45,7 @@ export function createSelectionManager(
     )
   }
   // add to selection
-  function select(id: string[] | string, anchorPoint?: Point) {
+  function select(id: string[] | string) {
     const ids = ensureArray(id)
     const previous = selectedIds().slice()
     setSelected(
@@ -67,7 +67,7 @@ export function createSelectionManager(
     )
   }
 
-  function deselect(id: string[] | string, anchorPoint?: Point) {
+  function deselect(id: string[] | string) {
     const ids = ensureArray(id)
     const previous = selectedIds().slice()
     setSelected(
