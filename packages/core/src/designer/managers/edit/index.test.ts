@@ -36,18 +36,22 @@ describe('edit manager', () => {
       })
 
       designer.edit.add([container, shape], { record: false, select: false })
-      designer.edit.parenting([shape.id], current => current.props)
+      designer.selection.replace([shape.id])
+      designer.edit.parenting([shape.id])
 
       expect(designer.getElementById<ShapeElement>(shape.id)?.parent).toBe(container.id)
       expect(designer.getElementById<ShapeElement>(container.id)?.children).toEqual([shape.id])
+      expect(designer.selection.selectedIds()).toEqual([shape.id])
 
       designer.undo()
       expect(designer.getElementById<ShapeElement>(shape.id)?.parent).toBeNull()
       expect(designer.getElementById<ShapeElement>(container.id)?.children).toEqual([])
+      expect(designer.selection.selectedIds()).toEqual([shape.id])
 
       designer.redo()
       expect(designer.getElementById<ShapeElement>(shape.id)?.parent).toBe(container.id)
       expect(designer.getElementById<ShapeElement>(container.id)?.children).toEqual([shape.id])
+      expect(designer.selection.selectedIds()).toEqual([shape.id])
     })
   })
 

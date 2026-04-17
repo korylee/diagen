@@ -263,7 +263,6 @@ export function createParentingCommand(
   return createCommand({
     name: 'el_parenting',
     execute() {
-      if (isNoOp) return
       applyParenting(deps, result)
     },
     undo() {

@@ -212,6 +212,7 @@ describe('createShapeDrag', () => {
         parent: container.id,
       })
       designer.edit.add([container, shape], { record: false, select: false })
+      designer.selection.replace([shape.id])
 
       expect(shapeDrag.start(createMouseEvent(120, 100), [shape.id])).toBe(true)
       shapeDrag.move(createMouseEvent(360, 280))
@@ -220,6 +221,17 @@ describe('createShapeDrag', () => {
 
       expect(designer.getElementById<ShapeElement>(shape.id)?.parent).toBeNull()
       expect(designer.getElementById<ShapeElement>(container.id)?.children).toEqual([])
+      expect(designer.selection.selectedIds()).toEqual([shape.id])
+
+      designer.undo()
+      expect(designer.getElementById<ShapeElement>(shape.id)?.parent).toBe(container.id)
+      expect(designer.getElementById<ShapeElement>(container.id)?.children).toEqual([shape.id])
+      expect(designer.selection.selectedIds()).toEqual([shape.id])
+
+      designer.redo()
+      expect(designer.getElementById<ShapeElement>(shape.id)?.parent).toBeNull()
+      expect(designer.getElementById<ShapeElement>(container.id)?.children).toEqual([])
+      expect(designer.selection.selectedIds()).toEqual([shape.id])
     })
   })
 
@@ -236,6 +248,7 @@ describe('createShapeDrag', () => {
         parent: containerA.id,
       })
       designer.edit.add([containerA, containerB, shape], { record: false, select: false })
+      designer.selection.replace([shape.id])
 
       expect(shapeDrag.start(createMouseEvent(100, 100), [shape.id])).toBe(true)
       shapeDrag.move(createMouseEvent(380, 100))
@@ -245,6 +258,19 @@ describe('createShapeDrag', () => {
       expect(designer.getElementById<ShapeElement>(containerA.id)?.children).toEqual([])
       expect(designer.getElementById<ShapeElement>(containerB.id)?.children).toEqual([shape.id])
       expect(designer.history.undoStack()).toHaveLength(1)
+      expect(designer.selection.selectedIds()).toEqual([shape.id])
+
+      designer.undo()
+      expect(designer.getElementById<ShapeElement>(shape.id)?.parent).toBe(containerA.id)
+      expect(designer.getElementById<ShapeElement>(containerA.id)?.children).toEqual([shape.id])
+      expect(designer.getElementById<ShapeElement>(containerB.id)?.children).toEqual([])
+      expect(designer.selection.selectedIds()).toEqual([shape.id])
+
+      designer.redo()
+      expect(designer.getElementById<ShapeElement>(shape.id)?.parent).toBe(containerB.id)
+      expect(designer.getElementById<ShapeElement>(containerA.id)?.children).toEqual([])
+      expect(designer.getElementById<ShapeElement>(containerB.id)?.children).toEqual([shape.id])
+      expect(designer.selection.selectedIds()).toEqual([shape.id])
     })
   })
 
@@ -266,6 +292,19 @@ describe('createShapeDrag', () => {
       expect(designer.getElementById<ShapeElement>(shapeB.id)?.parent).toBe(container.id)
       expect(designer.getElementById<ShapeElement>(container.id)?.children).toEqual([shapeA.id, shapeB.id])
       expect(designer.history.undoStack()).toHaveLength(1)
+
+      designer.selection.replace([shapeA.id, shapeB.id])
+      designer.undo()
+      expect(designer.getElementById<ShapeElement>(shapeA.id)?.parent).toBeNull()
+      expect(designer.getElementById<ShapeElement>(shapeB.id)?.parent).toBeNull()
+      expect(designer.getElementById<ShapeElement>(container.id)?.children).toEqual([])
+      expect(designer.selection.selectedIds()).toEqual([shapeA.id, shapeB.id])
+
+      designer.redo()
+      expect(designer.getElementById<ShapeElement>(shapeA.id)?.parent).toBe(container.id)
+      expect(designer.getElementById<ShapeElement>(shapeB.id)?.parent).toBe(container.id)
+      expect(designer.getElementById<ShapeElement>(container.id)?.children).toEqual([shapeA.id, shapeB.id])
+      expect(designer.selection.selectedIds()).toEqual([shapeA.id, shapeB.id])
     })
   })
 

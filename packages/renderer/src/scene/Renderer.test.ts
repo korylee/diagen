@@ -472,6 +472,25 @@ describe('Renderer', () => {
       expect(shapeB?.parent).toBe(container?.id)
       expect(harness.designer.history.undoStack()).toHaveLength(1)
       expect(harness.designer.selection.selectedIds()).toEqual(['shape_drag_multi_a', 'shape_drag_multi_b'])
+
+      harness.designer.undo()
+      expect(harness.designer.getElementById<ShapeElement>('shape_drag_multi_container')?.children ?? []).toEqual([])
+      expect(harness.designer.getElementById<ShapeElement>('shape_drag_multi_a')?.parent).toBeNull()
+      expect(harness.designer.getElementById<ShapeElement>('shape_drag_multi_b')?.parent).toBeNull()
+      expect(harness.designer.selection.selectedIds()).toEqual(['shape_drag_multi_a', 'shape_drag_multi_b'])
+
+      harness.designer.redo()
+      expect(harness.designer.getElementById<ShapeElement>('shape_drag_multi_container')?.children).toEqual([
+        'shape_drag_multi_a',
+        'shape_drag_multi_b',
+      ])
+      expect(harness.designer.getElementById<ShapeElement>('shape_drag_multi_a')?.parent).toBe(
+        'shape_drag_multi_container',
+      )
+      expect(harness.designer.getElementById<ShapeElement>('shape_drag_multi_b')?.parent).toBe(
+        'shape_drag_multi_container',
+      )
+      expect(harness.designer.selection.selectedIds()).toEqual(['shape_drag_multi_a', 'shape_drag_multi_b'])
     } finally {
       harness.dispose()
     }

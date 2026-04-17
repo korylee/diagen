@@ -1,6 +1,7 @@
 import { createRoot } from 'solid-js'
 import { describe, expect, it } from 'vitest'
 import { createEmitter } from '@diagen/shared'
+import { createShape, type ShapeElement } from '../../model'
 import { createDesigner } from '../create'
 import { type Command, createCommand, createHistoryManager } from './history'
 
@@ -61,6 +62,28 @@ function createMergeCommand(counter: { value: number }, delta: number) {
     },
   }) as Command & { payload: { delta: number } }
   return command
+}
+
+function createContainerShape(id: string) {
+  return createShape({
+    id,
+    name: id,
+    group: null,
+    attribute: {
+      ...createShape({}).attribute,
+      container: true,
+    },
+    props: { x: 0, y: 0, w: 260, h: 180, angle: 0 },
+  })
+}
+
+function createBasicShape(id: string, x: number, y: number) {
+  return createShape({
+    id,
+    name: id,
+    group: null,
+    props: { x, y, w: 80, h: 60, angle: 0 },
+  })
 }
 
 describe('history manager', () => {
@@ -193,6 +216,68 @@ describe('history manager', () => {
       designer.history.transaction.abort(txId || undefined)
       expect(counter.value).toBe(0)
       expect(designer.history.undoStack().length).toBe(0)
+    })
+  })
+
+  it('容器事务 commit 后应作为一个 undo 单元回滚 parent、children 与几何', () => {
+    withDesigner(designer => {
+      const container = createContainerShape('history_container_commit')
+      const shape = createBasicShape('history_shape_commit', 320, 40)
+      designer.edit.add([container, shape], { record: false, select: false })
+      designer.selection.replace([shape.id])
+
+      const txId = designer.history.transaction.begin('容器事务提交')
+      expect(txId).not.toBeNull()
+
+      designer.edit.update(shape.id, 'props', 'x', 60)
+      designer.edit.parenting([shape.id])
+
+      expect(designer.history.undoStack().length).toBe(0)
+      expect(designer.getElementById<ShapeElement>(shape.id)?.props.x).toBe(60)
+      expect(designer.getElementById<ShapeElement>(shape.id)?.parent).toBe(container.id)
+      expect(designer.getElementById<ShapeElement>(container.id)?.children).toEqual([shape.id])
+
+      designer.history.transaction.commit(txId || undefined)
+      expect(designer.history.undoStack().length).toBe(1)
+      expect(designer.selection.selectedIds()).toEqual([shape.id])
+
+      designer.undo()
+      expect(designer.getElementById<ShapeElement>(shape.id)?.props.x).toBe(320)
+      expect(designer.getElementById<ShapeElement>(shape.id)?.parent).toBeNull()
+      expect(designer.getElementById<ShapeElement>(container.id)?.children).toEqual([])
+      expect(designer.selection.selectedIds()).toEqual([shape.id])
+
+      designer.redo()
+      expect(designer.getElementById<ShapeElement>(shape.id)?.props.x).toBe(60)
+      expect(designer.getElementById<ShapeElement>(shape.id)?.parent).toBe(container.id)
+      expect(designer.getElementById<ShapeElement>(container.id)?.children).toEqual([shape.id])
+      expect(designer.selection.selectedIds()).toEqual([shape.id])
+    })
+  })
+
+  it('容器事务 abort 后应回滚 parent、children 与几何，且不写入历史', () => {
+    withDesigner(designer => {
+      const container = createContainerShape('history_container_abort')
+      const shape = createBasicShape('history_shape_abort', 320, 40)
+      designer.edit.add([container, shape], { record: false, select: false })
+      designer.selection.replace([shape.id])
+
+      const txId = designer.history.transaction.begin('容器事务回滚')
+      expect(txId).not.toBeNull()
+
+      designer.edit.update(shape.id, 'props', 'x', 60)
+      designer.edit.parenting([shape.id])
+
+      expect(designer.getElementById<ShapeElement>(shape.id)?.props.x).toBe(60)
+      expect(designer.getElementById<ShapeElement>(shape.id)?.parent).toBe(container.id)
+      expect(designer.getElementById<ShapeElement>(container.id)?.children).toEqual([shape.id])
+
+      designer.history.transaction.abort(txId || undefined)
+      expect(designer.history.undoStack().length).toBe(0)
+      expect(designer.getElementById<ShapeElement>(shape.id)?.props.x).toBe(320)
+      expect(designer.getElementById<ShapeElement>(shape.id)?.parent).toBeNull()
+      expect(designer.getElementById<ShapeElement>(container.id)?.children).toEqual([])
+      expect(designer.selection.selectedIds()).toEqual([shape.id])
     })
   })
 
