@@ -3,7 +3,7 @@
  */
 
 import { generateId } from '@diagen/shared'
-import type { LinkerType } from '../constants'
+import { DEFAULTS, type LinkerType } from '../constants'
 import type { BaseElement, LineStyle, FontStyle, DataAttribute } from './types'
 
 export type LinkerEndpointBinding =
@@ -79,25 +79,9 @@ export function createLinker(patch: Partial<LinkerElement>):LinkerElement {
     },
     points: [],
     textPosition: undefined,
-    lineStyle: {
-      lineWidth: 2,
-      lineColor: '50,50,50',
-      lineStyle: 'solid',
-      beginArrowStyle: 'none',
-      endArrowStyle: 'solidArrow',
-    },
-    fontStyle: {
-      fontFamily: '微软雅黑, Arial, sans-serif',
-      size: 13,
-      lineHeight: 1.25,
-      color: '50,50,50',
-      bold: false,
-      italic: false,
-      underline: false,
-      textAlign: 'center',
-      vAlign: 'middle',
-      orientation: 'horizontal',
-    },
+    // 保持 create 时的独立对象语义，避免实例间共享默认样式引用。
+    lineStyle: { ...DEFAULTS.DEFAULT_LINE_STYLE } as LineStyle,
+    fontStyle: { ...DEFAULTS.DEFAULT_FONT_STYLE } as FontStyle,
     dataAttributes: [],
     data: {},
     ...patch,

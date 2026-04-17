@@ -3,6 +3,7 @@
  */
 
 import { DeepPartial, generateId } from '@diagen/shared'
+import { DEFAULTS } from '../constants'
 
 /** 页面配置 */
 export interface DiagramPage {
@@ -27,17 +28,18 @@ export function createPage(overrides: DeepPartial<DiagramPage> = {}) {
   return {
     id,
     name: 'Page 1',
-    backgroundColor: 'rgb(255, 255, 255)',
-    width: 1050,
-    height: 1000,
-    padding: 20,
+    // 页面默认背景统一复用 core 默认值，避免常量与模型实现漂移。
+    backgroundColor: DEFAULTS.PAGE_BACKGROUND,
+    width: DEFAULTS.PAGE_WIDTH,
+    height: DEFAULTS.PAGE_HEIGHT,
+    padding: DEFAULTS.PAGE_PADDING,
     margin: 800,
-    showGrid: true,
-    gridSize: 15,
-    gridColor: '#e0e0e0',
+    showGrid: DEFAULTS.SHOW_GRID,
+    gridSize: DEFAULTS.GRID_SIZE,
+    gridColor: DEFAULTS.GRID_COLOR,
     gridStyle: 'line',
     orientation: 'portrait',
-    lineJumps: false,
+    lineJumps: DEFAULTS.LINE_JUMPS,
     ...overrides,
   } as DiagramPage
 }

@@ -18,6 +18,7 @@ import { createPointerInteraction } from './pointer'
 import { createCoordinateService } from './services/createCoordinateService'
 import { createRendererHover } from './services/createRendererHover'
 import { createScrollService } from './services/createScrollService'
+import { resolveRendererDefaults, type RendererDefaultsOverrides } from '../defaults'
 
 import './Renderer.scss'
 
@@ -99,10 +100,15 @@ export function Renderer(props: {
   shapeGuideTolerance?: number
   /** resize 吸附容差（画布坐标） */
   resizeGuideTolerance?: number
+  /** renderer 默认配置覆写 */
+  defaults?: RendererDefaultsOverrides
   /** 右键菜单上下文请求 */
   onContextMenu?: (request: RendererContextMenuRequest) => void
 }) {
   const { selection, edit, view, state, history, tool, clipboard, element } = useDesigner()
+  const rendererDefaults = resolveRendererDefaults(props.defaults)
+  const interactionDefaults = rendererDefaults.interaction
+  const zoomDefaults = rendererDefaults.zoom
 
   const [viewportRef, setViewportRef] = createSignal<HTMLDivElement | null>(null)
   const [containerRef, setContainerRef] = createSignal<HTMLDivElement | null>(null)
@@ -114,14 +120,21 @@ export function Renderer(props: {
     canvasToScreen: view.toScreen,
   })
   const pointer = createPointerInteraction(coordinate, {
-    panButton: 1,
-    shapeDragThreshold: 3,
-    shapeGuideTolerance: props.shapeGuideTolerance,
-    linkerDragThreshold: 3,
-    resizeMinWidth: 20,
-    resizeMinHeight: 20,
-    resizeGuideTolerance: props.resizeGuideTolerance,
-    boxSelectMinSize: 5,
+    panButton: interactionDefaults.panButton,
+    shapeDragThreshold: interactionDefaults.shapeDragThreshold,
+    shapeGuideTolerance: props.shapeGuideTolerance ?? interactionDefaults.shapeGuideTolerance,
+    linkerDragThreshold: interactionDefaults.linkerDragThreshold,
+    linkerSnapDistance: interactionDefaults.linkerSnapDistance,
+    linkerSnapOnMove: interactionDefaults.linkerSnapOnMove,
+    linkerSnapStickDistance: interactionDefaults.linkerSnapStickDistance,
+    linkerDirectionBias: interactionDefaults.linkerDirectionBias,
+    linkerAllowSelfConnect: interactionDefaults.linkerAllowSelfConnect,
+    resizeMinWidth: interactionDefaults.resizeMinWidth,
+    resizeMinHeight: interactionDefaults.resizeMinHeight,
+    resizeGuideTolerance: props.resizeGuideTolerance ?? interactionDefaults.resizeGuideTolerance,
+    boxSelectMinSize: interactionDefaults.boxSelectMinSize,
+    rotateThreshold: interactionDefaults.rotateThreshold,
+    rotateSnapStep: interactionDefaults.rotateSnapStep,
   })
   const keyboard = createKeyboard()
 
@@ -430,8 +443,8 @@ export function Renderer(props: {
     if (textEditor.isEditing()) return
     if (event.ctrlKey) {
       event.preventDefault()
-      const delta = event.deltaY > 0 ? -0.1 : 0.1
-      const newZoom = Math.max(0.1, Math.min(5, view.transform().zoom + delta))
+      const delta = event.deltaY > 0 ? -zoomDefaults.step : zoomDefaults.step
+      const newZoom = Math.max(zoomDefaults.min, Math.min(zoomDefaults.max, view.transform().zoom + delta))
       view.setZoom(newZoom, coordinate.eventToCanvas(event))
     }
   }

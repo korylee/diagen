@@ -2,7 +2,7 @@
  * 形状元素模型
  */
 
-import { generateId } from '@diagen/shared'
+import { deepClone, generateId } from '@diagen/shared'
 import { DEFAULTS } from '../constants'
 import type {
   Anchor,
@@ -15,14 +15,14 @@ import type {
   LineStyle,
   PathDefinition,
   ShapeStyle,
-  TextBlock
+  TextBlock,
 } from './types'
 
 /** 形状元素 */
 export interface ShapeElement extends BaseElement {
   type: 'shape'
   title: string
-  link?: string  // 超链接
+  link?: string // 超链接
 
   /** 几何属性 */
   props: BoxProps
@@ -54,6 +54,11 @@ export interface ShapeElement extends BaseElement {
 }
 
 export function createShape(patch: Partial<ShapeElement>): ShapeElement {
+  // 默认值按实例克隆，避免某个 shape 的运行时修改污染全局默认配置。
+  const defaultTextBlock = deepClone(DEFAULTS.DEFAULT_TEXT_BLOCK)
+  const defaultAnchors = deepClone(DEFAULTS.DEFAULT_ANCHORS)
+  const defaultPath = deepClone(DEFAULTS.DEFAULT_PATH)
+
   return {
     type: 'shape',
     title: '',
@@ -74,16 +79,16 @@ export function createShape(patch: Partial<ShapeElement>): ShapeElement {
       alpha: 1,
     },
     lineStyle: {
-      lineWidth: 2,
-      lineColor: '50,50,50',
-      lineStyle: 'solid',
+      lineWidth: DEFAULTS.DEFAULT_LINE_WIDTH,
+      lineColor: DEFAULTS.DEFAULT_LINE_COLOR,
+      lineStyle: DEFAULTS.DEFAULT_LINE_STYLE.lineStyle,
     },
-    fillStyle: DEFAULTS.DEFAULT_FILL_STYLE,
-    fontStyle: DEFAULTS.DEFAULT_FONT_STYLE,
-    textBlock: [DEFAULTS.DEFAULT_TEXT_BLOCK],
-    anchors: DEFAULTS.DEFAULT_ANCHORS,
-    path: DEFAULTS.DEFAULT_PATH,
-    attribute: DEFAULTS.DEFAULT_ATTRIBUTE,
+    fillStyle: { ...DEFAULTS.DEFAULT_FILL_STYLE },
+    fontStyle: { ...DEFAULTS.DEFAULT_FONT_STYLE },
+    textBlock: [defaultTextBlock],
+    anchors: defaultAnchors,
+    path: defaultPath,
+    attribute: { ...DEFAULTS.DEFAULT_ATTRIBUTE },
     dataAttributes: [],
     data: {},
     ...patch,

@@ -1,36 +1,24 @@
-import { createMemo } from 'solid-js'
 import { useDesignerContext } from '@diagen/renderer'
+import { createMemo } from 'solid-js'
 import { createActions } from '../actions'
-import { useUIActions } from '../config'
+import { useUIActions, useUIDefaults } from '../config'
 
-import type { ActionEntry } from '../actions'
 import type { ToolbarBridge, ToolbarBridgeItem, ToolbarEntries } from './types'
-
-const defaultEntries: readonly (ActionEntry | 'spacer')[] = [
-  'history:undo',
-  'history:redo',
-  '|',
-  'arrange:group',
-  'arrange:ungroup',
-  'edit:delete',
-  '|',
-  'view:zoom-out',
-  'view:fit',
-  'view:zoom-in',
-]
 
 export function createToolbarBridge(entries?: ToolbarEntries): ToolbarBridge {
   const designer = useDesignerContext()
   const configuredActions = useUIActions()
+  const defaults = useUIDefaults()
   const actions = createMemo(() => configuredActions() ?? (designer ? createActions(designer) : undefined))
   const items = createMemo<readonly ToolbarBridgeItem[]>(() => {
     const resolvedActions = actions()
-    const resolvedEntries = typeof entries === 'function' ? entries() : (entries ?? defaultEntries)
+    const resolvedEntries = typeof entries === 'function' ? entries() : (entries ?? defaults().ui.toolbarEntries)
     if (!resolvedActions) {
       return []
     }
 
-    return resolvedEntries.flatMap(entry => {
+    // 显式标注回调返回类型，避免 flatMap 在分支间产生错误的联合类型推断。
+    return resolvedEntries.flatMap((entry): readonly ToolbarBridgeItem[] => {
       if (entry === '|' || entry === 'spacer') {
         return [entry]
       }

@@ -1,24 +1,33 @@
+import { DesignerProvider, useDesignerContext } from '@diagen/renderer'
 import type { Accessor } from 'solid-js'
 import { createContext, createMemo, splitProps, useContext } from 'solid-js'
-import { DesignerProvider, useDesignerContext } from '@diagen/renderer'
 import type { UIActions } from '../actions'
 import { createActions } from '../actions'
+import { resolveDiagenDefaults, type DiagenDefaults } from '../defaults'
 import { createIconRegistry, defaultIconRegistry, type IconRegistry } from '../iconRegistry'
-import type { DiagenProviderProps, UIConfigProviderProps } from './types'
 import { ThemeProvider } from './ThemeProvider'
+import type { DiagenProviderProps, UIConfigProviderProps } from './types'
 
 interface UIConfigContextValue {
   iconRegistry: Accessor<IconRegistry>
   actions: Accessor<UIActions | undefined>
+  defaults: Accessor<DiagenDefaults>
 }
 
 const UIConfigContext = createContext<UIConfigContextValue>()
+const fallbackDefaults = resolveDiagenDefaults()
 
 export function UIConfigProvider(props: UIConfigProviderProps) {
-  const [local] = splitProps(props, ['designer', 'iconRegistry', 'actions', 'children'])
+  const [local] = splitProps(props, ['designer', 'iconRegistry', 'actions', 'defaults', 'children'])
   const contextDesigner = useDesignerContext()
   const resolvedDesigner = createMemo(() => local.designer ?? contextDesigner)
-  const iconRegistry = createMemo(() => createIconRegistry(local.iconRegistry))
+  const defaults = createMemo(() => resolveDiagenDefaults(local.defaults))
+  const iconRegistry = createMemo(() =>
+    createIconRegistry({
+      ...defaults().ui.iconRegistry,
+      ...local.iconRegistry,
+    }),
+  )
   const actions = createMemo<UIActions | undefined>(() => {
     const designer = resolvedDesigner()
     const defaultActions = designer ? createActions(designer) : undefined
@@ -40,6 +49,7 @@ export function UIConfigProvider(props: UIConfigProviderProps) {
       value={{
         iconRegistry,
         actions,
+        defaults,
       }}
     >
       {local.children}
@@ -48,12 +58,17 @@ export function UIConfigProvider(props: UIConfigProviderProps) {
 }
 
 export function DiagenProvider(props: DiagenProviderProps) {
-  const [local] = splitProps(props, ['designer', 'theme', 'iconRegistry', 'actions', 'children'])
+  const [local] = splitProps(props, ['designer', 'theme', 'iconRegistry', 'actions', 'defaults', 'children'])
 
   return (
     <DesignerProvider designer={local.designer}>
       <ThemeProvider theme={local.theme}>
-        <UIConfigProvider designer={local.designer} iconRegistry={local.iconRegistry} actions={local.actions}>
+        <UIConfigProvider
+          designer={local.designer}
+          iconRegistry={local.iconRegistry}
+          actions={local.actions}
+          defaults={local.defaults}
+        >
           {local.children}
         </UIConfigProvider>
       </ThemeProvider>
@@ -73,4 +88,9 @@ export function useUIIconRegistry(): Accessor<IconRegistry> {
 export function useUIActions(): Accessor<UIActions | undefined> {
   const config = useUIConfig()
   return () => config?.actions()
+}
+
+export function useUIDefaults(): Accessor<DiagenDefaults> {
+  const config = useUIConfig()
+  return () => config?.defaults() ?? fallbackDefaults
 }

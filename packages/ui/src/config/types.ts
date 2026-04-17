@@ -3,10 +3,12 @@ import type { JSX } from 'solid-js'
 import type { UIActions } from '../actions'
 import type { IconRegistryOverrides } from '../iconRegistry'
 import type { ThemeVars } from './theme'
+import type { DiagenDefaultsOverrides } from '../defaults'
 
 export interface UIConfig {
   iconRegistry?: IconRegistryOverrides
   actions?: UIActions | UIActionsFactory
+  defaults?: DiagenDefaultsOverrides
 }
 
 export interface UIActionsFactoryInput {

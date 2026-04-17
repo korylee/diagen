@@ -6,6 +6,7 @@ import { createRotate } from './shape/createRotate'
 import { createBoxSelection } from './viewport/createBoxSelection'
 import { createShapeDrag } from './shape/createShapeDrag'
 import type { CoordinateService } from '../services/createCoordinateService'
+import { RENDERER_DEFAULTS } from '../../defaults'
 
 export interface CreatePointerInteractionOptions {
   panButton?: number
@@ -31,22 +32,23 @@ export interface CreatePointerInteractionOptions {
  * - 内部组合所有鼠标相关交互模块
  */
 export function createPointerInteraction(coordinate: CoordinateService, options: CreatePointerInteractionOptions = {}) {
+  const defaultInteraction = RENDERER_DEFAULTS.interaction
   const {
-    panButton = 1,
-    shapeDragThreshold = 3,
+    panButton = defaultInteraction.panButton,
+    shapeDragThreshold = defaultInteraction.shapeDragThreshold,
     shapeGuideTolerance,
-    linkerDragThreshold = 3,
-    linkerSnapDistance = 12,
-    linkerSnapOnMove = true,
-    linkerSnapStickDistance = 8,
-    linkerDirectionBias = 0.35,
-    linkerAllowSelfConnect = true,
-    resizeMinWidth = 20,
-    resizeMinHeight = 20,
+    linkerDragThreshold = defaultInteraction.linkerDragThreshold,
+    linkerSnapDistance = defaultInteraction.linkerSnapDistance,
+    linkerSnapOnMove = defaultInteraction.linkerSnapOnMove,
+    linkerSnapStickDistance = defaultInteraction.linkerSnapStickDistance,
+    linkerDirectionBias = defaultInteraction.linkerDirectionBias,
+    linkerAllowSelfConnect = defaultInteraction.linkerAllowSelfConnect,
+    resizeMinWidth = defaultInteraction.resizeMinWidth,
+    resizeMinHeight = defaultInteraction.resizeMinHeight,
     resizeGuideTolerance,
-    boxSelectMinSize = 5,
-    rotateThreshold = 2,
-    rotateSnapStep = 15,
+    boxSelectMinSize = defaultInteraction.boxSelectMinSize,
+    rotateThreshold = defaultInteraction.rotateThreshold,
+    rotateSnapStep = defaultInteraction.rotateSnapStep,
   } = options
 
   const shapeDrag = createShapeDrag(coordinate, {

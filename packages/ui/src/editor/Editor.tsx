@@ -1,8 +1,9 @@
-import { Renderer, type RendererContextMenuRequest } from '@diagen/renderer'
-import { createSignal, Show } from 'solid-js'
+import { Renderer, mergeRendererDefaults, type RendererContextMenuRequest } from '@diagen/renderer'
+import { createMemo, createSignal, Show } from 'solid-js'
 import { ContextMenu } from './contextMenu'
 import type { ContextMenuState } from './contextMenu'
 import type { EditorProps } from './types'
+import { useUIDefaults } from '../config'
 
 const defaultContextMenuState: ContextMenuState = {
   open: false,
@@ -16,6 +17,8 @@ const defaultContextMenuState: ContextMenuState = {
 }
 
 export function Editor(props: EditorProps) {
+  const defaults = useUIDefaults()
+  const rendererDefaults = createMemo(() => mergeRendererDefaults(defaults().renderer, props.rendererDefaults))
   const [contextMenuState, setContextMenuState] = createSignal<ContextMenuState>(defaultContextMenuState)
 
   const handleContextMenuRequest = (request: RendererContextMenuRequest) => {
@@ -45,6 +48,7 @@ export function Editor(props: EditorProps) {
       <Renderer
         class={props.class}
         style={props.style}
+        defaults={rendererDefaults()}
         shapeGuideTolerance={props.shapeGuideTolerance}
         resizeGuideTolerance={props.resizeGuideTolerance}
         onContextMenu={props.contextMenu?.disabled ? undefined : handleContextMenuRequest}

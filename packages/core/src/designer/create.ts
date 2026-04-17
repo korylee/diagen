@@ -1,7 +1,7 @@
 import { createStore } from 'solid-js/store'
 
 import { createEmitter, DeepPartial, generateId, pick } from '@diagen/shared'
-import { LinkerType } from '../constants'
+import { DEFAULTS, LinkerType } from '../constants'
 import { unwrapClone } from '../_internal'
 import type { Transform } from '../transform'
 
@@ -119,7 +119,7 @@ function createInitialState(options: DesignerOptions): EditorState {
     transform: {
       x: 0,
       y: 0,
-      zoom: 1,
+      zoom: DEFAULTS.DEFAULT_ZOOM,
       ...options.transform,
     },
     viewportSize: {

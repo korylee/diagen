@@ -2,6 +2,7 @@ import type { JSX } from 'solid-js'
 import { createMemo, createSignal, For, Show, splitProps } from 'solid-js'
 
 import { createDgBem, cx } from '@diagen/shared'
+import { useUIDefaults } from '../config'
 import type {
   SidebarBodyProps,
   SidebarDensity,
@@ -68,6 +69,7 @@ export function SidebarFooter(props: JSX.HTMLAttributes<HTMLDivElement>): JSX.El
 
 export function SidebarSearchField(props: SidebarSearchFieldProps): JSX.Element {
   const [local, rest] = splitProps(props, ['class', 'style', 'value', 'placeholder', 'onInput', 'onClear'])
+  const defaults = useUIDefaults()
 
   return (
     <label {...rest} class={cx(bem('search'), local.class)} style={local.style}>
@@ -75,7 +77,7 @@ export function SidebarSearchField(props: SidebarSearchFieldProps): JSX.Element 
         class={bem('search-input')}
         type="text"
         value={local.value}
-        placeholder={local.placeholder ?? 'Search'}
+        placeholder={local.placeholder ?? defaults().ui.sidebar.searchPlaceholder}
         onInput={event => local.onInput(event.currentTarget.value)}
       />
       <Show when={local.value.length > 0}>
@@ -207,6 +209,7 @@ export function SidebarSection(props: {
   onCollapsedChange?: (collapsed: boolean) => void
   onItemSelect?: (item: SidebarItemData, section: SidebarSectionData) => void
 }): JSX.Element {
+  const defaults = useUIDefaults()
   const layout = createMemo<SidebarSectionLayout>(() => resolveSectionLayout(props.section))
   const [internalCollapsed, setInternalCollapsed] = createSignal(props.section.defaultCollapsed ?? false)
   const collapsed = createMemo<boolean>(() => {
@@ -229,7 +232,7 @@ export function SidebarSection(props: {
       <Show when={!collapsed()}>
         <Show
           when={props.section.items.length > 0}
-          fallback={<div class={bem('empty')}>{props.emptyState ?? 'No items'}</div>}
+          fallback={<div class={bem('empty')}>{props.emptyState ?? defaults().ui.sidebar.emptyText}</div>}
         >
           <div class={bem('section-content', [layout() === 'grid' ? 'grid' : 'list'])} role="list">
             <For each={props.section.items}>

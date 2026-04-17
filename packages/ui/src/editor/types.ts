@@ -1,3 +1,4 @@
+import type { RendererDefaultsOverrides } from '@diagen/renderer'
 import type { JSX } from 'solid-js'
 import type { ContextMenuEntries, ContextMenuItem } from './contextMenu'
 
@@ -13,5 +14,6 @@ export interface EditorProps {
   style?: Record<string, string>
   shapeGuideTolerance?: number
   resizeGuideTolerance?: number
+  rendererDefaults?: RendererDefaultsOverrides
   contextMenu?: EditorContextMenuOptions
 }

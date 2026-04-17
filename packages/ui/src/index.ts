@@ -1,5 +1,6 @@
 export * from './iconRegistry'
 export * from './actions'
+export * from './defaults'
 export * from './config'
 export * from './toolbar'
 export * from './sidebar'
