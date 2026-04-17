@@ -62,9 +62,14 @@
 - 文本编辑（shape 与 linker）
 - linker 标签拖拽与 textPosition
 
-当前阶段（容器与层级语义）重点缺口：
-- 容器收纳/脱离/跨容器移动的组合语义测试
+上一阶段（容器与层级语义）已完成的重点回归：
+- 容器收纳 / 脱离 / 跨容器移动的组合语义测试
 - 容器与 selection / history / clipboard 的一致性回归
+
+当前阶段（样式体系与导航效率）重点缺口：
+- 默认样式与新建元素继承的正式回归
+- 批量样式应用与 history 粒度回归
+- `zoom / fit / actual size / space 平移` 的动作一致性回归
 
 ## 5. 开发注意事项
 
@@ -73,13 +78,13 @@
 - 不要把 Solid proxy、draft 或共享对象引用写入 history。
 - 整对象、nested setter、produce 更新都要回归 undo/redo。
 
-## 6. 当前阶段手工回归清单（容器与层级语义）
+## 6. 当前阶段手工回归清单（样式体系与导航效率）
 
-1. 单个 shape 拖入容器：commit 后 `parent / children` 正确。
-2. 单个 shape 拖出容器：commit 后 `parent = null`，并从旧容器 `children` 移除。
-3. 跨容器移动：旧容器移除 + 新容器加入 + shape.parent 更新在同一事务内完成。
-4. 多选拖拽进入同一容器：所有元素层级一致且只产生一个 undo 单元。
-5. undo / redo 后 `parent / children / selection` 仍保持一致。
+1. 新建 shape / linker 时能继承当前默认样式。
+2. 对多选元素批量应用样式后，只产生一个 undo 单元。
+3. `fit to content / fit to selection / actual size / zoom in / zoom out` 行为一致且可预测。
+4. space 平移与滚轮缩放不会破坏现有拖拽、建线与文本编辑主链路。
+5. undo / redo 后样式字段与视图状态保持一致。
 
 ## 7. 后续阶段回归清单（文档链路/宿主工作流）
 
