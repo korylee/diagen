@@ -1,11 +1,11 @@
-import { createMemo, For, Show, splitProps } from 'solid-js'
 import type { JSX } from 'solid-js'
+import { For, Match, Show, splitProps, Switch } from 'solid-js'
 
-import { mergeIconRegistry, renderIcon, type IconRegistryOverrides } from '../iconRegistry'
+import { createDgBem, cx, toUnit } from '@diagen/shared'
 import { useUIIconRegistry } from '../config'
+import { renderIcon } from '../iconRegistry'
 import { createToolbarBridge } from './createToolbarBridge'
-import type { ToolbarBridgeItem, ToolbarEntries, ToolbarItem } from './types'
-import { createDgBem, cx, pick, toUnit } from '@diagen/shared'
+import type { ToolbarEntries, ToolbarItem } from './types'
 
 import './index.css'
 
@@ -20,34 +20,6 @@ function mergeStyle(width: number | string | undefined, style: string | undefine
   }
 
   return resolvedStyle
-}
-
-function ToolbarItemContent(props: {
-  icon?: JSX.Element
-  text?: JSX.Element
-  color?: string
-  dropdown?: boolean
-}): JSX.Element {
-  return (
-    <>
-      <Show when={props.icon}>
-        <span class={bem('icon')}>{props.icon}</span>
-      </Show>
-      <Show when={props.text}>
-        <span class={bem('text')}>{props.text}</span>
-      </Show>
-      <Show when={props.color}>
-        <span class={bem('color')} style={props.color ? `background-color:${props.color}` : undefined}></span>
-      </Show>
-      <Show when={props.dropdown}>
-        <span class={bem('caret')} aria-hidden="true"></span>
-      </Show>
-    </>
-  )
-}
-
-function resolveButtonClass(props: { class?: string; active?: boolean; selected?: boolean }): string {
-  return cx(bem('button', { active: props.active, selected: props.selected }), props.class)
 }
 
 function ToolbarDivider() {
@@ -87,10 +59,21 @@ function ToolbarButton(
     <button
       {...rest}
       type={rest.type ?? 'button'}
-      class={resolveButtonClass(local)}
+      class={cx(bem('button', { active: local.active, selected: local.selected }), local.class)}
       style={mergeStyle(local.width, local.style)}
     >
-      <ToolbarItemContent {...pick(local, ['icon', 'text', 'color', 'dropdown'])} />
+      <Show when={local.icon}>
+        <span class={bem('icon')}>{local.icon}</span>
+      </Show>
+      <Show when={local.text}>
+        <span class={bem('text')}>{local.text}</span>
+      </Show>
+      <Show when={local.color}>
+        <span class={bem('color')} style={local.color ? `background-color:${local.color}` : undefined}></span>
+      </Show>
+      <Show when={local.dropdown}>
+        <span class={bem('caret')} aria-hidden="true"></span>
+      </Show>
     </button>
   )
 }
@@ -100,44 +83,14 @@ export interface ToolbarProps extends Omit<JSX.HTMLAttributes<HTMLDivElement>, '
   style?: string
   width?: number | string
   endSlot?: JSX.Element
-  iconRegistry?: IconRegistryOverrides
   entries?: ToolbarEntries
   renderIcon?: (icon: ToolbarItem['icon'], item: ToolbarItem) => JSX.Element | undefined
 }
 
-function ToolbarBridgeItemView(props: {
-  item: ToolbarBridgeItem
-  renderIcon: NonNullable<ToolbarProps['renderIcon']>
-}) {
-  if (props.item === '|') {
-    return <ToolbarDivider />
-  }
-  if (props.item === 'spacer') {
-    return <ToolbarSpacer />
-  }
-
-  const button = props.item
-
-  return (
-    <ToolbarButton
-      {...pick(button, ['title', 'color', 'dropdown', 'active', 'selected', 'width'])}
-      text={button.text ?? button.label}
-      disabled={button.isDisabled?.()}
-      icon={props.renderIcon(button.icon, button)}
-      onClick={() => {
-        button.execute?.()
-      }}
-    />
-  )
-}
-
 export function Toolbar(props: ToolbarProps) {
-  const [local, rest] = splitProps(props, ['class', 'style', 'width', 'endSlot', 'renderIcon', 'iconRegistry', 'entries'])
+  const [local, rest] = splitProps(props, ['class', 'style', 'width', 'endSlot', 'renderIcon', 'entries'])
   const bridge = createToolbarBridge(local.entries)
-  const globalIconRegistry = useUIIconRegistry()
-  const iconRegistry = createMemo(() =>
-    local.iconRegistry ? mergeIconRegistry(globalIconRegistry(), local.iconRegistry) : globalIconRegistry(),
-  )
+  const iconRegistry = useUIIconRegistry()
   const renderToolbarIcon: ToolbarProps['renderIcon'] = (iconKey, item) => {
     return local.renderIcon
       ? local.renderIcon(iconKey, item)
@@ -155,7 +108,40 @@ export function Toolbar(props: ToolbarProps) {
       aria-label={rest['aria-label'] ?? 'Toolbar'}
     >
       <For each={bridge.items()}>
-        {item => <ToolbarBridgeItemView item={item} renderIcon={renderToolbarIcon} />}
+        {item => (
+          <Switch>
+            <Match when={item === '|'}>
+              <ToolbarDivider />
+            </Match>
+            <Match when={item === 'spacer'}>
+              <ToolbarSpacer />
+            </Match>
+            <Match when={item as ToolbarItem}>
+              {buttonAccessor => {
+                const button = buttonAccessor()
+                const [buttonProps, rest] = splitProps(button, [
+                  'title',
+                  'color',
+                  'dropdown',
+                  'active',
+                  'selected',
+                  'width',
+                ])
+                return (
+                  <ToolbarButton
+                    {...buttonProps}
+                    text={rest.text ?? rest.label}
+                    disabled={rest.isDisabled?.()}
+                    icon={renderToolbarIcon(rest.icon, button)}
+                    onClick={() => {
+                      rest.execute?.()
+                    }}
+                  />
+                )
+              }}
+            </Match>
+          </Switch>
+        )}
       </For>
       <Show when={local.endSlot}>
         <ToolbarSpacer />

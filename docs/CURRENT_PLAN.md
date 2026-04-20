@@ -37,11 +37,11 @@
 
 本阶段建议先做：
 
-- 收口默认样式入口，让新建 shape / linker 能稳定继承默认样式
-- 收口选中元素的批量样式应用语义
-- 收口 `zoom in / zoom out / fit to content / fit to selection / actual size` 等导航动作
-- 收口 space 平移与高频导航快捷键一致性
-- 评估 minimap 的必要性与最小接入边界
+- 先收口 `zoom in / zoom out / fit to content / fit to selection / actual size` 与 space 平移
+- 再补导航动作的 UI action / 快捷键 / renderer 行为一致性
+- 再收口默认样式入口，让新建 shape / linker 能稳定继承默认样式
+- 再收口选中元素的批量样式应用语义
+- 最后评估 `zoom preset / theme preset / minimap` 是否进入本阶段尾声
 
 本阶段先不做：
 
@@ -78,26 +78,31 @@
 - `packages/core/src/model/shape.ts`、`packages/core/src/model/linker.ts` 已具备 `lineStyle / fillStyle / fontStyle / shapeStyle / theme` 字段基础
 - `packages/core/src/schema/Schema.ts` 已具备默认样式与主题注册的基础入口
 - `packages/core/src/designer/managers/view/index.ts` 已提供 `setZoom / setPan / pan / fitBounds / fitToContent / fitToSelection / zoomIn / zoomOut`
+- `packages/renderer/src/scene/pointer/viewport/createPan.ts` 已支持 middle button 与 `Space + drag` 平移
 - `packages/ui/src/actions/createActions.ts` 已接线 `zoom in / zoom out / fit to content` 动作
+- `packages/ui/src/sidebar/creationMode.ts` 与 `packages/core/src/designer/managers/tool.ts` 已开始统一单个 / 批量创建模式的工具态连续性语义
 
 当前核心缺口：
 
+- `actual size`、`fit to selection`、`zoom preset` 仍缺少正式 UI action 与阶段验收口径
+- 导航动作虽然已有 `view manager` 基础，但 `UI action / 快捷键 / renderer` 还没完全形成统一对外工作流
 - 默认样式与新建元素之间还没有形成完整、明确的编辑工作流
 - 批量样式应用尚未形成正式 manager 语义与测试口径
-- 导航动作还缺少 `actual size / fit selection / zoom preset` 等高频入口
-- 样式与导航的阶段验收标准仍未在知识库中形成当前执行口径
+- 样式与导航的阶段验收标准仍需根据当前代码进度更新
 
 ## 5. 建议实现顺序
 
-1. 先收口默认样式入口
-2. 再完成选中元素的批量样式应用
-3. 然后收口导航动作与快捷键一致性
-4. 最后评估 minimap 与阶段文档收尾
+1. 先补齐导航动作入口（`actual size / fit to selection / zoom preset`）
+2. 再统一导航动作在 UI action、快捷键与 renderer 手势中的行为
+3. 然后收口默认样式入口
+4. 再完成选中元素的批量样式应用
+5. 最后评估 minimap 与阶段文档收尾
 
 原因：
 
-- 没有稳定默认样式入口，批量样式应用和主题 preset 都容易返工
-- 导航动作复用现有 `view manager` 成本更低，适合在样式语义稳定后统一收口
+- `view manager`、`createPan` 与现有 toolbar action 已经具备导航基础，继续补齐入口和一致性，返工成本最低
+- 默认样式入口虽然重要，但当前代码明显先进入了导航与工具态一致性收口，先顺势收口这部分更符合当前分支实际状态
+- 批量样式应用依赖默认样式与正式样式入口更稳定之后再做，更不容易重写
 
 ## 6. 样式与导航规则表
 
@@ -168,30 +173,47 @@
 
 ## 9. 最小验收标准
 
+- `zoom in / zoom out / fit to content / fit to selection / actual size` 具备正式入口，并共享同一组 `view manager` API
+- space 平移、滚轮缩放与 UI action 在行为上保持一致
 - 新建 shape / linker 能稳定继承当前默认样式
 - 批量样式应用能在一次操作中写入多个选中元素，并保持 undo / redo 一致
-- `zoom in / zoom out / fit to content / fit to selection / actual size` 具备正式入口与测试
-- space 平移、滚轮缩放与 UI action 在行为上保持一致
-- 当前知识库可以直接回答“默认样式来源于哪里、导航状态来源于哪里”
+- 当前知识库可以直接回答“默认样式来源于哪里、导航状态来源于哪里、创建模式连续性由哪里统一维护”
 
-## 10. 对应测试
+## 10. 推荐下一步
+
+当前分支更像是在收口“导航与工具态一致性”，而不是正式进入样式系统实现。
+
+因此推荐下一步按下面顺序推进：
+
+1. 在 `packages/ui/src/actions/createActions.ts` 补上 `view:actual-size`、`view:fit-selection`，必要时增加 `zoom preset`
+2. 把对应入口接到 `packages/ui/src/toolbar/createToolbarBridge.ts` / `packages/ui/src/toolbar/Toolbar.tsx`
+3. 给 `packages/core/src/designer/managers/view/index.test.ts` 增补 `actual size / fitToSelection` 的明确断言
+4. 给 `packages/renderer/src/scene/Renderer.test.ts` 增补 `Space + drag`、缩放后导航动作与现有拖拽/编辑链路不冲突的回归
+5. 导航闭环稳定后，再开始默认样式入口与批量样式应用的正式 manager 设计
+
+这样做的原因：
+
+- 现有代码已经有 `view manager + createPan + toolbar/sidebar/tool continuous` 的连续改动轨迹
+- 先把导航闭环做完，可以更快形成本阶段一个可验证、可演示的子里程碑
+- 样式系统目前仍停留在 `Schema` 默认值层，直接推进批量样式应用容易反复调整事实源
+
+## 11. 对应测试
 
 优先补：
 
-- `packages/core/src/model/index.test.ts`
-- `packages/core/src/designer/managers/edit/index.test.ts`
-- `packages/core/src/designer/managers/history.test.ts`
 - `packages/core/src/designer/managers/view/index.test.ts`
 - `packages/renderer/src/scene/Renderer.test.ts`
+- `packages/ui/src/actions/createActions.ts` 对应 bridge 测试（若已有）
+- 导航闭环完成后，再补 `packages/core/src/designer/managers/edit/index.test.ts` / `history.test.ts` 的样式事务测试
 
 建议新增断言：
 
-- 新建元素时默认样式被正确继承
-- 批量样式应用只产生一个 history entry
-- undo / redo 后样式字段恢复一致
-- `fitToSelection` 与 `actual size` 行为可预测
-- 导航动作与快捷键不会破坏既有拖拽/编辑主链路
+- `actual size` 把 zoom 复位到 `1`
+- `fitToSelection` 在空选区与单/多选场景下行为可预测
+- `Space + drag` 与中键平移共享同一套 view 结果
+- 工具栏动作不会破坏现有拖拽、建线、文本编辑主链路
+- 导航入口补齐后，知识库描述与代码现状一致
 
 ---
 
-最后更新：2026-04-17
+最后更新：2026-04-20

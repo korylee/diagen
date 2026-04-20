@@ -18,10 +18,7 @@ interface EditorStatus {
 }
 
 function useEditorStatus(): EditorStatus {
-  const designer = useDesigner()
-  const { selection, element, view } = designer
-
-  ;(window as any).designer = designer
+  const { selection, element, view } = useDesigner()
 
   const zoomDisplay = createMemo<string>(() => (view.zoom() * 100).toFixed())
   const selectionCount = createMemo<number>(() => selection.selectedIds().length)
@@ -43,7 +40,9 @@ function SidebarPanel(props: { status: EditorStatus }): JSX.Element {
       header={
         <>
           <div class="sidebar-brand">Diagen</div>
-          <div class="sidebar-caption">designer-ui 将 Designer 状态映射到 panel/action-bar 基础构件，宿主只保留插槽。</div>
+          <div class="sidebar-caption">
+            designer-ui 将 Designer 状态映射到 panel/action-bar 基础构件，宿主只保留插槽。
+          </div>
         </>
       }
       footer={

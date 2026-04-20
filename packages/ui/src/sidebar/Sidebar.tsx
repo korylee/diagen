@@ -1,6 +1,5 @@
-import { createEffect, createMemo, createSignal, For, Show, splitProps, type JSX } from 'solid-js'
-import type { Designer } from '@diagen/core'
 import { createDgBem, cx, ensureArray } from '@diagen/shared'
+import { createEffect, createMemo, createSignal, For, Show, splitProps, type JSX } from 'solid-js'
 import {
   SidebarBody,
   SidebarFooter,
@@ -12,19 +11,18 @@ import {
 } from './panel'
 import type { SidebarFrameProps, SidebarItemData, SidebarRailItem, SidebarSectionData } from './types'
 
-import { mergeIconRegistry, renderIcon, type IconRegistryOverrides } from '../iconRegistry'
 import { useUIIconRegistry } from '../config'
-import { syncCreationModeForActiveTool, type SidebarCreationMode } from './creationMode'
+import { renderIcon } from '../iconRegistry'
 import { createShapeLibraryBridge } from './createShapeLibraryBridge'
+import { syncCreationModeForActiveTool, type SidebarCreationMode } from './creationMode'
 import { createSidebarRailItems, createSidebarSearchSections, filterSidebarSections } from './search'
 
-import './sidebar.css'
 import { useDesigner } from '@diagen/renderer'
+import './sidebar.css'
 
 export interface SidebarProps extends Omit<SidebarFrameProps, 'children'> {
   searchable?: boolean
   searchPlaceholder?: string
-  iconRegistry?: IconRegistryOverrides
   header?: JSX.Element
   footer?: JSX.Element
   emptyState?: JSX.Element
@@ -39,7 +37,6 @@ export function Sidebar(props: SidebarProps): JSX.Element {
   const [local, rest] = splitProps(props, [
     'searchable',
     'searchPlaceholder',
-    'iconRegistry',
     'header',
     'footer',
     'emptyState',
@@ -50,11 +47,8 @@ export function Sidebar(props: SidebarProps): JSX.Element {
   ])
 
   const [creationMode, setCreationMode] = createSignal<SidebarCreationMode>('batch')
-  const globalIconRegistry = useUIIconRegistry()
-  const iconRegistry = createMemo(() =>
-    local.iconRegistry ? mergeIconRegistry(globalIconRegistry(), local.iconRegistry) : globalIconRegistry(),
-  )
-  const shapeLibrary = createShapeLibraryBridge(designer, {
+  const iconRegistry = useUIIconRegistry()
+  const { sections, activeItemId } = createShapeLibraryBridge(designer, {
     creationMode,
   })
 
@@ -63,12 +57,11 @@ export function Sidebar(props: SidebarProps): JSX.Element {
 
   const normalizedQuery = createMemo<string>(() => searchValue().trim().toLowerCase())
   const isSearching = createMemo<boolean>(() => normalizedQuery().length > 0)
-  const librarySections = createMemo<readonly SidebarSectionData[]>(() => shapeLibrary.sections())
   const librarySearchSections = createMemo<SidebarSectionData[]>(() =>
-    isSearching() ? filterSidebarSections(librarySections(), normalizedQuery()) : [...librarySections()],
+    isSearching() ? filterSidebarSections(sections(), normalizedQuery()) : [...sections()],
   )
   const searchSections = createMemo<SidebarSectionData[]>(() =>
-    isSearching() ? createSidebarSearchSections(librarySections(), [], normalizedQuery()) : [],
+    isSearching() ? createSidebarSearchSections(sections(), [], normalizedQuery()) : [],
   )
   const railItems = createMemo<SidebarRailItem[]>(() => createSidebarRailItems(librarySearchSections()))
 
@@ -81,7 +74,7 @@ export function Sidebar(props: SidebarProps): JSX.Element {
       return current
     }
 
-    const activeToolId = shapeLibrary.activeItemId()
+    const activeToolId = activeItemId()
     if (activeToolId) {
       const matchedSection = librarySearchSections().find(section =>
         section.items.some(item => item.id === activeToolId),
@@ -192,7 +185,7 @@ export function Sidebar(props: SidebarProps): JSX.Element {
                   {section => (
                     <SidebarSection
                       section={section}
-                      activeItemId={shapeLibrary.activeItemId()}
+                      activeItemId={activeItemId()}
                       readonly={local.readonly}
                       emptyState={local.emptyState}
                       density="compact"
@@ -218,7 +211,7 @@ export function Sidebar(props: SidebarProps): JSX.Element {
                   {section => (
                     <SidebarSection
                       section={section}
-                      activeItemId={shapeLibrary.activeItemId()}
+                      activeItemId={activeItemId()}
                       readonly={local.readonly}
                       emptyState={local.emptyState}
                       density="compact"
