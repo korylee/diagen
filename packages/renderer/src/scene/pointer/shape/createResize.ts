@@ -35,7 +35,7 @@ export function createResize(
 ) {
   const { threshold = 0, minWidth = 20, minHeight = 20, guideTolerance } = options
   const { element, history, selection, view, edit } = useDesigner()
-  const transaction = history.transaction.createScope('调整尺寸')
+  const transaction = history.createScope('调整尺寸')
   const pointerDelta = createPointerDeltaState(coordinate)
   const [guides, setGuides] = createSignal<GuideLine[]>([])
   const session = createDragSession<{ id: string; dir: ResizeDirection; event: MouseEvent }, ResizeDragState>({

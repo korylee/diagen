@@ -1,31 +1,32 @@
-import {
-  isNonNullable,
-  keys,
-  type Bounds,
-  type UnionKeyOf,
-  type UnionNestedKeyOf,
-  type UnionNestedValue,
-} from '@diagen/shared'
+import { isNonNullable, keys, type UnionKeyOf, type UnionNestedKeyOf, type UnionNestedValue } from '@diagen/shared'
 import { batch } from 'solid-js'
 import type { StoreSetter } from 'solid-js/store'
-import type { DiagramElement, ShapeElement } from '../../../model'
 import { unwrapClone } from '../../../_internal'
+import type { DiagramElement } from '../../../model'
+import { resolveParenting, type ResolveParentingOptions, type ResolveParentingResult } from '../element/parenting'
+import { createCommand, type ICommand } from '../history'
 import {
-  resolveParenting,
-  type ParentingContainment,
-  type ResolveParentingOptions,
-  type ResolveParentingResult,
-} from '../element/parenting'
-import { type Command, createCommand } from '../history'
-import {
-  type ChangeEntry,
-  type EditCreateOptions,
-  type EditDeps,
+  EditOptions,
   hasChanged,
-  type LayerAction,
   normalizeIds,
   resolveSetter,
+  type ChangeEntry,
+  type EditDeps,
+  type LayerAction,
 } from './shared'
+
+export interface EditCreateOptions extends EditOptions {
+  /**
+   * 新增后是否替换为当前新增元素选区。
+   * @default true
+   */
+  select?: boolean
+
+  /**
+   * @default true
+   */
+  clone?: boolean
+}
 
 function createChangeCommand<T>(name: string, entries: ChangeEntry<T>[], apply: (id: string, value: T) => void) {
   return createCommand({
@@ -276,17 +277,17 @@ export function createInsertElementsCommand(
   params: {
     name: string
     elements: DiagramElement[]
-    options?: Pick<EditCreateOptions, 'assumeCloned' | 'select'>
+    options?: Pick<EditCreateOptions, 'clone' | 'select'>
   },
 ) {
   const { element, selection } = deps
   const { name, elements, options = {} } = params
-  const { assumeCloned = false, select = true } = options
-  const snapshots = assumeCloned ? elements : elements.map(current => unwrapClone(current))
+  const { clone = false, select = true } = options
+  const snapshots = clone ? elements.map(current => unwrapClone(current)) : elements
   const addedIds = snapshots.map(current => current.id)
   const beforeSelectionIds = selection.selectedIds().slice()
 
-  type InsertCommand = Command & {
+  type InsertCommand = ICommand & {
     payload: DiagramElement[]
   }
 
@@ -309,10 +310,10 @@ export function createInsertElementsCommand(
         }
       })
     },
-    canMergeWith(next: Command): boolean {
+    canMergeWith(next: ICommand): boolean {
       return next.name === name && Date.now() - next.timestamp < 300
     },
-    merge<K extends Command>(next: K): K extends null | undefined ? InsertCommand : InsertCommand | null {
+    merge<K extends ICommand>(next: K): K extends null | undefined ? InsertCommand : InsertCommand | null {
       return (
         next.name !== name
           ? null
@@ -320,7 +321,7 @@ export function createInsertElementsCommand(
               name,
               elements: [...snapshots, ...(next as any).payload],
               options: {
-                assumeCloned: true,
+                clone: false,
                 select,
               },
             })
@@ -334,7 +335,7 @@ export function createInsertElementsCommand(
 export function createAddCommand(
   deps: EditDeps,
   elements: DiagramElement[],
-  options: Pick<EditCreateOptions, 'assumeCloned' | 'select'> = {},
+  options: Pick<EditCreateOptions, 'clone' | 'select'> = {},
 ) {
   return createInsertElementsCommand(deps, {
     name: 'add_els',
@@ -374,7 +375,7 @@ export function createMoveCommand(deps: EditDeps, elements: DiagramElement[], dx
     dy: number
   }
 
-  type MoveCommand = Command & {
+  type MoveCommand = ICommand & {
     payload: MovePayload
   }
 
@@ -388,12 +389,12 @@ export function createMoveCommand(deps: EditDeps, elements: DiagramElement[], dx
     name,
     payload,
     execute() {
-      deps.element.move(elements, dx, dy)
+      deps.element.move(elements, command.payload.dx, command.payload.dy)
     },
     undo() {
-      deps.element.move(elements, -dx, -dy)
+      deps.element.move(elements, -command.payload.dx, -command.payload.dy)
     },
-    canMergeWith(next: Command): boolean {
+    canMergeWith(next: ICommand): boolean {
       if (next.name !== name) return false
       const nextPayload = (next as MoveCommand).payload
 
@@ -402,7 +403,7 @@ export function createMoveCommand(deps: EditDeps, elements: DiagramElement[], dx
         nextPayload.targetIds.every((id, index) => id === targetIds[index])
       )
     },
-    merge(next: Command): MoveCommand | null {
+    merge(next: ICommand): MoveCommand | null {
       if (!command.canMergeWith?.(next)) return null
       const nextPayload = (next as MoveCommand).payload
       command.payload.dx += nextPayload.dx

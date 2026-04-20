@@ -32,7 +32,7 @@ export function createRotate(coordinate: Pick<CoordinateService, 'eventToCanvas'
   const { eventToCanvas } = coordinate
   const { threshold = 2, snapStep = 15 } = options
   const { element, edit, history } = useDesigner()
-  const transaction = history.transaction.createScope('旋转图形')
+  const transaction = history.createScope('旋转图形')
   let session!: ReturnType<typeof createDragSession<{ id: string; event: MouseEvent }, RotateDragState>>
   session = createDragSession({
     threshold,

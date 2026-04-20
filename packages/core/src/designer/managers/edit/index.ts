@@ -4,17 +4,17 @@ import {
   type UnionKeyOf,
   type UnionNestedKeyOf,
   type UnionNestedValue,
-  type UnionValue
+  type UnionValue,
 } from '@diagen/shared'
 import { batch } from 'solid-js'
 import type { StoreSetter } from 'solid-js/store'
 import type { DiagramElement } from '../../../model'
 import type { CreateMethods } from '../element'
 import {
-  resolveParentPreview,
   resolveParenting,
+  resolveParentPreview,
   type ResolveParentingOptions,
-  type ResolveParentingResult
+  type ResolveParentingResult,
 } from '../element/parenting'
 import type { DesignerContext } from '../types'
 import {
@@ -25,14 +25,9 @@ import {
   createParentingCommand,
   createRemoveCommand,
   createUpdateCommand,
+  EditCreateOptions,
 } from './commands'
-import {
-  normalizeIds,
-  takeEditOptions,
-  type EditCreateOptions,
-  type EditDeps,
-  type EditOptions,
-} from './shared'
+import { normalizeIds, takeEditOptions, type EditDeps, type EditOptions } from './shared'
 
 export function createEditManager(_ctx: DesignerContext, deps: EditDeps) {
   const { element, selection, history, view } = deps
@@ -54,14 +49,14 @@ export function createEditManager(_ctx: DesignerContext, deps: EditDeps) {
   }
 
   function add(elements: DiagramElement[], options: EditCreateOptions = {}): void {
-    const { record = true, select = true, assumeCloned = false } = options
+    const { record = true, select = true, clone = true } = options
     if (!record) {
       element.add(elements)
       if (select) selection.select(elements.map(element => element.id))
       return
     }
 
-    history.execute(createAddCommand(deps, elements, { assumeCloned, select }))
+    history.execute(createAddCommand(deps, elements, { clone, select }))
   }
 
   function create<T extends keyof CreateMethods>(
@@ -144,7 +139,9 @@ export function createEditManager(_ctx: DesignerContext, deps: EditDeps) {
       return
     }
 
-    history.execute(createMoveCommand(deps, elements, dx, dy))
+    history.execute(createMoveCommand(deps, elements, dx, dy), {
+      mergeKey: `el_move:${elements.map(element => element.id).join(',')}`,
+    })
   }
 
   function parenting(
@@ -251,4 +248,4 @@ export function createEditManager(_ctx: DesignerContext, deps: EditDeps) {
 }
 
 export type EditManager = ReturnType<typeof createEditManager>
-export type { EditCreateOptions, EditDeps, EditOptions } from './shared'
+export type { EditDeps, EditOptions } from './shared'

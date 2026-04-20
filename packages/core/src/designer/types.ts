@@ -49,8 +49,6 @@ export type DesignerToolState =
 
 /** 外部传入的编辑器配置（可选） */
 export interface EditorConfig {
-  panelItemWidth: number
-  panelItemHeight: number
   anchorSize: number
   rotaterSize: number
   anchorColor: string

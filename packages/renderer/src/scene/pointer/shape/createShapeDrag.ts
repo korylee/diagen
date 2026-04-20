@@ -30,7 +30,7 @@ export function createShapeDrag(
 ) {
   const { threshold = 3, guideTolerance } = options
   const { history, view, element, edit, selection } = useDesigner()
-  const transaction = history.transaction.createScope('拖拽图形')
+  const transaction = history.createScope('拖拽图形')
   const pointerDelta = createPointerDeltaState(coordinate)
   const [guides, setGuides] = createSignal<GuideLine[]>([])
   const [previewParentId, setPreviewParentId] = createSignal<string | null>(null)

@@ -3,9 +3,7 @@ import { createMemo } from 'solid-js'
 import { createStore, produce } from 'solid-js/store'
 import type { DesignerContext } from './types'
 
-// ==================== 命令接口 ====================
-
-export interface Command {
+export interface ICommand {
   id: string
   name: string
   timestamp: number
@@ -13,13 +11,21 @@ export interface Command {
   undo: () => void
   redo: () => void
   isNoOp?: boolean
-  canMergeWith?(next: Command): boolean
-  merge?(next: Command): Command | null
+  canMergeWith?(next: ICommand): boolean
+  merge?(next: ICommand): ICommand | null
 }
 
+export interface CommandMeta {
+  mergeKey?: string
+  mergeWindow?: number
+  [k: string]: any
+}
+
+export type Command = ICommand & CommandMeta
+
 export function createCommand<T>(
-  opts: Optional<Omit<Command, 'id' | 'timestamp'>, 'redo'> & { payload?: T },
-): T extends null | undefined ? Command : Command & { payload: T } {
+  opts: Optional<Omit<ICommand, 'id' | 'timestamp'>, 'redo'> & { payload?: T },
+): T extends null | undefined ? ICommand : ICommand & { payload: T } {
   const command: any = {
     redo: () => {
       command.execute()
@@ -31,10 +37,26 @@ export function createCommand<T>(
   return command
 }
 
-export interface CommandMeta {
-  group?: string
-  silent?: boolean
-  mergeStrategy?: 'replace' | 'append' | 'custom'
+export function createCompositeCommand(name: string, commands: ICommand[]) {
+  type CompositeCommand = ICommand & { readonly length: number }
+
+  return {
+    name,
+    id: generateId(),
+    timestamp: Date.now(),
+    execute() {
+      commands.forEach(cmd => cmd.execute())
+    },
+    undo() {
+      commands.reduceRight((_, cmd) => cmd.undo(), null as any)
+    },
+    redo() {
+      commands.forEach(cmd => cmd.redo())
+    },
+    get length() {
+      return commands.length
+    },
+  } as CompositeCommand
 }
 
 export interface TransactionScope {
@@ -45,62 +67,45 @@ export interface TransactionScope {
   isActive: () => boolean
 }
 
-// ==================== 组合命令 ====================
-
-export class CompositeCommand implements Command {
-  readonly id = generateId()
-  readonly timestamp = Date.now()
-  constructor(
-    readonly name: string,
-    private commands: Command[] = [],
-  ) {}
-
-  execute() {
-    this.commands.forEach(cmd => cmd.execute())
-  }
-  undo() {
-    this.commands.reduceRight((_, cmd) => cmd.undo(), null as any)
-  }
-  redo() {
-    this.commands.forEach(cmd => cmd.redo())
-  }
-  get length() {
-    return this.commands.length
-  }
-}
-
-// ==================== 历史管理器 ====================
-
 export interface HistoryState {
   undoStack: Command[]
   redoStack: Command[]
   maxHistory: number
   mergeWindow: number
-  transaction?: { id: string; name: string; commands: Command[] }
+  transactions: TransactionFrame[]
+}
+
+interface TransactionFrame {
+  id: string
+  name: string
+  commands: Array<Command>
 }
 
 export interface HistoryEvents {
-  'history:committed': Command
-  'history:undo': Command
-  'history:redo': Command
+  'history:committed': ICommand
+  'history:undo': ICommand
+  'history:redo': ICommand
   'history:clear': void
 }
 
 function shouldMergeCommand(params: {
   lastCommand?: Command
-  nextCommand: Command & CommandMeta
+  nextCommand: Command
   mergeWindow: number
   now?: number
 }): boolean {
   const { lastCommand, nextCommand, mergeWindow, now = Date.now() } = params
 
-  if (!lastCommand || nextCommand.mergeStrategy === 'append') return false
+  if (!lastCommand || !lastCommand.mergeKey || !nextCommand.mergeKey) return false
 
-  const withinWindow = now - lastCommand.timestamp <= mergeWindow
-  return (
-    (nextCommand.mergeStrategy === 'replace' && lastCommand.name === nextCommand.name) ||
-    (nextCommand.mergeStrategy === 'custom' && withinWindow)
-  )
+  const resolvedMergeWindow = nextCommand.mergeWindow ?? lastCommand.mergeWindow ?? mergeWindow
+  const withinWindow = now - lastCommand.timestamp <= resolvedMergeWindow
+
+  return nextCommand.mergeKey === lastCommand.mergeKey && withinWindow
+}
+
+function getLast<T>(list: T[]) {
+  return list[list.length - 1]
 }
 
 export function createHistoryManager(ctx: DesignerContext) {
@@ -111,13 +116,14 @@ export function createHistoryManager(ctx: DesignerContext) {
     redoStack: [],
     maxHistory: 50,
     mergeWindow: 300,
+    transactions: [],
   })
 
   function updateHistoryState(recipe: (state: HistoryState) => void): void {
     setState(produce(recipe))
   }
 
-  function enrichCommand<T extends Command>(command: T, meta?: CommandMeta): T & CommandMeta {
+  function enrichCommand<T extends ICommand>(command: T, meta?: CommandMeta): T & CommandMeta {
     if (!meta) return command as T & CommandMeta
 
     return Object.assign(Object.create(Object.getPrototypeOf(command)), command, meta)
@@ -127,13 +133,18 @@ export function createHistoryManager(ctx: DesignerContext) {
 
   const canUndo = createMemo(() => state.undoStack.length > 0)
   const canRedo = createMemo(() => state.redoStack.length > 0)
-  const isInTransaction = createMemo(() => state.transaction !== undefined)
+  const isInTransaction = createMemo(() => state.transactions.length > 0)
   const undoStack = () => [...state.undoStack]
   const redoStack = () => [...state.redoStack]
 
+  function createTransactionCommand(name: string, commands: Command[]): ICommand | null {
+    if (commands.length === 0) return null
+    return commands.length === 1 ? commands[0] : createCompositeCommand(name, commands)
+  }
+
   // ==================== 命令合并逻辑 ====================
 
-  function tryMerge(command: Command & CommandMeta): Command | null {
+  function tryMerge(command: Command): ICommand | null {
     const lastCommand = state.undoStack[state.undoStack.length - 1]
     if (
       !shouldMergeCommand({
@@ -146,12 +157,16 @@ export function createHistoryManager(ctx: DesignerContext) {
     }
 
     if (lastCommand.canMergeWith?.(command)) {
-      const merged = lastCommand.merge?.(command)
+      const merged = lastCommand.merge?.(command) as Command
       if (merged) {
-        updateHistoryState(s => {
-          s.undoStack[s.undoStack.length - 1] = merged
+        const mergedCommand = enrichCommand(merged, {
+          mergeKey: merged.mergeKey ?? command.mergeKey ?? lastCommand.mergeKey,
+          mergeWindow: merged.mergeWindow ?? command.mergeWindow ?? lastCommand.mergeWindow,
         })
-        return merged
+        updateHistoryState(s => {
+          s.undoStack[s.undoStack.length - 1] = mergedCommand
+        })
+        return mergedCommand
       }
     }
     return null
@@ -159,7 +174,7 @@ export function createHistoryManager(ctx: DesignerContext) {
 
   // ==================== 核心操作 ====================
 
-  function pushCommand(command: Command & CommandMeta) {
+  function pushCommand(command: Command) {
     const mergedCommand = tryMerge(command)
     if (mergedCommand) {
       emit('history:committed', mergedCommand)
@@ -175,19 +190,17 @@ export function createHistoryManager(ctx: DesignerContext) {
     emit('history:committed', command)
   }
 
-  function execute(command: Command, meta?: CommandMeta) {
+  function execute(command: ICommand, meta?: CommandMeta) {
     if (command.isNoOp) return
     const enrichedCommand = enrichCommand(command, meta)
+    const activeTransaction = getLast(state.transactions)
 
-    if (state.transaction) {
+    if (activeTransaction) {
       enrichedCommand.execute()
-      setState(
-        'transaction',
-        'commands',
-        produce(commands => {
-          commands.push(enrichedCommand)
-        }),
-      )
+      updateHistoryState(s => {
+        const transaction = getLast(s.transactions)
+        transaction?.commands.push(enrichedCommand)
+      })
       return
     }
 
@@ -195,48 +208,52 @@ export function createHistoryManager(ctx: DesignerContext) {
     pushCommand(enrichedCommand)
   }
 
-  function batch(commands: Command[], name = '批量操作', meta?: CommandMeta) {
-    if (commands.length === 0) return
-    execute(commands.length === 1 ? commands[0] : new CompositeCommand(name, commands), meta)
+  function batch(commands: ICommand[], name = '批量操作', meta?: CommandMeta) {
+    const transaction = createTransactionCommand(name, commands)
+    if (!transaction) return
+    execute(transaction, meta)
   }
 
   // ==================== 事务系统 ====================
 
   function startTransaction(name = '事务'): string | null {
-    if (state.transaction) {
-      console.warn('事务嵌套不支持')
-      return null
-    }
     const id = generateId()
     updateHistoryState(s => {
-      s.transaction = { id, name, commands: [] }
+      s.transactions.push({ id, name, commands: [] })
     })
     return id
   }
 
   function commitTransaction(transactionId?: string): boolean {
-    const { transaction } = state
+    const transaction = getLast(state.transactions)
     if (!transaction) return false
     if (transactionId && transaction.id !== transactionId) return false
 
+    const command = createTransactionCommand(transaction.name, transaction.commands)
+    const hasParentTransaction = state.transactions.length > 1
+
     updateHistoryState(s => {
-      s.transaction = undefined
+      s.transactions.pop()
+      if (command && hasParentTransaction) {
+        const transaction = getLast(s.transactions)
+        transaction?.commands.push(command)
+      }
     })
 
-    if (transaction.commands.length > 0) {
-      pushCommand(new CompositeCommand(transaction.name, transaction.commands))
+    if (command && !hasParentTransaction) {
+      pushCommand(command)
     }
     return true
   }
 
   function abortTransaction(transactionId?: string): boolean {
-    const { transaction } = state
+    const transaction = getLast(state.transactions)
     if (!transaction) return false
     if (transactionId && transaction.id !== transactionId) return false
 
     transaction.commands.reduceRight((_, cmd) => cmd.undo(), null as any)
     updateHistoryState(s => {
-      s.transaction = undefined
+      s.transactions.pop()
     })
     return true
   }
@@ -268,7 +285,7 @@ export function createHistoryManager(ctx: DesignerContext) {
 
     const run = async <T>(fn: () => Promise<T> | T): Promise<T> => {
       if (!begin()) {
-        throw new Error('事务嵌套不支持')
+        throw new Error('事务作用域已开始')
       }
 
       try {
@@ -292,18 +309,13 @@ export function createHistoryManager(ctx: DesignerContext) {
     }
   }
 
-  const transaction = function transaction<T>(name: string, fn: () => Promise<T> | T): Promise<T> {
-    const scope = createTransactionScope(name)
-    return scope.run(fn)
-  }
-
   // ==================== Undo/Redo ====================
 
   function undo() {
-    if (state.transaction) return
+    if (isInTransaction()) return
     if (!canUndo()) return
 
-    const command = state.undoStack[state.undoStack.length - 1]
+    const command = getLast(state.undoStack)
     command.undo()
     updateHistoryState(s => {
       s.undoStack.pop()
@@ -313,10 +325,10 @@ export function createHistoryManager(ctx: DesignerContext) {
   }
 
   function redo() {
-    if (state.transaction) return
+    if (isInTransaction()) return
     if (!canRedo()) return
 
-    const command = state.redoStack[state.redoStack.length - 1]
+    const command = getLast(state.redoStack)
     command.redo()
     updateHistoryState(s => {
       s.redoStack.pop()
@@ -326,7 +338,7 @@ export function createHistoryManager(ctx: DesignerContext) {
   }
 
   function clear() {
-    if (state.transaction) return
+    if (isInTransaction()) return
     updateHistoryState(s => {
       s.undoStack = []
       s.redoStack = []
@@ -335,7 +347,7 @@ export function createHistoryManager(ctx: DesignerContext) {
   }
 
   function move(position: number): void {
-    if (state.transaction) return
+    if (isInTransaction()) return
     const total = state.undoStack.length + state.redoStack.length
     const target = Math.max(0, Math.min(position, total))
     const current = state.undoStack.length
@@ -365,13 +377,7 @@ export function createHistoryManager(ctx: DesignerContext) {
     clear,
 
     // 事务系统
-    transaction: {
-      begin: startTransaction,
-      commit: commitTransaction,
-      abort: abortTransaction,
-      createScope: createTransactionScope,
-      run: transaction,
-    },
+    createScope: createTransactionScope,
 
     // 配置
     setMaxHistory: (max: number) =>

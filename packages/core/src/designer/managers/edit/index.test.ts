@@ -186,6 +186,33 @@ describe('edit manager', () => {
     })
   })
 
+  it('连续 move 应合并为一个 undo 单元，并按累计位移回滚', () => {
+    withDesigner(designer => {
+      const shape = createShape({
+        id: 'shape_move_merge',
+        name: 'shape_move_merge',
+        group: null,
+        props: { x: 0, y: 0, w: 100, h: 80, angle: 0 },
+      })
+      designer.edit.add([shape], { record: false, select: false })
+
+      designer.edit.move([shape.id], 10, 0)
+      designer.edit.move([shape.id], 5, 2)
+
+      expect(designer.getElementById<ShapeElement>(shape.id)?.props.x).toBe(15)
+      expect(designer.getElementById<ShapeElement>(shape.id)?.props.y).toBe(2)
+      expect(designer.history.undoStack().length).toBe(1)
+
+      designer.undo()
+      expect(designer.getElementById<ShapeElement>(shape.id)?.props.x).toBe(0)
+      expect(designer.getElementById<ShapeElement>(shape.id)?.props.y).toBe(0)
+
+      designer.redo()
+      expect(designer.getElementById<ShapeElement>(shape.id)?.props.x).toBe(15)
+      expect(designer.getElementById<ShapeElement>(shape.id)?.props.y).toBe(2)
+    })
+  })
+
   it('layer 调整应支持 undo/redo', () => {
     withDesigner(designer => {
       const shapeA = createShape({

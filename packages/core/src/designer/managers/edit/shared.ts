@@ -20,18 +20,6 @@ export interface EditOptions {
   record?: boolean
 }
 
-export interface EditCreateOptions extends EditOptions {
-  /**
-   * 新增后是否替换为当前新增元素选区。
-   * @default true
-   */
-  select?: boolean
-  /**
-   * 内部优化：调用方已提供稳定快照时，可跳过命令创建阶段的额外 clone。
-   */
-  assumeCloned?: boolean
-}
-
 export interface ChangeEntry<T> {
   id: string
   before: T

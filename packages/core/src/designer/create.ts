@@ -8,7 +8,7 @@ import type { Transform } from '../transform'
 import { createDiagram } from '../model'
 import type { Diagram } from '../model'
 import {
-  type Command,
+  type ICommand,
   createEditManager,
   createElementManager,
   createHistoryManager,
@@ -70,16 +70,12 @@ function createResolvedConfig(options: DesignerOptions): EditorConfig {
   const containerInset = typeof options.containerInset === 'number' ? options.containerInset : 800
 
   return {
-    panelItemWidth: 50,
-    panelItemHeight: 50,
     anchorSize: 8,
     rotaterSize: 9,
     anchorColor: '#067bef',
     selectorColor: '#067bef',
     containerInset,
     ...pick(options, [
-      'panelItemWidth',
-      'panelItemHeight',
       'anchorSize',
       'rotaterSize',
       'anchorColor',
@@ -177,7 +173,7 @@ export function createDesigner(options: DesignerOptions = {}) {
     const previousDiagram = cloneDesignerDiagram(state.diagram)
     const nextDiagram = loadDesignerDiagram(json)
 
-    const command: Command = {
+    const command: ICommand = {
       id: generateId('cmd_load'),
       name: 'Load diagram',
       timestamp: Date.now(),

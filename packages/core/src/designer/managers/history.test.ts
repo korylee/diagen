@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { createEmitter } from '@diagen/shared'
 import { createShape, type ShapeElement } from '../../model'
 import { createDesigner } from '../create'
-import { type Command, createCommand, createHistoryManager } from './history'
+import { type ICommand, createCommand, createHistoryManager } from './history'
 
 function withDesigner(run: (designer: ReturnType<typeof createDesigner>) => void) {
   createRoot(dispose => {
@@ -30,7 +30,7 @@ function withHistory(
   })
 }
 
-function createDeltaCommand(name: string, counter: { value: number }, delta: number): Command {
+function createDeltaCommand(name: string, counter: { value: number }, delta: number): ICommand {
   return createCommand({
     name,
     execute() {
@@ -43,7 +43,7 @@ function createDeltaCommand(name: string, counter: { value: number }, delta: num
 }
 
 function createMergeCommand(counter: { value: number }, delta: number) {
-  let command: Command & { payload: { delta: number } }
+  let command: ICommand & { payload: { delta: number } }
   command = createCommand({
     name: 'merge_delta',
     payload: { delta },
@@ -53,14 +53,14 @@ function createMergeCommand(counter: { value: number }, delta: number) {
     undo() {
       counter.value -= command.payload.delta
     },
-    canMergeWith(next: Command) {
+    canMergeWith(next: ICommand) {
       return next.name === 'merge_delta'
     },
-    merge(next: Command) {
+    merge(next: ICommand) {
       command.payload.delta += (next as any).payload.delta
       return command
     },
-  }) as Command & { payload: { delta: number } }
+  }) as ICommand & { payload: { delta: number } }
   return command
 }
 
@@ -104,12 +104,12 @@ describe('history manager', () => {
         replayed.push('undo')
       })
       history.execute(createDeltaCommand('plus_one', counter, 1))
-      const txId = history.transaction.begin('批量变更')
-      expect(txId).not.toBeNull()
+      const transaction = history.createScope('批量变更')
+      expect(transaction.begin()).toBe(true)
 
       history.execute(createDeltaCommand('add_1', counter, 1))
       history.execute(createDeltaCommand('add_2', counter, 2))
-      history.transaction.commit(txId || undefined)
+      expect(transaction.commit()).toBe(true)
 
       history.undo()
       history.redo()
@@ -158,11 +158,11 @@ describe('history manager', () => {
     })
   })
 
-  it('replace 合并策略应将同类命令合并为一个历史项', () => {
+  it('mergeKey 相同的命令应合并为一个历史项', () => {
     withDesigner(designer => {
       const counter = { value: 0 }
-      designer.history.execute(createMergeCommand(counter, 1), { mergeStrategy: 'replace' })
-      designer.history.execute(createMergeCommand(counter, 2), { mergeStrategy: 'replace' })
+      designer.history.execute(createMergeCommand(counter, 1), { mergeKey: 'counter:delta' })
+      designer.history.execute(createMergeCommand(counter, 2), { mergeKey: 'counter:delta' })
 
       expect(counter.value).toBe(3)
       expect(designer.history.undoStack().length).toBe(1)
@@ -172,11 +172,11 @@ describe('history manager', () => {
     })
   })
 
-  it('append 合并策略不应触发命令合并', () => {
+  it('未提供 mergeKey 的命令不应触发命令合并', () => {
     withDesigner(designer => {
       const counter = { value: 0 }
-      designer.history.execute(createMergeCommand(counter, 1), { mergeStrategy: 'append' })
-      designer.history.execute(createMergeCommand(counter, 2), { mergeStrategy: 'append' })
+      designer.history.execute(createMergeCommand(counter, 1))
+      designer.history.execute(createMergeCommand(counter, 2))
 
       expect(counter.value).toBe(3)
       expect(designer.history.undoStack().length).toBe(2)
@@ -186,8 +186,8 @@ describe('history manager', () => {
   it('事务 commit 应生成一个组合命令，undo 可整体回退', () => {
     withDesigner(designer => {
       const counter = { value: 0 }
-      const txId = designer.history.transaction.begin('批量变更')
-      expect(txId).not.toBeNull()
+      const transaction = designer.history.createScope('批量变更')
+      expect(transaction.begin()).toBe(true)
 
       designer.history.execute(createDeltaCommand('add_1', counter, 1))
       designer.history.execute(createDeltaCommand('add_2', counter, 2))
@@ -195,7 +195,7 @@ describe('history manager', () => {
       expect(counter.value).toBe(3)
       expect(designer.history.undoStack().length).toBe(0)
 
-      designer.history.transaction.commit(txId || undefined)
+      expect(transaction.commit()).toBe(true)
       expect(designer.history.undoStack().length).toBe(1)
 
       designer.history.undo()
@@ -206,16 +206,75 @@ describe('history manager', () => {
   it('事务 abort 应回滚已执行命令且不写入历史栈', () => {
     withDesigner(designer => {
       const counter = { value: 0 }
-      const txId = designer.history.transaction.begin('回滚测试')
-      expect(txId).not.toBeNull()
+      const transaction = designer.history.createScope('回滚测试')
+      expect(transaction.begin()).toBe(true)
 
       designer.history.execute(createDeltaCommand('add_1', counter, 1))
       designer.history.execute(createDeltaCommand('add_2', counter, 2))
       expect(counter.value).toBe(3)
 
-      designer.history.transaction.abort(txId || undefined)
+      expect(transaction.abort()).toBe(true)
       expect(counter.value).toBe(0)
       expect(designer.history.undoStack().length).toBe(0)
+    })
+  })
+
+  it('嵌套事务 commit 后应在根事务提交时统一入栈', () => {
+    withDesigner(designer => {
+      const counter = { value: 0 }
+      const rootTransaction = designer.history.createScope('根事务')
+      expect(rootTransaction.begin()).toBe(true)
+
+      designer.history.execute(createDeltaCommand('root_add', counter, 1))
+
+      const childTransaction = designer.history.createScope('子事务')
+      expect(childTransaction.begin()).toBe(true)
+
+      designer.history.execute(createDeltaCommand('child_add', counter, 2))
+      expect(counter.value).toBe(3)
+      expect(designer.history.undoStack().length).toBe(0)
+
+      expect(childTransaction.commit()).toBe(true)
+      expect(designer.history.undoStack().length).toBe(0)
+      expect(designer.history.isInTransaction()).toBe(true)
+
+      expect(rootTransaction.commit()).toBe(true)
+      expect(designer.history.undoStack().length).toBe(1)
+
+      designer.history.undo()
+      expect(counter.value).toBe(0)
+
+      designer.history.redo()
+      expect(counter.value).toBe(3)
+    })
+  })
+
+  it('嵌套事务 abort 只应回滚当前子事务，并允许父事务继续提交', () => {
+    withDesigner(designer => {
+      const counter = { value: 0 }
+      const rootTransaction = designer.history.createScope('根事务')
+      expect(rootTransaction.begin()).toBe(true)
+
+      designer.history.execute(createDeltaCommand('root_add', counter, 1))
+
+      const childTransaction = designer.history.createScope('子事务')
+      expect(childTransaction.begin()).toBe(true)
+
+      designer.history.execute(createDeltaCommand('child_add', counter, 2))
+      expect(counter.value).toBe(3)
+
+      expect(childTransaction.abort()).toBe(true)
+      expect(counter.value).toBe(1)
+      expect(designer.history.isInTransaction()).toBe(true)
+
+      designer.history.execute(createDeltaCommand('root_add_more', counter, 3))
+      expect(counter.value).toBe(4)
+
+      expect(rootTransaction.commit()).toBe(true)
+      expect(designer.history.undoStack().length).toBe(1)
+
+      designer.history.undo()
+      expect(counter.value).toBe(0)
     })
   })
 
@@ -226,8 +285,8 @@ describe('history manager', () => {
       designer.edit.add([container, shape], { record: false, select: false })
       designer.selection.replace([shape.id])
 
-      const txId = designer.history.transaction.begin('容器事务提交')
-      expect(txId).not.toBeNull()
+      const transaction = designer.history.createScope('容器事务提交')
+      expect(transaction.begin()).toBe(true)
 
       designer.edit.update(shape.id, 'props', 'x', 60)
       designer.edit.parenting([shape.id])
@@ -237,7 +296,7 @@ describe('history manager', () => {
       expect(designer.getElementById<ShapeElement>(shape.id)?.parent).toBe(container.id)
       expect(designer.getElementById<ShapeElement>(container.id)?.children).toEqual([shape.id])
 
-      designer.history.transaction.commit(txId || undefined)
+      expect(transaction.commit()).toBe(true)
       expect(designer.history.undoStack().length).toBe(1)
       expect(designer.selection.selectedIds()).toEqual([shape.id])
 
@@ -262,8 +321,8 @@ describe('history manager', () => {
       designer.edit.add([container, shape], { record: false, select: false })
       designer.selection.replace([shape.id])
 
-      const txId = designer.history.transaction.begin('容器事务回滚')
-      expect(txId).not.toBeNull()
+      const transaction = designer.history.createScope('容器事务回滚')
+      expect(transaction.begin()).toBe(true)
 
       designer.edit.update(shape.id, 'props', 'x', 60)
       designer.edit.parenting([shape.id])
@@ -272,7 +331,7 @@ describe('history manager', () => {
       expect(designer.getElementById<ShapeElement>(shape.id)?.parent).toBe(container.id)
       expect(designer.getElementById<ShapeElement>(container.id)?.children).toEqual([shape.id])
 
-      designer.history.transaction.abort(txId || undefined)
+      expect(transaction.abort()).toBe(true)
       expect(designer.history.undoStack().length).toBe(0)
       expect(designer.getElementById<ShapeElement>(shape.id)?.props.x).toBe(320)
       expect(designer.getElementById<ShapeElement>(shape.id)?.parent).toBeNull()
