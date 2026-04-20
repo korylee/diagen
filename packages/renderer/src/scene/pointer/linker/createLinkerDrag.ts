@@ -129,7 +129,7 @@ export interface CreateLinkerDragOptions extends CreatePointerDragTrackerOptions
   allowSelfConnect?: boolean
 }
 
-interface EndpointTarget {
+interface EndpointPatchTarget {
   shapeId: string | null
   binding: LinkerEndpointBinding
   point: Point
@@ -210,7 +210,7 @@ export function createLinkerDrag(
   } = options
 
   const { edit, view, element, history, selection } = useDesigner()
-  const transaction = history.transaction.createScope('拖拽连线')
+  const transaction = history.createScope('拖拽连线')
   const pointerDelta = createPointerDeltaState(coordinate)
 
   const [snapTarget, setSnapTarget] = createSignal<AnchorHit | null>(null)
@@ -334,10 +334,15 @@ export function createLinkerDrag(
     if (!isEndpointMode(state.mode)) return null
 
     const endpoint = state.mode === 'from' ? state.startRawFrom : state.startRawTo
-    if (!endpoint.id || endpoint.binding.type === 'free') return null
+    if (endpoint.binding.type === 'free') return null
+    if (endpoint.binding.target.kind !== 'element') return null
+
+    const target = element.getElementById(endpoint.binding.target.id)
+    const shape = target?.type === 'shape' ? target : null
+    if (!shape) return null
 
     return resolveAnchorHit({
-      shapeId: endpoint.id,
+      shapeId: shape.id,
       binding: endpoint.binding,
       point: { x: endpoint.x, y: endpoint.y },
       angle: endpoint.angle ?? 0,
@@ -355,7 +360,14 @@ export function createLinkerDrag(
       if (!info) return null
       return {
         shapeId: shape.id,
-        binding: { type: 'fixed', anchorId: info.id },
+        binding: {
+          type: 'fixed',
+          target: {
+            kind: 'element',
+            id: shape.id,
+          },
+          anchorId: info.id,
+        },
         anchorId: info.id,
         point: info.point,
         angle: info.angle,
@@ -369,6 +381,10 @@ export function createLinkerDrag(
         shapeId: shape.id,
         binding: {
           type: 'perimeter',
+          target: {
+            kind: 'element',
+            id: shape.id,
+          },
           pathIndex: info.pathIndex,
           segmentIndex: info.segmentIndex,
           t: info.t,
@@ -474,7 +490,7 @@ export function createLinkerDrag(
         controlIndex,
         controlIndices,
         orthogonalMoveAxis,
-        oppositeShapeId: (mode === 'from' ? linker.to.id : mode === 'to' ? linker.from.id : null) ?? null,
+        oppositeShapeId: resolveOppositeShapeId(linker, mode),
         startFrom: route.points[0],
         startTo: route.points[route.points.length - 1],
         startControl,
@@ -488,6 +504,15 @@ export function createLinkerDrag(
       },
       shouldInsertSegmentControl: hit.type === 'segment',
     }
+  }
+
+  function resolveOppositeShapeId(linker: LinkerElement, mode: LinkerDragMode): string | null {
+    const endpoint = mode === 'from' ? linker.to : linker.from
+    if (endpoint.binding.type === 'free') return null
+    if (endpoint.binding.target.kind !== 'element') return null
+
+    const target = element.getElementById(endpoint.binding.target.id)
+    return target?.type === 'shape' ? endpoint.binding.target.id : null
   }
 
   function beginEdit(e: MouseEvent, options: BeginLinkerEditOptions): boolean {
@@ -528,13 +553,11 @@ export function createLinkerDrag(
       'linker',
       options.linkerId,
       {
-        id: null,
         x: point.x,
         y: point.y,
         binding: { type: 'free' },
       },
       {
-        id: null,
         x: point.x,
         y: point.y,
         binding: { type: 'free' },
@@ -566,16 +589,26 @@ export function createLinkerDrag(
 
     const fromBinding: LinkerEndpointBinding =
       preferredAnchor.type === 'fixed'
-        ? { type: 'fixed', anchorId: preferredAnchor.id }
+        ? {
+            type: 'fixed',
+            target: {
+              kind: 'element',
+              id: sourceShape.id,
+            },
+            anchorId: preferredAnchor.id,
+          }
         : {
             type: 'perimeter',
+            target: {
+              kind: 'element',
+              id: sourceShape.id,
+            },
             pathIndex: preferredAnchor.pathIndex,
             segmentIndex: preferredAnchor.segmentIndex,
             t: preferredAnchor.t,
           }
 
     const fromEndpoint: LinkerEndpoint = {
-      id: sourceShape.id,
       x: preferredAnchor.point.x,
       y: preferredAnchor.point.y,
       angle: preferredAnchor.angle,
@@ -583,7 +616,6 @@ export function createLinkerDrag(
     }
 
     const toEndpoint: LinkerEndpoint = {
-      id: null,
       x: preferredAnchor.point.x,
       y: preferredAnchor.point.y,
       angle: preferredAnchor.angle,
@@ -671,14 +703,12 @@ export function createLinkerDrag(
     edit.update(state.linkerId, {
       from: {
         ...state.startRawFrom,
-        id: null,
         binding: { type: 'free' },
         x: state.startFrom.x + delta.x,
         y: state.startFrom.y + delta.y,
       },
       to: {
         ...state.startRawTo,
-        id: null,
         binding: { type: 'free' },
         x: state.startTo.x + delta.x,
         y: state.startTo.y + delta.y,
@@ -999,7 +1029,7 @@ export function createLinkerDrag(
     target: Point,
     oppositePoint: Point,
     nextSnapTarget: AnchorHit | null,
-  ): EndpointTarget {
+  ): EndpointPatchTarget {
     if (snapOnMove && nextSnapTarget) {
       return {
         shapeId: nextSnapTarget.shapeId,
@@ -1031,11 +1061,10 @@ export function createLinkerDrag(
   function buildEndpointPatch(
     mode: LinkerEndpointMode,
     endpoint: LinkerElement['from'] | LinkerElement['to'],
-    target: EndpointTarget,
+    target: EndpointPatchTarget,
   ): LinkerEndpointPatch {
     const nextEndpoint = {
       ...endpoint,
-      id: target.shapeId,
       binding: target.binding,
       angle: target.angle,
       x: target.point.x,
@@ -1087,7 +1116,14 @@ export function createLinkerDrag(
           bestScore = score
           best = {
             shapeId: shape.id,
-            binding: { type: 'fixed', anchorId: anchor.id },
+            binding: {
+              type: 'fixed',
+              target: {
+                kind: 'element',
+                id: shape.id,
+              },
+              anchorId: anchor.id,
+            },
             anchorId: anchor.id,
             point: anchor.point,
             angle: anchor.angle,
@@ -1112,6 +1148,10 @@ export function createLinkerDrag(
           shapeId: shape.id,
           binding: {
             type: 'perimeter',
+            target: {
+              kind: 'element',
+              id: shape.id,
+            },
             pathIndex: perimeter.pathIndex,
             segmentIndex: perimeter.segmentIndex,
             t: perimeter.t,

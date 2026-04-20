@@ -56,8 +56,8 @@ function createStraightLinkerById(id: string, from: { x: number; y: number }, to
     id,
     name: id,
     linkerType: 'straight',
-    from: { id: null, x: from.x, y: from.y, binding: { type: 'free' } },
-    to: { id: null, x: to.x, y: to.y, binding: { type: 'free' } },
+    from: { x: from.x, y: from.y, binding: { type: 'free' } },
+    to: { x: to.x, y: to.y, binding: { type: 'free' } },
   })
 }
 
@@ -275,14 +275,13 @@ describe('view manager', () => {
     await withDesignerAsync(async designer => {
       const baseWorldSize = { ...designer.view.worldSize() }
       const far = createShapeById('view_far_world_size_transaction', 2600, 1800, 120, 90)
-      const txId = designer.history.transaction.begin('view_auto_grow_transaction')
-
-      expect(txId).not.toBeNull()
+      const transaction = designer.history.createScope('view_auto_grow_transaction')
+      expect(transaction.begin()).toBe(true)
 
       designer.edit.add([far], { select: false })
       expect(designer.view.worldSize()).toEqual(baseWorldSize)
 
-      designer.history.transaction.commit(txId || undefined)
+      expect(transaction.commit()).toBe(true)
       await waitMicrotask()
 
       const nextWorldSize = designer.view.worldSize()
@@ -348,8 +347,8 @@ describe('view manager', () => {
       const linker = createLinker({
         id: 'view_linker',
         name: 'view_linker',
-        from: { id: a.id, x: 200, y: 140, binding: { type: 'free' } },
-        to: { id: b.id, x: 400, y: 280, binding: { type: 'free' } },
+        from: { x: 200, y: 140, binding: { type: 'free' } },
+        to: { x: 400, y: 280, binding: { type: 'free' } },
       })
       designer.edit.add([a, b, linker], { record: false, select: false })
 
@@ -371,8 +370,8 @@ describe('view manager', () => {
           dx: 120,
           dy: -40,
         },
-        from: { id: null, x: 100, y: 100, binding: { type: 'free' } },
-        to: { id: null, x: 200, y: 100, binding: { type: 'free' } },
+        from: { x: 100, y: 100, binding: { type: 'free' } },
+        to: { x: 200, y: 100, binding: { type: 'free' } },
       })
       designer.edit.add([linker], { record: false, select: false })
 
@@ -396,8 +395,8 @@ describe('view manager', () => {
           dx: 2200,
           dy: 1500,
         },
-        from: { id: null, x: 100, y: 100, binding: { type: 'free' } },
-        to: { id: null, x: 200, y: 100, binding: { type: 'free' } },
+        from: { x: 100, y: 100, binding: { type: 'free' } },
+        to: { x: 200, y: 100, binding: { type: 'free' } },
       })
       designer.edit.add([linker], { record: false, select: false })
 
@@ -416,8 +415,16 @@ describe('view manager', () => {
         id: 'route_linker',
         name: 'route_linker',
         linkerType: 'broken',
-        from: { id: a.id, x: a.props.x + a.props.w, y: a.props.y + a.props.h / 2, binding: { type: 'free' } },
-        to: { id: b.id, x: b.props.x, y: b.props.y + b.props.h / 2, binding: { type: 'free' } },
+        from: {
+          x: a.props.x + a.props.w,
+          y: a.props.y + a.props.h / 2,
+          binding: { type: 'fixed', target: { kind: 'element', id: a.id }, anchorId: 'right' },
+        },
+        to: {
+          x: b.props.x,
+          y: b.props.y + b.props.h / 2,
+          binding: { type: 'fixed', target: { kind: 'element', id: b.id }, anchorId: 'left' },
+        },
       })
       designer.edit.add([a, blocker, b, linker], { record: false, select: false })
 
@@ -440,8 +447,16 @@ describe('view manager', () => {
         id: 'route_dynamic_linker',
         name: 'route_dynamic_linker',
         linkerType: 'broken',
-        from: { id: a.id, x: a.props.x + a.props.w, y: a.props.y + a.props.h / 2, binding: { type: 'free' } },
-        to: { id: b.id, x: b.props.x, y: b.props.y + b.props.h / 2, binding: { type: 'free' } },
+        from: {
+          x: a.props.x + a.props.w,
+          y: a.props.y + a.props.h / 2,
+          binding: { type: 'fixed', target: { kind: 'element', id: a.id }, anchorId: 'right' },
+        },
+        to: {
+          x: b.props.x,
+          y: b.props.y + b.props.h / 2,
+          binding: { type: 'fixed', target: { kind: 'element', id: b.id }, anchorId: 'left' },
+        },
       })
       designer.edit.add([a, b, linker], { record: false, select: false })
 
@@ -469,8 +484,16 @@ describe('view manager', () => {
         id: 'route_remove_dynamic_linker',
         name: 'route_remove_dynamic_linker',
         linkerType: 'broken',
-        from: { id: a.id, x: a.props.x + a.props.w, y: a.props.y + a.props.h / 2, binding: { type: 'free' } },
-        to: { id: b.id, x: b.props.x, y: b.props.y + b.props.h / 2, binding: { type: 'free' } },
+        from: {
+          x: a.props.x + a.props.w,
+          y: a.props.y + a.props.h / 2,
+          binding: { type: 'fixed', target: { kind: 'element', id: a.id }, anchorId: 'right' },
+        },
+        to: {
+          x: b.props.x,
+          y: b.props.y + b.props.h / 2,
+          binding: { type: 'fixed', target: { kind: 'element', id: b.id }, anchorId: 'left' },
+        },
       })
       designer.edit.add([a, b, linker], { record: false, select: false })
 
@@ -496,8 +519,8 @@ describe('view manager', () => {
         id: 'route_basic_linker',
         name: 'route_basic_linker',
         linkerType: 'broken',
-        from: { id: a.id, x: a.props.x + a.props.w, y: a.props.y + a.props.h / 2, binding: { type: 'free' } },
-        to: { id: b.id, x: b.props.x, y: b.props.y + b.props.h / 2, binding: { type: 'free' } },
+        from: { x: a.props.x + a.props.w, y: a.props.y + a.props.h / 2, binding: { type: 'free' } },
+        to: { x: b.props.x, y: b.props.y + b.props.h / 2, binding: { type: 'free' } },
       })
       designer.edit.add([a, blocker, b, linker], { record: false, select: false })
       designer.view.setLinkerRouteConfig({

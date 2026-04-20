@@ -32,14 +32,32 @@ describe('clipboard manager', () => {
       const internalLinker = createLinker({
         id: 'linker_internal',
         name: 'linker_internal',
-        from: { id: shapeA.id, x: 120, y: 40, binding: { type: 'fixed', anchorId: 'right' } },
-        to: { id: shapeB.id, x: 200, y: 40, binding: { type: 'perimeter', pathIndex: 0, segmentIndex: 3, t: 0.5 } },
+        from: {
+          x: 120,
+          y: 40,
+          binding: { type: 'fixed', target: { kind: 'element', id: shapeA.id }, anchorId: 'right' },
+        },
+        to: {
+          x: 200,
+          y: 40,
+          binding: {
+            type: 'perimeter',
+            target: { kind: 'element', id: shapeB.id },
+            pathIndex: 0,
+            segmentIndex: 3,
+            t: 0.5,
+          },
+        },
       })
       const externalLinker = createLinker({
         id: 'linker_external',
         name: 'linker_external',
-        from: { id: shapeA.id, x: 120, y: 40, binding: { type: 'fixed', anchorId: 'right' } },
-        to: { id: shapeC.id, x: 400, y: 40, binding: { type: 'free' } },
+        from: {
+          x: 120,
+          y: 40,
+          binding: { type: 'fixed', target: { kind: 'element', id: shapeA.id }, anchorId: 'right' },
+        },
+        to: { x: 400, y: 40, binding: { type: 'free' } },
       })
 
       designer.edit.add([shapeB, shapeC, externalLinker, shapeA, internalLinker], { record: false, select: false })
@@ -62,8 +80,22 @@ describe('clipboard manager', () => {
         id: 'linker_grouped',
         name: 'linker_grouped',
         group: 'group_2',
-        from: { id: shapeA.id, x: 120, y: 40, binding: { type: 'fixed', anchorId: 'right' } },
-        to: { id: shapeB.id, x: 200, y: 40, binding: { type: 'perimeter', pathIndex: 0, segmentIndex: 3, t: 0.25 } },
+        from: {
+          x: 120,
+          y: 40,
+          binding: { type: 'fixed', target: { kind: 'element', id: shapeA.id }, anchorId: 'right' },
+        },
+        to: {
+          x: 200,
+          y: 40,
+          binding: {
+            type: 'perimeter',
+            target: { kind: 'element', id: shapeB.id },
+            pathIndex: 0,
+            segmentIndex: 3,
+            t: 0.25,
+          },
+        },
         points: [{ x: 160, y: 40 }],
       })
 
@@ -84,8 +116,16 @@ describe('clipboard manager', () => {
       expect(Array.from(pastedGroupIds)[0]).not.toBe('group_2')
 
       const pastedShapeIds = new Set(pastedShapes.map(shape => shape?.id))
-      expect(pastedLinker?.from.id && pastedShapeIds.has(pastedLinker.from.id)).toBe(true)
-      expect(pastedLinker?.to.id && pastedShapeIds.has(pastedLinker.to.id)).toBe(true)
+      expect(
+        pastedLinker?.from.binding.type !== 'free' &&
+          pastedLinker.from.binding.target.kind === 'element' &&
+          pastedShapeIds.has(pastedLinker.from.binding.target.id),
+      ).toBe(true)
+      expect(
+        pastedLinker?.to.binding.type !== 'free' &&
+          pastedLinker.to.binding.target.kind === 'element' &&
+          pastedShapeIds.has(pastedLinker.to.binding.target.id),
+      ).toBe(true)
       expect(pastedLinker?.from.binding.type).toBe('fixed')
       expect(pastedLinker?.to.binding.type).toBe('perimeter')
       expect(pastedLinker?.points[0]).toEqual({ x: 184, y: 64 })
@@ -99,8 +139,22 @@ describe('clipboard manager', () => {
       const externalLinker = createLinker({
         id: 'linker_external_endpoint',
         name: 'linker_external_endpoint',
-        from: { id: shapeA.id, x: 120, y: 40, binding: { type: 'fixed', anchorId: 'right' } },
-        to: { id: shapeB.id, x: 300, y: 40, binding: { type: 'perimeter', pathIndex: 0, segmentIndex: 1, t: 0.5 } },
+        from: {
+          x: 120,
+          y: 40,
+          binding: { type: 'fixed', target: { kind: 'element', id: shapeA.id }, anchorId: 'right' },
+        },
+        to: {
+          x: 300,
+          y: 40,
+          binding: {
+            type: 'perimeter',
+            target: { kind: 'element', id: shapeB.id },
+            pathIndex: 0,
+            segmentIndex: 1,
+            t: 0.5,
+          },
+        },
       })
 
       designer.edit.add([shapeA, shapeB, externalLinker], { record: false, select: false })
@@ -111,9 +165,12 @@ describe('clipboard manager', () => {
         .map(id => designer.getElementById(id))
         .find(element => element?.type === 'linker')
 
-      expect(pastedLinker?.from.id).not.toBeNull()
       expect(pastedLinker?.from.binding.type).toBe('fixed')
-      expect(pastedLinker?.to.id).toBeNull()
+      expect(
+        pastedLinker?.from.binding.type !== 'free' && pastedLinker.from.binding.target.kind === 'element'
+          ? pastedLinker.from.binding.target.id
+          : null,
+      ).not.toBeNull()
       expect(pastedLinker?.to.binding.type).toBe('free')
       expect(pastedLinker?.to.x).toBe(324)
       expect(pastedLinker?.to.y).toBe(64)

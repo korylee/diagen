@@ -1,6 +1,6 @@
 import type { Point } from '@diagen/shared'
 import type { LinkerType } from '../constants'
-import type { DiagramElement, LinkerElement, LinkerEndpoint, ShapeElement } from '../model'
+import { type DiagramElement, type LinkerElement, type LinkerEndpoint } from '../model'
 import { getAnchorInfoById, resolvePerimeterInfo } from '../anchors'
 import type { Obstacle, RouteConfig } from './types'
 import { getObstacleRoute, getObstacles, type RouteOptions } from './obstacleRoute'
@@ -63,9 +63,9 @@ interface ResolvedEndpoint {
  */
 export function getBasicLinkerRoute(
   linker: LinkerElement,
-  getShapeById: (id: string) => ShapeElement | undefined | null,
+  getElementById: (id: string) => DiagramElement | undefined | null,
 ): LinkerRoute {
-  const endpoints = resolveLinkerEndpoints(linker, getShapeById)
+  const endpoints = resolveLinkerEndpoints(linker, getElementById)
   return {
     points: calculateBasicRoutePoints(
       endpoints.from.point,
@@ -87,11 +87,11 @@ export function getBasicLinkerRoute(
  */
 export function getLinkerRoute(
   linker: LinkerElement,
-  getShapeById: (id: string) => ShapeElement | undefined | null,
+  getElementById: (id: string) => DiagramElement | undefined | null,
   options: LinkerRouteOptions = {},
 ): LinkerRoute {
   const { strategy = 'basic', fallbackToBasic = true } = options
-  const endpoints = resolveLinkerEndpoints(linker, getShapeById)
+  const endpoints = resolveLinkerEndpoints(linker, getElementById)
 
   // 显式控制点优先：用户手动编辑的路由应无条件生效。
   if (linker.points.length > 0) {
@@ -145,11 +145,11 @@ export function getLinkerRoute(
 
 function resolveLinkerEndpoints(
   linker: LinkerElement,
-  getShapeById: (id: string) => ShapeElement | undefined | null,
+  getElementById: (id: string) => DiagramElement | undefined | null,
 ): { from: ResolvedEndpoint; to: ResolvedEndpoint } {
   return {
-    from: resolveEndpoint(linker.from, getShapeById),
-    to: resolveEndpoint(linker.to, getShapeById),
+    from: resolveEndpoint(linker.from, getElementById),
+    to: resolveEndpoint(linker.to, getElementById),
   }
 }
 
@@ -157,8 +157,10 @@ function resolveLinkerObstacles(linker: LinkerElement, options: LinkerRouteOptio
   if (options.obstacles) return options.obstacles
 
   const excludeIds = new Set(options.excludeObstacleIds ?? [])
-  if (linker.from.id) excludeIds.add(linker.from.id)
-  if (linker.to.id) excludeIds.add(linker.to.id)
+  const fromId = linker.from.binding.type !== 'free' && linker.from.binding.target.kind === 'element' ? linker.from.binding.target.id : null
+  const toId = linker.to.binding.type !== 'free' && linker.to.binding.target.kind === 'element' ? linker.to.binding.target.id : null
+  if (fromId) excludeIds.add(fromId)
+  if (toId) excludeIds.add(toId)
 
   return getObstacles(options.obstacleElements ?? [], Array.from(excludeIds))
 }
@@ -228,19 +230,20 @@ function calculateBasicRoutePoints(
  */
 function resolveEndpoint(
   endpoint: LinkerEndpoint,
-  getShapeById: (id: string) => ShapeElement | undefined | null,
+  getElementById: (id: string) => DiagramElement | undefined | null,
 ): ResolvedEndpoint {
   const fallback: ResolvedEndpoint = {
     point: { x: endpoint.x, y: endpoint.y },
     angle: endpoint.angle ?? 0,
   }
 
-  if (!endpoint.id) return fallback
-  const shape = getShapeById(endpoint.id)
-  if (!shape) return fallback
-
   const binding = endpoint.binding
   if (binding.type === 'free') return fallback
+  if (binding.target.kind !== 'element') return fallback
+
+  const target = getElementById(binding.target.id)
+  const shape = target?.type === 'shape' ? target : null
+  if (!shape) return fallback
 
   if (binding.type === 'fixed') {
     const info = getAnchorInfoById(shape, binding.anchorId)

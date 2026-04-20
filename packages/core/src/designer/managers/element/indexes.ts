@@ -16,9 +16,12 @@ export function createElementIndexes(options: CreateElementIndexesOptions) {
     const map = new Map<string, LinkerElement[]>()
 
     for (const linker of linkers()) {
-      appendLinker(map, linker.from.id ?? null, linker)
-      if (linker.to.id && linker.to.id !== linker.from.id) {
-        appendLinker(map, linker.to.id, linker)
+      const fromShapeId = getEndpointShapeId(linker.from)
+      const toShapeId = getEndpointShapeId(linker.to)
+
+      appendLinker(map, fromShapeId, linker)
+      if (toShapeId && toShapeId !== fromShapeId) {
+        appendLinker(map, toShapeId, linker)
       }
     }
 
@@ -73,8 +76,8 @@ export function createElementIndexes(options: CreateElementIndexesOptions) {
 
     for (const id of idsSet) {
       for (const linker of getRelatedLinkers(id)) {
-        const fromId = linker.from.id
-        const toId = linker.to.id
+        const fromId = getEndpointShapeId(linker.from)
+        const toId = getEndpointShapeId(linker.to)
         if (!!fromId && !!toId && idsSet.has(fromId) && idsSet.has(toId)) {
           linkerIds.add(linker.id)
         }
@@ -93,6 +96,14 @@ export function createElementIndexes(options: CreateElementIndexesOptions) {
     getGroupElementIds,
     orderElementIds,
     getInternalLinkerIds,
+  }
+
+  function getEndpointShapeId(endpoint: LinkerElement['from'] | LinkerElement['to']): string | null {
+    if (endpoint.binding.type === 'free') return null
+    if (endpoint.binding.target.kind !== 'element') return null
+
+    const target = options.getElementById(endpoint.binding.target.id)
+    return target && isShape(target) ? target.id : null
   }
 }
 

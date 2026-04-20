@@ -2,7 +2,7 @@ import type { Bounds } from '@diagen/shared'
 import { batch, createSignal } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { DEFAULTS } from '../../../constants'
-import { isLinker, isShape, type DiagramElement, type LinkerElement, type ShapeElement } from '../../../model'
+import { isLinker, isShape, type DiagramElement, type LinkerElement } from '../../../model'
 import {
   calculateLineJumps,
   getLinkerRoute,
@@ -122,7 +122,7 @@ export function createLinkerLayoutController(options: CreateLinkerLayoutControll
       }
     }
 
-    const route = getLinkerRoute(linker, getShapeById, resolveRouteOptions(linker))
+    const route = getLinkerRoute(linker, getElementById, resolveRouteOptions(linker))
     const bounds = calculateLinkerBounds(linker, route)
 
     linkerLayoutCache.set(linker.id, {
@@ -139,9 +139,8 @@ export function createLinkerLayoutController(options: CreateLinkerLayoutControll
     return JSON.stringify(routeConfig())
   }
 
-  function getShapeById(id: string): ShapeElement | null {
-    const el = element.getElementById(id)
-    return el && isShape(el) ? el : null
+  function getElementById(id: string): DiagramElement | null {
+    return element.getElementById(id) ?? null
   }
 
   function resolveRouteOptions(linker: LinkerElement): LinkerRouteOptions {

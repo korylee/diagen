@@ -131,8 +131,8 @@ export function createSchemaRegistry() {
     return _createLinker({
       name: definition.name,
       linkerType: definition.linkerType,
-      from: { id: null, binding: { type: 'free' }, ...from },
-      to: { id: null, binding: { type: 'free' }, ...to },
+      from: { binding: { type: 'free' }, ...from },
+      to: { binding: { type: 'free' }, ...to },
       lineStyle: { ...defaultLineStyle, ...definition.lineStyle },
       fontStyle: { ...defaultFontStyle, ...definition.fontStyle },
       ...overrides,

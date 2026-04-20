@@ -34,15 +34,31 @@ describe('element manager', () => {
         id: 'el_rel_internal',
         name: 'el_rel_internal',
         group: null,
-        from: { id: a.id, x: 80, y: 30, binding: { type: 'free' } },
-        to: { id: b.id, x: 100, y: 30, binding: { type: 'free' } },
+        from: {
+          x: 80,
+          y: 30,
+          binding: { type: 'fixed', target: { kind: 'element', id: a.id }, anchorId: 'right' },
+        },
+        to: {
+          x: 100,
+          y: 30,
+          binding: { type: 'fixed', target: { kind: 'element', id: b.id }, anchorId: 'left' },
+        },
       })
       const linkerExternal = createLinker({
         id: 'el_rel_external',
         name: 'el_rel_external',
         group: null,
-        from: { id: a.id, x: 80, y: 30, binding: { type: 'free' } },
-        to: { id: c.id, x: 200, y: 30, binding: { type: 'free' } },
+        from: {
+          x: 80,
+          y: 30,
+          binding: { type: 'fixed', target: { kind: 'element', id: a.id }, anchorId: 'right' },
+        },
+        to: {
+          x: 200,
+          y: 30,
+          binding: { type: 'fixed', target: { kind: 'element', id: c.id }, anchorId: 'left' },
+        },
       })
 
       designer.element.add([
@@ -156,8 +172,8 @@ describe('element manager', () => {
       const linker = createLinker({
         id: 'el_move_linker',
         name: 'el_move_linker',
-        from: { id: shape.id, x: 20, y: 30, binding: { type: 'free' } },
-        to: { id: null, x: 120, y: 130, binding: { type: 'free' } },
+        from: { x: 20, y: 30, binding: { type: 'free' } },
+        to: { x: 120, y: 130, binding: { type: 'free' } },
         points: [{ x: 40, y: 50 }],
       })
 

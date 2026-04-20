@@ -2,6 +2,7 @@
 
 ## 1. 根目录
 - `docs/`：当前知识库
+  - `LINKER_ENDPOINT_REFACTOR.md`：`LinkerEndpoint` 重构方案与阶段性执行口径
 - `packages/`：各业务包
 - `playgrounds/vite/`：当前唯一正式联调入口
 - `.processon/`：历史参考资料

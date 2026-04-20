@@ -155,8 +155,16 @@ describe('anchors', () => {
         id: 'linker_1',
         name: 'linker_1',
         linkerType: 'curved',
-        from: { id: fromShape.id, binding: { type: 'fixed', anchorId: 'top' }, x: 0, y: 0 },
-        to: { id: toShape.id, binding: { type: 'fixed', anchorId: 'left' }, x: 0, y: 0 },
+        from: {
+          binding: { type: 'fixed', target: { kind: 'element', id: fromShape.id }, anchorId: 'top' },
+          x: 0,
+          y: 0,
+        },
+        to: {
+          binding: { type: 'fixed', target: { kind: 'element', id: toShape.id }, anchorId: 'left' },
+          x: 0,
+          y: 0,
+        },
       })
 
       const route = getLinkerRoute(linker, id => {
@@ -189,8 +197,16 @@ describe('anchors', () => {
         id: 'linker_2',
         name: 'linker_2',
         linkerType: 'orthogonal',
-        from: { id: fromShape.id, binding: { type: 'fixed', anchorId: 'right' }, x: 0, y: 0 },
-        to: { id: toShape.id, binding: { type: 'fixed', anchorId: 'left' }, x: 0, y: 0 },
+        from: {
+          binding: { type: 'fixed', target: { kind: 'element', id: fromShape.id }, anchorId: 'right' },
+          x: 0,
+          y: 0,
+        },
+        to: {
+          binding: { type: 'fixed', target: { kind: 'element', id: toShape.id }, anchorId: 'left' },
+          x: 0,
+          y: 0,
+        },
       })
 
       const route = getLinkerRoute(
@@ -231,8 +247,16 @@ describe('anchors', () => {
         id: 'linker_basic',
         name: 'linker_basic',
         linkerType: 'straight',
-        from: { id: fromShape.id, binding: { type: 'fixed', anchorId: 'right' }, x: 0, y: 0 },
-        to: { id: toShape.id, binding: { type: 'fixed', anchorId: 'left' }, x: 0, y: 0 },
+        from: {
+          binding: { type: 'fixed', target: { kind: 'element', id: fromShape.id }, anchorId: 'right' },
+          x: 0,
+          y: 0,
+        },
+        to: {
+          binding: { type: 'fixed', target: { kind: 'element', id: toShape.id }, anchorId: 'left' },
+          x: 0,
+          y: 0,
+        },
       })
       const route = getBasicLinkerRoute(linker, id => {
         if (id === fromShape.id) return fromShape
@@ -240,6 +264,35 @@ describe('anchors', () => {
         return null
       })
       expect(route.points.length).toBeGreaterThanOrEqual(2)
+    })
+
+    it('端点目标不是 shape 时应回退到端点原始坐标', () => {
+      const linkerTarget = createLinker({
+        id: 'target_linker',
+        name: 'target_linker',
+        from: { x: 10, y: 10, binding: { type: 'free' } },
+        to: { x: 50, y: 10, binding: { type: 'free' } },
+      })
+      const linker = createLinker({
+        id: 'linker_non_shape_target',
+        name: 'linker_non_shape_target',
+        linkerType: 'straight',
+        from: {
+          binding: { type: 'fixed', target: { kind: 'element', id: linkerTarget.id }, anchorId: 'right' },
+          x: 20,
+          y: 30,
+          angle: 0.5,
+        },
+        to: { binding: { type: 'free' }, x: 100, y: 30, angle: 0 },
+      })
+
+      const route = getBasicLinkerRoute(linker, id => {
+        if (id === linkerTarget.id) return linkerTarget
+        return null
+      })
+
+      expect(route.points[0]).toEqual({ x: 20, y: 30 })
+      expect(route.fromAngle).toBeCloseTo(0.5)
     })
   })
 })

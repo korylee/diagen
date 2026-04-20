@@ -2,14 +2,18 @@
  * 连线元素模型
  */
 
-import { generateId } from '@diagen/shared'
+import { generateId, Point } from '@diagen/shared'
 import { DEFAULTS, type LinkerType } from '../constants'
 import type { BaseElement, LineStyle, FontStyle, DataAttribute } from './types'
 
+export type EndpointTarget =
+  | { kind: 'element'; id: string }
+  | { kind: 'port'; ownerId: string; portId: string }
+
 export type LinkerEndpointBinding =
   | { type: 'free' }
-  | { type: 'fixed'; anchorId: string }
-  | { type: 'perimeter'; pathIndex: number; segmentIndex: number; t: number }
+  | { type: 'fixed'; target: EndpointTarget; anchorId: string }
+  | { type: 'perimeter'; target: EndpointTarget; pathIndex: number; segmentIndex: number; t: number }
 
 /** 连线标签相对路线中心的正式偏移 */
 export interface LinkerTextPosition {
@@ -19,7 +23,6 @@ export interface LinkerTextPosition {
 
 /** 连线端点 */
 export interface LinkerEndpoint {
-  id?: string | null   // 连接的形状 ID
   x: number
   y: number
   binding: LinkerEndpointBinding
@@ -37,10 +40,10 @@ export interface LinkerElement extends BaseElement {
   to: LinkerEndpoint
 
   /** 自定义路由控制点 */
-  points: Array<{ x: number; y: number }>
+  points: Array<Point>
 
   /** 计算后的路由点 */
-  routePoints?: Array<{ x: number; y: number }>
+  routePoints?: Array<Point>
 
   /** 连线标签位置；未设置时跟随路线中心自动定位 */
   textPosition?: LinkerTextPosition
@@ -66,13 +69,11 @@ export function createLinker(patch: Partial<LinkerElement>):LinkerElement {
     children: [],
     linkerType: 'broken',
     from: {
-      id: null,
       x: 0,
       y: 0,
       binding: { type: 'free' },
     },
     to: {
-      id: null,
       x: 0,
       y: 0,
       binding: { type: 'free' },
@@ -96,17 +97,17 @@ export function isLinker(element?: BaseElement): element is LinkerElement {
 
 /** 两端是否都已连接 */
 export function isLinkerConnected(linker: LinkerElement): boolean {
-  return linker.from.id !== null && linker.to.id !== null
+  return linker.from.binding.type !== 'free' && linker.to.binding.type !== 'free'
 }
 
 /** 是否有断开的连接 */
 export function isLinkerBroken(linker: LinkerElement): boolean {
-  return linker.from.id === null || linker.to.id === null
+  return linker.from.binding.type === 'free' || linker.to.binding.type === 'free'
 }
 
 /** 是否为自由连线（两端都未连接） */
 export function isLinkerFree(linker: LinkerElement): boolean {
-  return linker.from.id === null && linker.to.id === null
+  return linker.from.binding.type === 'free' && linker.to.binding.type === 'free'
 }
 
 /** 是否锁定 */

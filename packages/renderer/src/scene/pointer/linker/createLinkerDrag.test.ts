@@ -77,13 +77,11 @@ function createFreeLinkerById(id: string, from: { x: number; y: number }, to: { 
     id,
     name: id,
     from: {
-      id: null,
       x: from.x,
       y: from.y,
       binding: { type: 'free' },
     },
     to: {
-      id: null,
       x: to.x,
       y: to.y,
       binding: { type: 'free' },
@@ -138,14 +136,12 @@ describe('createLinkerDrag', () => {
         name: 'broken_control_normalize',
         linkerType: 'broken',
         from: {
-          id: null,
-          x: 0,
+ x: 0,
           y: 0,
           binding: { type: 'free' },
         },
         to: {
-          id: null,
-          x: 100,
+ x: 100,
           y: 0,
           binding: { type: 'free' },
         },
@@ -190,14 +186,12 @@ describe('createLinkerDrag', () => {
         name: 'broken_control_keep_diagonal',
         linkerType: 'broken',
         from: {
-          id: null,
-          x: 0,
+ x: 0,
           y: 0,
           binding: { type: 'free' },
         },
         to: {
-          id: null,
-          x: 100,
+ x: 100,
           y: 0,
           binding: { type: 'free' },
         },
@@ -237,14 +231,12 @@ describe('createLinkerDrag', () => {
         name: 'broken_remove_control_action',
         linkerType: 'broken',
         from: {
-          id: null,
-          x: 0,
+ x: 0,
           y: 0,
           binding: { type: 'free' },
         },
         to: {
-          id: null,
-          x: 100,
+ x: 100,
           y: 0,
           binding: { type: 'free' },
         },
@@ -275,14 +267,12 @@ describe('createLinkerDrag', () => {
         linkerType: 'straight',
         text: '标签',
         from: {
-          id: null,
-          x: 0,
+ x: 0,
           y: 0,
           binding: { type: 'free' },
         },
         to: {
-          id: null,
-          x: 100,
+ x: 100,
           y: 0,
           binding: { type: 'free' },
         },
@@ -337,14 +327,12 @@ describe('createLinkerDrag', () => {
         name: 'orthogonal_control_drag',
         linkerType: 'orthogonal',
         from: {
-          id: null,
-          x: 0,
+ x: 0,
           y: 0,
           binding: { type: 'free' },
         },
         to: {
-          id: null,
-          x: 120,
+ x: 120,
           y: 120,
           binding: { type: 'free' },
         },
@@ -401,14 +389,12 @@ describe('createLinkerDrag', () => {
         name: 'orthogonal_first_control_drag',
         linkerType: 'orthogonal',
         from: {
-          id: null,
-          x: 0,
+ x: 0,
           y: 0,
           binding: { type: 'free' },
         },
         to: {
-          id: null,
-          x: 80,
+ x: 80,
           y: 120,
           binding: { type: 'free' },
         },
@@ -453,14 +439,12 @@ describe('createLinkerDrag', () => {
         name: 'orthogonal_segment_insert_drag',
         linkerType: 'orthogonal',
         from: {
-          id: null,
-          x: 0,
+ x: 0,
           y: 0,
           binding: { type: 'free' },
         },
         to: {
-          id: null,
-          x: 100,
+ x: 100,
           y: 100,
           binding: { type: 'free' },
         },
@@ -513,14 +497,12 @@ describe('createLinkerDrag', () => {
         name: 'orthogonal_segment_start_drag',
         linkerType: 'orthogonal',
         from: {
-          id: null,
-          x: 0,
+ x: 0,
           y: 0,
           binding: { type: 'free' },
         },
         to: {
-          id: null,
-          x: 100,
+ x: 100,
           y: 100,
           binding: { type: 'free' },
         },
@@ -562,14 +544,12 @@ describe('createLinkerDrag', () => {
         name: 'orthogonal_single_segment_drag',
         linkerType: 'orthogonal',
         from: {
-          id: null,
-          x: 0,
+ x: 0,
           y: 0,
           binding: { type: 'free' },
         },
         to: {
-          id: null,
-          x: 0,
+ x: 0,
           y: 100,
           binding: { type: 'free' },
         },
@@ -650,10 +630,22 @@ describe('createLinkerDrag', () => {
       const createdId = designer.selection.selectedIds()[0]
       const createdLinker = designer.element.getElementById<LinkerElement>(createdId)
 
-      expect(createdLinker?.from.id).toBe(sourceShape.id)
-      expect(createdLinker?.to.id).toBe(targetShape.id)
+      expect(createdLinker?.from.binding.type).toBe('fixed')
+      expect(createdLinker?.from.binding.type !== 'free' ? createdLinker.from.binding.target : null).toEqual({
+        kind: 'element',
+        id: sourceShape.id,
+      })
+      expect(createdLinker?.to.binding.type).toBe('fixed')
+      expect(createdLinker?.to.binding.type !== 'free' ? createdLinker.to.binding.target : null).toEqual({
+        kind: 'element',
+        id: targetShape.id,
+      })
       expect(createdLinker?.to.binding).toEqual({
         type: 'fixed',
+        target: {
+          kind: 'element',
+          id: targetShape.id,
+        },
         anchorId: targetAnchor!.id,
       })
     })
@@ -712,16 +704,28 @@ describe('createLinkerDrag', () => {
           id: 'self_connect_linker',
           name: 'self_connect_linker',
           from: {
-            id: sourceShape.id,
             x: 100,
             y: 40,
-            binding: { type: 'free' },
+            binding: {
+              type: 'fixed',
+              target: {
+                kind: 'element',
+                id: sourceShape.id,
+              },
+              anchorId: 'right',
+            },
           },
           to: {
-            id: targetShape.id,
             x: 300,
             y: 40,
-            binding: { type: 'free' },
+            binding: {
+              type: 'fixed',
+              target: {
+                kind: 'element',
+                id: targetShape.id,
+              },
+              anchorId: 'left',
+            },
           },
         })
 
@@ -764,17 +768,19 @@ describe('createLinkerDrag', () => {
         id: 'fixed_bound_linker',
         name: 'fixed_bound_linker',
         from: {
-          id: sourceShape.id,
           x: sourceAnchor!.point.x,
           y: sourceAnchor!.point.y,
           angle: sourceAnchor!.angle,
           binding: {
             type: 'fixed',
+            target: {
+              kind: 'element',
+              id: sourceShape.id,
+            },
             anchorId: sourceAnchor!.id,
           },
         },
         to: {
-          id: targetShape.id,
           x: 300,
           y: 40,
           binding: { type: 'free' },
@@ -798,6 +804,10 @@ describe('createLinkerDrag', () => {
         shapeId: sourceShape.id,
         binding: {
           type: 'fixed',
+          target: {
+            kind: 'element',
+            id: sourceShape.id,
+          },
           anchorId: sourceAnchor!.id,
         },
         anchorId: sourceAnchor!.id,
@@ -820,19 +830,21 @@ describe('createLinkerDrag', () => {
         id: 'perimeter_bound_linker',
         name: 'perimeter_bound_linker',
         from: {
-          id: sourceShape.id,
           x: sourcePerimeter!.point.x,
           y: sourcePerimeter!.point.y,
           angle: sourcePerimeter!.angle,
           binding: {
             type: 'perimeter',
+            target: {
+              kind: 'element',
+              id: sourceShape.id,
+            },
             pathIndex: sourcePerimeter!.pathIndex,
             segmentIndex: sourcePerimeter!.segmentIndex,
             t: sourcePerimeter!.t,
           },
         },
         to: {
-          id: targetShape.id,
           x: 300,
           y: 40,
           binding: { type: 'free' },
@@ -856,6 +868,10 @@ describe('createLinkerDrag', () => {
         shapeId: sourceShape.id,
         binding: {
           type: 'perimeter',
+          target: {
+            kind: 'element',
+            id: sourceShape.id,
+          },
           pathIndex: sourcePerimeter!.pathIndex,
           segmentIndex: sourcePerimeter!.segmentIndex,
           t: sourcePerimeter!.t,
@@ -863,6 +879,58 @@ describe('createLinkerDrag', () => {
         point: sourcePerimeter!.point,
         angle: sourcePerimeter!.angle,
       })
+    })
+  })
+
+  it('端点目标不是 shape 时，不应继承 snapTarget，且 oppositeShapeId 应为空', () => {
+    withLinkerDrag({}, ({ designer, linkerDrag }) => {
+      const targetLinker = createLinker({
+        id: 'drag_target_linker',
+        name: 'drag_target_linker',
+        from: { x: 20, y: 20, binding: { type: 'free' } },
+        to: { x: 120, y: 20, binding: { type: 'free' } },
+      })
+      const linker = createLinker({
+        id: 'drag_non_shape_bound_linker',
+        name: 'drag_non_shape_bound_linker',
+        from: {
+          x: 40,
+          y: 60,
+          angle: 0.4,
+          binding: {
+            type: 'fixed',
+            target: {
+              kind: 'element',
+              id: targetLinker.id,
+            },
+            anchorId: 'right',
+          },
+        },
+        to: {
+          x: 200,
+          y: 60,
+          binding: { type: 'free' },
+        },
+      })
+      designer.edit.add([targetLinker, linker], { record: false, select: false })
+
+      const started = linkerDrag.beginEdit(createMouseEvent(40, 60), {
+        linkerId: linker.id,
+        point: { x: 40, y: 60 },
+        hit: { type: 'from' },
+        route: {
+          points: [
+            { x: 40, y: 60 },
+            { x: 200, y: 60 },
+          ],
+          fromAngle: 0.4,
+          toAngle: 0,
+        },
+      })
+
+      expect(started).toBe(true)
+      expect(linkerDrag.snapTarget()).toBeNull()
+      expect(linkerDrag.state()?.oppositeShapeId).toBeNull()
     })
   })
 })

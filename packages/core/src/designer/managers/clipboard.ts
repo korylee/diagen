@@ -1,7 +1,7 @@
 import { generateId, type Point } from '@diagen/shared'
 import { batch } from 'solid-js'
 import { unwrapClone } from '../../_internal'
-import { type DiagramElement, isLinker, isShape, type LinkerEndpoint } from '../../model'
+import { type DiagramElement, isLinker, isShape, type LinkerEndpoint, type EndpointTarget } from '../../model'
 import type { EditManager } from './edit'
 import { createInsertElementsCommand } from './edit/commands'
 import type { ElementManager } from './element'
@@ -32,21 +32,71 @@ interface ClipboardSource {
   sourceSelectionIds: string[]
 }
 
-function offsetPoint(point: Point, delta: Point): Point {
+function remapLinkerEndpoint(
+  endpoint: LinkerEndpoint,
+  sourceElementMap: Map<string, DiagramElement>,
+  idMap: Map<string, string>,
+  delta: Point,
+): LinkerEndpoint {
+  const binding = remapLinkerEndpointBinding(endpoint.binding, sourceElementMap, idMap)
+
   return {
-    x: point.x + delta.x,
-    y: point.y + delta.y,
+    ...unwrapClone(endpoint),
+    x: endpoint.x + delta.x,
+    y: endpoint.y + delta.y,
+    binding,
   }
 }
 
-function remapLinkerEndpoint(endpoint: LinkerEndpoint, idMap: Map<string, string>, delta: Point): LinkerEndpoint {
-  const nextId = endpoint.id ? idMap.get(endpoint.id) : null
+function remapEndpointTarget(
+  target: EndpointTarget,
+  sourceElementMap: Map<string, DiagramElement>,
+  idMap: Map<string, string>,
+): EndpointTarget | null {
+  if (target.kind === 'port') {
+    const nextOwnerId = idMap.get(target.ownerId)
+    if (!nextOwnerId) return null
+    return {
+      kind: 'port',
+      ownerId: nextOwnerId,
+      portId: target.portId,
+    }
+  }
+
+  const sourceTarget = sourceElementMap.get(target.id)
+  const nextId = idMap.get(target.id)
+  if (!nextId || !sourceTarget || !isShape(sourceTarget)) return null
+
   return {
-    ...unwrapClone(endpoint),
-    id: nextId ?? null,
-    x: endpoint.x + delta.x,
-    y: endpoint.y + delta.y,
-    binding: nextId ? unwrapClone(endpoint.binding) : { type: 'free' },
+    kind: 'element',
+    id: nextId,
+  }
+}
+
+function remapLinkerEndpointBinding(
+  binding: LinkerEndpoint['binding'],
+  sourceElementMap: Map<string, DiagramElement>,
+  idMap: Map<string, string>,
+): LinkerEndpoint['binding'] {
+  if (binding.type === 'free') return { type: 'free' }
+
+  const nextTarget = remapEndpointTarget(binding.target, sourceElementMap, idMap)
+  if (!nextTarget) return { type: 'free' }
+
+  if (binding.type === 'fixed') {
+    return {
+      type: 'fixed',
+      target: nextTarget,
+      anchorId: binding.anchorId,
+    }
+  }
+
+  return {
+    type: 'perimeter',
+    target: nextTarget,
+    pathIndex: binding.pathIndex,
+    segmentIndex: binding.segmentIndex,
+    t: binding.t,
   }
 }
 
@@ -135,6 +185,7 @@ export function createClipboardManager(deps: ClipboardDeps) {
   function cloneElementsForPaste(sourceElements: DiagramElement[], delta: Point): DiagramElement[] {
     const idMap = createIdMap(sourceElements)
     const groupMap = createGroupMap(sourceElements)
+    const sourceElementMap = new Map(sourceElements.map(element => [element.id, element] as const))
 
     return sourceElements.map(element => {
       const next = unwrapClone(element)
@@ -149,11 +200,17 @@ export function createClipboardManager(deps: ClipboardDeps) {
         return next
       }
 
-      next.from = remapLinkerEndpoint(next.from, idMap, delta)
-      next.to = remapLinkerEndpoint(next.to, idMap, delta)
-      next.points = next.points.map(point => offsetPoint(point, delta))
+      next.from = remapLinkerEndpoint(next.from, sourceElementMap, idMap, delta)
+      next.to = remapLinkerEndpoint(next.to, sourceElementMap, idMap, delta)
+      next.points = next.points.map(point => ({
+        x: point.x + delta.x,
+        y: point.y + delta.y,
+      }))
       if (next.routePoints) {
-        next.routePoints = next.routePoints.map(point => offsetPoint(point, delta))
+        next.routePoints = next.routePoints.map(point => ({
+          x: point.x + delta.x,
+          y: point.y + delta.y,
+        }))
       }
       return next
     })
@@ -196,7 +253,7 @@ export function createClipboardManager(deps: ClipboardDeps) {
           name: 'clipboard_paste',
           elements: pastedElements,
           options: {
-            assumeCloned: true,
+            clone: false,
             select: true,
           },
         },
@@ -224,7 +281,7 @@ export function createClipboardManager(deps: ClipboardDeps) {
           name: 'clipboard_duplicate',
           elements: duplicatedElements,
           options: {
-            assumeCloned: true,
+            clone: false,
             select: true,
           },
         },
