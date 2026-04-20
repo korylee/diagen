@@ -51,16 +51,5 @@ export function selectLinkerCreationTool(
 export function syncCreationModeForActiveTool(designer: Designer, creationMode: SidebarCreationMode): void {
   const { tool } = designer
   const continuous = resolveCreationContinuous(creationMode)
-  const current = tool.toolState()
-
-  if (current.type === 'idle' || current.continuous === continuous) {
-    return
-  }
-
-  if (current.type === 'create-shape') {
-    tool.setCreateShape(current.shapeId, { continuous })
-    return
-  }
-
-  tool.setCreateLinker(current.linkerId, { continuous })
+  tool.setContinuous(continuous)
 }

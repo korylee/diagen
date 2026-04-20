@@ -63,4 +63,33 @@ describe('tool manager', () => {
       expect(designer.tool.toolState()).toEqual({ type: 'idle' })
     })
   })
+
+  it('setContinuous 应更新当前创建工具的连续模式', () => {
+    withDesigner(designer => {
+      designer.tool.setCreateShape('rectangle', { continuous: true })
+      designer.tool.setContinuous(false)
+
+      expect(designer.tool.toolState()).toEqual({
+        type: 'create-shape',
+        shapeId: 'rectangle',
+        continuous: false,
+      })
+
+      designer.tool.setCreateLinker('curve_linker', { continuous: false })
+      designer.tool.setContinuous(true)
+
+      expect(designer.tool.toolState()).toEqual({
+        type: 'create-linker',
+        linkerId: 'curve_linker',
+        continuous: true,
+      })
+    })
+  })
+
+  it('setContinuous 在 idle 时应保持无变化', () => {
+    withDesigner(designer => {
+      designer.tool.setContinuous(false)
+      expect(designer.tool.toolState()).toEqual({ type: 'idle' })
+    })
+  })
 })
