@@ -1,5 +1,5 @@
 import type { JSX } from 'solid-js'
-import { createMemo, createSignal, For, Show, splitProps } from 'solid-js'
+import { createMemo, createSignal, For, mergeProps, Show, splitProps } from 'solid-js'
 
 import { createDgBem, cx } from '@diagen/shared'
 import { useUIDefaults } from '../config'
@@ -68,8 +68,14 @@ export function SidebarFooter(props: JSX.HTMLAttributes<HTMLDivElement>): JSX.El
 }
 
 export function SidebarSearchField(props: SidebarSearchFieldProps): JSX.Element {
-  const [local, rest] = splitProps(props, ['class', 'style', 'value', 'placeholder', 'onInput', 'onClear'])
   const defaults = useUIDefaults()
+  const merged = mergeProps(
+    {
+      placeholder: defaults().ui.sidebar.searchPlaceholder,
+    },
+    props,
+  )
+  const [local, rest] = splitProps(merged, ['class', 'style', 'value', 'placeholder', 'onInput', 'onClear'])
 
   return (
     <label {...rest} class={cx(bem('search'), local.class)} style={local.style}>
@@ -77,7 +83,7 @@ export function SidebarSearchField(props: SidebarSearchFieldProps): JSX.Element 
         class={bem('search-input')}
         type="text"
         value={local.value}
-        placeholder={local.placeholder ?? defaults().ui.sidebar.searchPlaceholder}
+        placeholder={local.placeholder}
         onInput={event => local.onInput(event.currentTarget.value)}
       />
       <Show when={local.value.length > 0}>

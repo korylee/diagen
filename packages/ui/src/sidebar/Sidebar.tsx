@@ -1,5 +1,5 @@
 import { createDgBem, cx, ensureArray } from '@diagen/shared'
-import { createEffect, createMemo, createSignal, For, Show, splitProps, type JSX } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, mergeProps, Show, splitProps, type JSX } from 'solid-js'
 import {
   SidebarBody,
   SidebarFooter,
@@ -34,7 +34,13 @@ const bem = createDgBem('sidebar')
 
 export function Sidebar(props: SidebarProps): JSX.Element {
   const designer = useDesigner()
-  const [local, rest] = splitProps(props, [
+  const merged = mergeProps(
+    {
+      searchPlaceholder: 'Search',
+    },
+    props,
+  )
+  const [local, rest] = splitProps(merged, [
     'searchable',
     'searchPlaceholder',
     'header',
@@ -87,13 +93,11 @@ export function Sidebar(props: SidebarProps): JSX.Element {
     return categories[0]?.id
   })
 
-  const activeLibrarySection = createMemo<SidebarSectionData | undefined>(() => {
-    const targetId = resolvedActiveCategoryId()
-    return librarySearchSections().find(section => section.id === targetId) ?? librarySearchSections()[0]
-  })
   const visibleLibrarySections = createMemo<SidebarSectionData[]>(() => {
     if (isSearching()) return []
-    return ensureArray(activeLibrarySection())
+    const targetId = resolvedActiveCategoryId()
+    const data = librarySearchSections().find(section => section.id === targetId) ?? librarySearchSections()[0]
+    return ensureArray(data)
   })
 
   const hasSearchSections = createMemo<boolean>(() => searchSections().length > 0)
@@ -153,7 +157,7 @@ export function Sidebar(props: SidebarProps): JSX.Element {
       <Show when={local.searchable !== false}>
         <SidebarSearchField
           value={searchValue()}
-          placeholder={local.searchPlaceholder ?? 'Search'}
+          placeholder={local.searchPlaceholder}
           onInput={setSearchValue}
           onClear={() => setSearchValue('')}
         />
@@ -176,53 +180,51 @@ export function Sidebar(props: SidebarProps): JSX.Element {
           </div>
         </Show>
 
-        <Show when={hasVisibleLibrarySections()}>
-          <Show
-            when={showRail()}
-            fallback={
-              <div class={bem('stack')}>
-                <For each={visibleLibrarySections()}>
-                  {section => (
-                    <SidebarSection
-                      section={section}
-                      activeItemId={activeItemId()}
-                      readonly={local.readonly}
-                      emptyState={local.emptyState}
-                      density="compact"
-                      onCollapsedChange={collapsed => local.onSectionToggle?.(section, collapsed)}
-                      onItemSelect={local.onItemSelect}
-                    />
-                  )}
-                </For>
-              </div>
-            }
-          >
-            <div class={bem('library-shell')}>
-              <SidebarRail
-                class={bem('rail')}
-                items={railItems()}
-                activeItemId={resolvedActiveCategoryId()}
-                readonly={local.readonly}
-                onItemSelect={item => setActiveCategoryId(item.id)}
-              />
-
-              <div class={bem('library-panel')}>
-                <For each={visibleLibrarySections()}>
-                  {section => (
-                    <SidebarSection
-                      section={section}
-                      activeItemId={activeItemId()}
-                      readonly={local.readonly}
-                      emptyState={local.emptyState}
-                      density="compact"
-                      onCollapsedChange={collapsed => local.onSectionToggle?.(section, collapsed)}
-                      onItemSelect={local.onItemSelect}
-                    />
-                  )}
-                </For>
-              </div>
+        <Show
+          when={hasVisibleLibrarySections() && showRail()}
+          fallback={
+            <div class={bem('stack')}>
+              <For each={visibleLibrarySections()}>
+                {section => (
+                  <SidebarSection
+                    section={section}
+                    activeItemId={activeItemId()}
+                    readonly={local.readonly}
+                    emptyState={local.emptyState}
+                    density="compact"
+                    onCollapsedChange={collapsed => local.onSectionToggle?.(section, collapsed)}
+                    onItemSelect={local.onItemSelect}
+                  />
+                )}
+              </For>
             </div>
-          </Show>
+          }
+        >
+          <div class={bem('library-shell')}>
+            <SidebarRail
+              class={bem('rail')}
+              items={railItems()}
+              activeItemId={resolvedActiveCategoryId()}
+              readonly={local.readonly}
+              onItemSelect={item => setActiveCategoryId(item.id)}
+            />
+
+            <div class={bem('library-panel')}>
+              <For each={visibleLibrarySections()}>
+                {section => (
+                  <SidebarSection
+                    section={section}
+                    activeItemId={activeItemId()}
+                    readonly={local.readonly}
+                    emptyState={local.emptyState}
+                    density="compact"
+                    onCollapsedChange={collapsed => local.onSectionToggle?.(section, collapsed)}
+                    onItemSelect={local.onItemSelect}
+                  />
+                )}
+              </For>
+            </div>
+          </div>
         </Show>
 
         <Show when={!hasSearchSections() && !hasVisibleLibrarySections()}>
