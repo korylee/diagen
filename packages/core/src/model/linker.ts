@@ -6,14 +6,21 @@ import { generateId, Point } from '@diagen/shared'
 import { DEFAULTS, type LinkerType } from '../constants'
 import type { BaseElement, LineStyle, FontStyle, DataAttribute } from './types'
 
-export type EndpointTarget =
-  | { kind: 'element'; id: string }
-  | { kind: 'port'; ownerId: string; portId: string }
+export type EndpointTarget = string
 
 export type LinkerEndpointBinding =
   | { type: 'free' }
-  | { type: 'fixed'; target: EndpointTarget; anchorId: string }
-  | { type: 'perimeter'; target: EndpointTarget; pathIndex: number; segmentIndex: number; t: number }
+  | { type: 'fixed'; anchorId: string }
+  | { type: 'perimeter'; pathIndex: number; segmentIndex: number; t: number }
+
+type EndpointTransform = Point & {
+  angle?: number
+}
+
+export type BoundLinkerEndpoint = EndpointTransform & {
+  target: EndpointTarget
+  binding: Exclude<LinkerEndpointBinding, { type: 'free' }>
+}
 
 /** 连线标签相对路线中心的正式偏移 */
 export interface LinkerTextPosition {
@@ -22,12 +29,7 @@ export interface LinkerTextPosition {
 }
 
 /** 连线端点 */
-export interface LinkerEndpoint {
-  x: number
-  y: number
-  binding: LinkerEndpointBinding
-  angle?: number
-}
+export type LinkerEndpoint = (EndpointTransform & { binding: { type: 'free' } }) | BoundLinkerEndpoint
 
 /** 连线元素（形状之间的连接） */
 export interface LinkerElement extends BaseElement {
@@ -57,9 +59,8 @@ export interface LinkerElement extends BaseElement {
   data: Record<string, unknown>
 }
 
-export function createLinker(patch: Partial<LinkerElement>):LinkerElement {
+export function createLinker(patch: Partial<LinkerElement>): LinkerElement {
   return {
-    type: 'linker',
     text: '',
     zIndex: 0,
     locked: false,
@@ -86,8 +87,9 @@ export function createLinker(patch: Partial<LinkerElement>):LinkerElement {
     dataAttributes: [],
     data: {},
     ...patch,
+    type: 'linker',
     id: patch.id || generateId('linker'),
-    name: patch.name || 'unknown'
+    name: patch.name || 'unknown',
   }
 }
 
@@ -97,20 +99,24 @@ export function isLinker(element?: BaseElement): element is LinkerElement {
 
 /** 两端是否都已连接 */
 export function isLinkerConnected(linker: LinkerElement): boolean {
-  return linker.from.binding.type !== 'free' && linker.to.binding.type !== 'free'
+  return isBoundLinkerEndpoint(linker.from) && isBoundLinkerEndpoint(linker.to)
 }
 
 /** 是否有断开的连接 */
 export function isLinkerBroken(linker: LinkerElement): boolean {
-  return linker.from.binding.type === 'free' || linker.to.binding.type === 'free'
+  return !isBoundLinkerEndpoint(linker.from) || !isBoundLinkerEndpoint(linker.to)
 }
 
 /** 是否为自由连线（两端都未连接） */
 export function isLinkerFree(linker: LinkerElement): boolean {
-  return linker.from.binding.type === 'free' && linker.to.binding.type === 'free'
+  return !isBoundLinkerEndpoint(linker.from) && !isBoundLinkerEndpoint(linker.to)
 }
 
 /** 是否锁定 */
 export function isLinkerLocked(linker: LinkerElement): boolean {
   return linker.locked
+}
+
+export function isBoundLinkerEndpoint(endpoint: LinkerEndpoint): endpoint is BoundLinkerEndpoint {
+  return endpoint.binding.type !== 'free'
 }

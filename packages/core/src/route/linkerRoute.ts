@@ -1,6 +1,6 @@
 import type { Point } from '@diagen/shared'
 import type { LinkerType } from '../constants'
-import { type DiagramElement, type LinkerElement, type LinkerEndpoint } from '../model'
+import { isBoundLinkerEndpoint, type DiagramElement, type LinkerElement, type LinkerEndpoint } from '../model'
 import { getAnchorInfoById, resolvePerimeterInfo } from '../anchors'
 import type { Obstacle, RouteConfig } from './types'
 import { getObstacleRoute, getObstacles, type RouteOptions } from './obstacleRoute'
@@ -153,12 +153,15 @@ function resolveLinkerEndpoints(
   }
 }
 
+const getLinkerEndpointTargetId = (endpoint: LinkerEndpoint): string | null =>
+  isBoundLinkerEndpoint(endpoint) ? endpoint.target : null
+
 function resolveLinkerObstacles(linker: LinkerElement, options: LinkerRouteOptions): Obstacle[] {
   if (options.obstacles) return options.obstacles
 
   const excludeIds = new Set(options.excludeObstacleIds ?? [])
-  const fromId = linker.from.binding.type !== 'free' && linker.from.binding.target.kind === 'element' ? linker.from.binding.target.id : null
-  const toId = linker.to.binding.type !== 'free' && linker.to.binding.target.kind === 'element' ? linker.to.binding.target.id : null
+  const fromId = getLinkerEndpointTargetId(linker.from)
+  const toId = getLinkerEndpointTargetId(linker.to)
   if (fromId) excludeIds.add(fromId)
   if (toId) excludeIds.add(toId)
 
@@ -177,12 +180,12 @@ function calculateBasicRoutePoints(
   fromAngle: number,
   toAngle: number,
   linkerType: LinkerType,
-  controlPoints: Point[],
+  waypoints: Point[],
 ): Point[] {
   const points: Point[] = [from]
 
-  if (controlPoints.length > 0) {
-    points.push(...controlPoints, to)
+  if (waypoints.length > 0) {
+    points.push(...waypoints, to)
     return points
   }
 
@@ -239,9 +242,9 @@ function resolveEndpoint(
 
   const binding = endpoint.binding
   if (binding.type === 'free') return fallback
-  if (binding.target.kind !== 'element') return fallback
 
-  const target = getElementById(binding.target.id)
+  const targetId = getLinkerEndpointTargetId(endpoint)
+  const target = targetId ? getElementById(targetId) : null
   const shape = target?.type === 'shape' ? target : null
   if (!shape) return fallback
 

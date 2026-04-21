@@ -1,8 +1,8 @@
 import {
   isLinker,
+  isShape,
   type LinkerElement,
   type LinkerEndpoint,
-  type LinkerEndpointBinding,
   type LinkerRoute,
   type ShapeElement,
 } from '@diagen/core'
@@ -15,17 +15,17 @@ import { hitTestLinkerGeometry, type LinkerHit } from '../../../utils'
 import {
   areSamePoints,
   normalizeLinkerManualPoints,
-  removeControlPointAt,
-  supportsManualControlPoints,
+  removeWaypointAt,
+  supportsManualWaypoints,
 } from '../../linker/normalizeManualPoints'
 import type { CoordinateService } from '../../services/createCoordinateService'
 import { createDragSession } from '../shared/createDragSession'
 import { createPointerDeltaState } from '../shared/createPointerDeltaState'
 import type { CreatePointerDragTrackerOptions } from '../shared/createPointerDragTracker'
+import { isBoundLinkerEndpoint, LinkerTextPosition, type BoundLinkerEndpoint } from '@diagen/core/model'
 
 export type LinkerDragMode = 'from' | 'to' | 'control' | 'line' | 'text'
 type LinkerEndpointMode = Extract<LinkerDragMode, 'from' | 'to'>
-type LinkerEndpointPatch = Pick<LinkerElement, 'from'> | Pick<LinkerElement, 'to'>
 
 interface DragState {
   linkerId: string
@@ -40,20 +40,17 @@ interface DragState {
   startRawFrom: LinkerElement['from']
   startRawTo: LinkerElement['to']
   startPoints: Point[]
-  startTextPosition: {
-    dx: number
-    dy: number
-  }
+  startTextPosition: LinkerTextPosition
 }
 
 interface CreateContext {
-  createdLinkerId: string
   linkerId: string
 }
 
 interface LinkerDragStartInput {
   event: MouseEvent
   state: DragState
+  context?: CreateContext
   createContext?: CreateContext | null
   prepare?: () => void
 }
@@ -67,7 +64,7 @@ interface LinkerEditStateOptions {
 
 interface LinkerEditStateResult {
   state: DragState
-  shouldInsertSegmentControl: boolean
+  shouldInsertSegmentWaypoint: boolean
 }
 
 interface SegmentDragState {
@@ -76,14 +73,6 @@ interface SegmentDragState {
   orthogonalMoveAxis?: Axis
   startControl: Point
   startPoints: Point[]
-}
-
-export interface AnchorHit {
-  shapeId: string
-  binding: LinkerEndpointBinding
-  anchorId?: string
-  point: Point
-  angle: number
 }
 
 export interface LinkerDragSnapshot {
@@ -129,13 +118,6 @@ export interface CreateLinkerDragOptions extends CreatePointerDragTrackerOptions
   allowSelfConnect?: boolean
 }
 
-interface EndpointPatchTarget {
-  shapeId: string | null
-  binding: LinkerEndpointBinding
-  point: Point
-  angle: number
-}
-
 interface FixedAnchorCandidate {
   id: string
   point: Point
@@ -163,6 +145,10 @@ type OrthogonalBinding =
       type: 'endpoint'
       point: Point
     }
+
+function isEndpointMode(mode: LinkerDragMode): mode is LinkerEndpointMode {
+  return mode === 'from' || mode === 'to'
+}
 
 function createEmptySnapCandidates(): SnapCandidateCollection {
   return {
@@ -213,10 +199,10 @@ export function createLinkerDrag(
   const transaction = history.createScope('拖拽连线')
   const pointerDelta = createPointerDeltaState(coordinate)
 
-  const [snapTarget, setSnapTarget] = createSignal<AnchorHit | null>(null)
+  const [snapTarget, setSnapTarget] = createSignal<BoundLinkerEndpoint | null>(null)
   const [createContext, setCreateContext] = createSignal<CreateContext | null>(null)
   let snapCandidates: SnapCandidateCollection = createEmptySnapCandidates()
-  const session: ReturnType<typeof createDragSession<LinkerDragStartInput, DragState>> = createDragSession({
+  const session = createDragSession<LinkerDragStartInput, DragState>({
     threshold,
     transaction,
     transactionMode: 'on-begin',
@@ -258,13 +244,13 @@ export function createLinkerDrag(
       }
 
       if (isEndpointMode(state.mode)) {
-        moveEndpoint(state, state.mode, delta, zoom, linker)
+        moveEndpoint(state, delta, zoom, linker)
       }
     },
     finalize: ({ state, shouldCommit }) => {
       if (!shouldCommit || !state) return
       if (state.mode === 'control') {
-        normalizeControlPoints(state.linkerId)
+        normalizeWaypoints(state.linkerId)
         return
       }
       if (state.mode === 'text') return
@@ -281,21 +267,18 @@ export function createLinkerDrag(
     onCommit: () => {
       const currentCreateContext = createContext()
       if (currentCreateContext) {
-        selection.replace([currentCreateContext.createdLinkerId])
+        selection.replace([currentCreateContext.linkerId])
       }
     },
   })
 
-  function isShapeLinkableShape(shape: ShapeElement, state?: DragState): boolean {
-    if (!shape.visible || shape.locked) return false
-    if (shape.attribute?.visible === false || shape.attribute?.linkable === false) return false
-    if (!allowSelfConnect && state?.oppositeShapeId && shape.id === state.oppositeShapeId) return false
+  function isShapeLinkable(shape: string | ShapeElement, state?: DragState): boolean {
+    const shapeElement = typeof shape === 'string' ? element.getElementById(shape) : shape
+    if (!shapeElement || !isShape(shapeElement)) return false
+    if (!shapeElement.visible || shapeElement.locked) return false
+    if (shapeElement.attribute?.visible === false || shapeElement.attribute?.linkable === false) return false
+    if (!allowSelfConnect && state?.oppositeShapeId && shapeElement.id === state.oppositeShapeId) return false
     return true
-  }
-
-  function isShapeLinkable(shapeId: string, state?: DragState): boolean {
-    const shape = element.getElementById(shapeId)
-    return !!shape && shape.type === 'shape' && isShapeLinkableShape(shape, state)
   }
 
   function buildSnapCandidates(state?: DragState): SnapCandidateCollection {
@@ -303,7 +286,7 @@ export function createLinkerDrag(
     const byId = new Map<string, SnapShapeCandidate>()
 
     for (const shape of element.shapes()) {
-      if (!isShapeLinkableShape(shape, state)) continue
+      if (!isShapeLinkable(shape, state)) continue
 
       const fixedAnchors: FixedAnchorCandidate[] = []
       for (let index = 0; index < shape.anchors.length; index++) {
@@ -330,71 +313,54 @@ export function createLinkerDrag(
     }
   }
 
-  function resolveInitialSnapTarget(state: DragState): AnchorHit | null {
+  function resolveInitialSnapTarget(state: DragState): BoundLinkerEndpoint | null {
     if (!isEndpointMode(state.mode)) return null
 
     const endpoint = state.mode === 'from' ? state.startRawFrom : state.startRawTo
-    if (endpoint.binding.type === 'free') return null
-    if (endpoint.binding.target.kind !== 'element') return null
+    if (!isBoundLinkerEndpoint(endpoint)) return null
 
-    const target = element.getElementById(endpoint.binding.target.id)
-    const shape = target?.type === 'shape' ? target : null
+    const target = element.getElementById(endpoint.target)
+    const shape = isShape(target) ? target : null
     if (!shape) return null
 
-    return resolveAnchorHit({
-      shapeId: shape.id,
-      binding: endpoint.binding,
-      point: { x: endpoint.x, y: endpoint.y },
-      angle: endpoint.angle ?? 0,
-    })
+    return resolveBoundEndpoint(endpoint)
   }
 
-  function resolveAnchorHit(hit: AnchorHit): AnchorHit | null {
-    const candidate = snapCandidates.byId.get(hit.shapeId)
+  function resolveBoundEndpoint(endpoint: BoundLinkerEndpoint): BoundLinkerEndpoint | null {
+    const { binding, target } = endpoint
+    const candidate = snapCandidates.byId.get(target)
     if (!candidate) return null
     const { shape } = candidate
 
-    if (hit.binding.type === 'fixed') {
-      const binding = hit.binding as Extract<LinkerEndpointBinding, { type: 'fixed' }>
+    if (binding.type === 'fixed') {
       const info = candidate.fixedAnchors.find(anchor => anchor.id === binding.anchorId)
       if (!info) return null
       return {
-        shapeId: shape.id,
+        x: info.point.x,
+        y: info.point.y,
+        angle: info.angle,
+        target: shape.id,
         binding: {
           type: 'fixed',
-          target: {
-            kind: 'element',
-            id: shape.id,
-          },
           anchorId: info.id,
         },
-        anchorId: info.id,
-        point: info.point,
-        angle: info.angle,
       }
     }
 
-    if (hit.binding.type === 'perimeter') {
-      const info = resolvePerimeterInfo(shape, hit.binding)
-      if (!info) return null
-      return {
-        shapeId: shape.id,
-        binding: {
-          type: 'perimeter',
-          target: {
-            kind: 'element',
-            id: shape.id,
-          },
-          pathIndex: info.pathIndex,
-          segmentIndex: info.segmentIndex,
-          t: info.t,
-        },
-        point: info.point,
-        angle: info.angle,
-      }
+    const info = resolvePerimeterInfo(shape, binding)
+    if (!info) return null
+    return {
+      x: info.point.x,
+      y: info.point.y,
+      angle: info.angle,
+      target: shape.id,
+      binding: {
+        type: 'perimeter',
+        pathIndex: info.pathIndex,
+        segmentIndex: info.segmentIndex,
+        t: info.t,
+      },
     }
-
-    return null
   }
 
   function resolveLinkerHit(linker: LinkerElement, point: Point): { hit: LinkerHit | null; route: LinkerRoute } {
@@ -410,10 +376,10 @@ export function createLinkerDrag(
   }
 
   function hitTest(linkerId: string, point: Point): LinkerHit | null {
-    return hitTestWithRoute(linkerId, point)?.hit ?? null
+    return resolveHitResult(linkerId, point)?.hit ?? null
   }
 
-  function hitTestWithRoute(linkerId: string, point: Point): { hit: LinkerHit; route: LinkerRoute } | null {
+  function resolveHitResult(linkerId: string, point: Point): { hit: LinkerHit; route: LinkerRoute } | null {
     const el = element.getElementById(linkerId)
     if (!el || !isLinker(el)) return null
     const result = resolveLinkerHit(el, point)
@@ -430,9 +396,9 @@ export function createLinkerDrag(
     point: Point,
     segmentIndex: number,
   ): SegmentDragState {
-    const startPoints = linker.points.map(p => ({ x: p.x, y: p.y }))
+    const startPoints = linker.points.map(p => ({ ...p }))
     const orthogonalState =
-      linker.linkerType === 'orthogonal' ? prepareOrthogonalSegmentDragState(route, segmentIndex) : null
+      linker.linkerType === 'orthogonal' ? resolveOrthogonalSegmentDragState(route, segmentIndex) : null
 
     if (orthogonalState) {
       return {
@@ -446,7 +412,7 @@ export function createLinkerDrag(
 
     const insertionIndex =
       startPoints.length === 0 ? 0 : Math.max(0, Math.min(startPoints.length, segmentIndex ?? startPoints.length))
-    const insertedPoint = { x: point.x, y: point.y }
+    const insertedPoint = { ...point }
     const nextPoints = [...startPoints]
     nextPoints.splice(insertionIndex, 0, insertedPoint)
 
@@ -464,7 +430,7 @@ export function createLinkerDrag(
     let controlIndices: number[] | undefined
     let orthogonalMoveAxis: Axis | undefined
     let startControl: Point | undefined
-    let startPoints = linker.points.map(p => ({ x: p.x, y: p.y }))
+    let startPoints = linker.points.map(p => ({ ...p }))
 
     if (hit.type === 'from' || hit.type === 'to') {
       mode = hit.type
@@ -502,17 +468,16 @@ export function createLinkerDrag(
           dy: linker.textPosition?.dy ?? 0,
         },
       },
-      shouldInsertSegmentControl: hit.type === 'segment',
+      shouldInsertSegmentWaypoint: hit.type === 'segment',
     }
   }
 
   function resolveOppositeShapeId(linker: LinkerElement, mode: LinkerDragMode): string | null {
     const endpoint = mode === 'from' ? linker.to : linker.from
-    if (endpoint.binding.type === 'free') return null
-    if (endpoint.binding.target.kind !== 'element') return null
+    if (!isBoundLinkerEndpoint(endpoint)) return null
 
-    const target = element.getElementById(endpoint.binding.target.id)
-    return target?.type === 'shape' ? endpoint.binding.target.id : null
+    const target = element.getElementById(endpoint.target)
+    return isShape(target) ? endpoint.target : null
   }
 
   function beginEdit(e: MouseEvent, options: BeginLinkerEditOptions): boolean {
@@ -534,7 +499,7 @@ export function createLinkerDrag(
 
     return beginSession(e, editState.state, {
       prepare: () => {
-        if (editState.shouldInsertSegmentControl) {
+        if (editState.shouldInsertSegmentWaypoint) {
           edit.update(linkerId, { points: editState.state.startPoints })
         }
       },
@@ -548,10 +513,10 @@ export function createLinkerDrag(
       point: Point
     },
   ): boolean {
-    const point = options.point
+    const { point, linkerId } = options
     const linker = element.create(
       'linker',
-      options.linkerId,
+      linkerId,
       {
         x: point.x,
         y: point.y,
@@ -566,9 +531,8 @@ export function createLinkerDrag(
     if (!linker || !isLinker(linker)) return false
     return beginCreateWithLinker(e, {
       linker,
-      createContext: {
-        createdLinkerId: linker.id,
-        linkerId: options.linkerId,
+      context: {
+        linkerId: linkerId,
       },
       oppositeShapeId: null,
     })
@@ -581,39 +545,37 @@ export function createLinkerDrag(
       linkerId: string
     },
   ): boolean {
-    const sourceShape = element.getElementById(options.shapeId)
-    if (!sourceShape || sourceShape.type !== 'shape') return false
+    const { shapeId, linkerId } = options
+    const sourceShape = element.getElementById(shapeId)
+    if (!sourceShape || !isShape(sourceShape)) return false
 
     const preferredAnchor = resolveCreateAnchor(sourceShape)
     if (!preferredAnchor) return false
 
-    const fromBinding: LinkerEndpointBinding =
+    const fromEndpoint: LinkerEndpoint =
       preferredAnchor.type === 'fixed'
         ? {
-            type: 'fixed',
-            target: {
-              kind: 'element',
-              id: sourceShape.id,
+            x: preferredAnchor.point.x,
+            y: preferredAnchor.point.y,
+            angle: preferredAnchor.angle,
+            target: sourceShape.id,
+            binding: {
+              type: 'fixed',
+              anchorId: preferredAnchor.id,
             },
-            anchorId: preferredAnchor.id,
           }
         : {
-            type: 'perimeter',
-            target: {
-              kind: 'element',
-              id: sourceShape.id,
+            x: preferredAnchor.point.x,
+            y: preferredAnchor.point.y,
+            angle: preferredAnchor.angle,
+            target: sourceShape.id,
+            binding: {
+              type: 'perimeter',
+              pathIndex: preferredAnchor.pathIndex,
+              segmentIndex: preferredAnchor.segmentIndex,
+              t: preferredAnchor.t,
             },
-            pathIndex: preferredAnchor.pathIndex,
-            segmentIndex: preferredAnchor.segmentIndex,
-            t: preferredAnchor.t,
           }
-
-    const fromEndpoint: LinkerEndpoint = {
-      x: preferredAnchor.point.x,
-      y: preferredAnchor.point.y,
-      angle: preferredAnchor.angle,
-      binding: fromBinding,
-    }
 
     const toEndpoint: LinkerEndpoint = {
       x: preferredAnchor.point.x,
@@ -622,27 +584,27 @@ export function createLinkerDrag(
       binding: { type: 'free' },
     }
 
-    const linker = element.create('linker', options.linkerId, fromEndpoint, toEndpoint)
+    const linker = element.create('linker', linkerId, fromEndpoint, toEndpoint)
     if (!linker || !isLinker(linker)) return false
     return beginCreateWithLinker(e, {
       linker,
-      createContext: {
-        createdLinkerId: linker.id,
-        linkerId: options.linkerId,
+      context: {
+        linkerId: linkerId,
       },
       oppositeShapeId: sourceShape.id,
     })
   }
 
   function beginCreate(e: MouseEvent, options: BeginLinkerCreateOptions): boolean {
-    return options.from.type === 'point'
+    const { from, linkerId } = options
+    return from.type === 'point'
       ? beginCreateFromPoint(e, {
-          linkerId: options.linkerId,
-          point: options.from.point,
+          linkerId: linkerId,
+          point: from.point,
         })
       : beginCreateFromShape(e, {
-          linkerId: options.linkerId,
-          shapeId: options.from.shapeId,
+          linkerId: linkerId,
+          shapeId: from.shapeId,
         })
   }
 
@@ -650,11 +612,11 @@ export function createLinkerDrag(
     e: MouseEvent,
     options: {
       linker: LinkerElement
-      createContext: CreateContext
+      context: CreateContext
       oppositeShapeId: string | null
     },
   ): boolean {
-    const { linker, createContext, oppositeShapeId } = options
+    const { linker, context, oppositeShapeId } = options
     const state: DragState = {
       linkerId: linker.id,
       mode: 'to',
@@ -671,7 +633,7 @@ export function createLinkerDrag(
     }
 
     return beginSession(e, state, {
-      createContext,
+      context,
       prepare: () => {
         edit.add([linker])
       },
@@ -682,15 +644,16 @@ export function createLinkerDrag(
     e: MouseEvent,
     state: DragState,
     options: {
-      createContext?: CreateContext | null
+      context?: CreateContext
       prepare?: () => void
     } = {},
   ): boolean {
+    const { context, prepare } = options
     return session.begin({
       event: e,
       state,
-      createContext: options.createContext ?? null,
-      prepare: options.prepare,
+      context: context,
+      prepare: prepare,
     })
   }
 
@@ -702,16 +665,16 @@ export function createLinkerDrag(
     setSnapTarget(null)
     edit.update(state.linkerId, {
       from: {
-        ...state.startRawFrom,
-        binding: { type: 'free' },
         x: state.startFrom.x + delta.x,
         y: state.startFrom.y + delta.y,
+        angle: state.startRawFrom.angle,
+        binding: { type: 'free' },
       },
       to: {
-        ...state.startRawTo,
-        binding: { type: 'free' },
         x: state.startTo.x + delta.x,
         y: state.startTo.y + delta.y,
+        angle: state.startRawTo.angle,
+        binding: { type: 'free' },
       },
       points: state.startPoints.map(p => ({ x: p.x + delta.x, y: p.y + delta.y })),
     })
@@ -720,10 +683,10 @@ export function createLinkerDrag(
   function moveText(state: DragState, delta: Point, linkerElement: LinkerElement): void {
     setSnapTarget(null)
 
-    const textOffset = normalizeTextPosition({
+    const textOffset = {
       dx: state.startTextPosition.dx + delta.x,
       dy: state.startTextPosition.dy + delta.y,
-    })
+    }
 
     if (
       linkerElement.textPosition?.dx === textOffset?.dx &&
@@ -756,7 +719,7 @@ export function createLinkerDrag(
         }
       }
 
-      const nextPoints = resolveOrthogonalControlPoints(state, delta, controlIndex, startControl)
+      const nextPoints = resolveOrthogonalWaypoints(state, delta, controlIndex, startControl)
       if (nextPoints) {
         edit.update(state.linkerId, { points: nextPoints })
         return
@@ -771,7 +734,7 @@ export function createLinkerDrag(
     edit.update(state.linkerId, { points: nextPoints })
   }
 
-  function commitControlPoints(
+  function commitWaypoints(
     linkerId: string,
     nextPoints: Point[],
     options: {
@@ -790,7 +753,7 @@ export function createLinkerDrag(
     return true
   }
 
-  function prepareOrthogonalSegmentDragState(
+  function resolveOrthogonalSegmentDragState(
     route: LinkerRoute,
     segmentIndex: number,
   ): OrthogonalSegmentDragState | null {
@@ -844,7 +807,7 @@ export function createLinkerDrag(
     }
   }
 
-  function resolveOrthogonalControlPoints(
+  function resolveOrthogonalWaypoints(
     state: DragState,
     delta: Point,
     controlIndex: number,
@@ -944,32 +907,27 @@ export function createLinkerDrag(
     }
   }
 
-  function normalizeControlPoints(linkerId: string): void {
+  function normalizeWaypoints(linkerId: string): void {
     const linker = element.getElementById(linkerId)
     if (!linker || !isLinker(linker)) return
-    commitControlPoints(linkerId, linker.points, { normalize: true })
+    commitWaypoints(linkerId, linker.points, { normalize: true })
   }
 
-  function removeControlPoint(linkerId: string, index: number): boolean {
+  function removeWaypoint(linkerId: string, index: number): boolean {
     const linker = element.getElementById(linkerId)
     if (!linker || !isLinker(linker)) return false
-    if (!supportsManualControlPoints(linker.linkerType)) return false
+    if (!supportsManualWaypoints(linker.linkerType)) return false
 
-    const nextPoints = removeControlPointAt(linker.points, index)
+    const nextPoints = removeWaypointAt(linker.points, index)
     if (!nextPoints) return false
 
-    return commitControlPoints(linkerId, nextPoints, {
+    return commitWaypoints(linkerId, nextPoints, {
       normalize: true,
     })
   }
 
-  function moveEndpoint(
-    state: DragState,
-    mode: LinkerEndpointMode,
-    delta: Point,
-    zoom: number,
-    linkerElement: LinkerElement,
-  ): void {
+  function moveEndpoint(state: DragState, delta: Point, zoom: number, linkerElement: LinkerElement): void {
+    const mode = state.mode
     const startPoint = mode === 'from' ? state.startFrom : state.startTo
     const target = {
       x: startPoint.x + delta.x,
@@ -986,10 +944,12 @@ export function createLinkerDrag(
     })
     setSnapTarget(nextSnapTarget)
 
-    edit.update(
-      state.linkerId,
-      buildEndpointPatch(mode, linkerElement[mode], resolveMoveEndpointTarget(target, oppositePoint, nextSnapTarget)),
-    )
+    const endpoint =
+      snapOnMove && nextSnapTarget
+        ? nextSnapTarget
+        : createFreeEndpoint(target, Math.atan2(oppositePoint.y - target.y, oppositePoint.x - target.x))
+
+    edit.update(state.linkerId, { [mode]: endpoint })
   }
 
   function end(): void {
@@ -1004,11 +964,11 @@ export function createLinkerDrag(
     const el = element.getElementById(state.linkerId)
     if (!el || !isLinker(el)) return
 
-    const currentPoint = mode === 'from' ? { x: el.from.x, y: el.from.y } : { x: el.to.x, y: el.to.y }
-    const zoom = view.transform().zoom
+    const currentPoint = pick(mode === 'from' ? el.from : el.to, ['x', 'y'])
+    const zoom = view.zoom()
     const maxDistance = snapDistance / zoom
     const stickDistance = snapStickDistance / zoom
-    const oppositePoint = mode === 'from' ? el.to : el.from
+    const oppositePoint = pick(mode === 'from' ? el.to : el.from, ['x', 'y'])
     const target =
       snapTarget() ??
       findNearestAnchor(currentPoint, {
@@ -1018,80 +978,37 @@ export function createLinkerDrag(
       })
     if (!target) return
 
-    edit.update(state.linkerId, buildEndpointPatch(mode, el[mode], target))
+    edit.update(state.linkerId, { [mode]: target })
   }
 
-  function isEndpointMode(mode: LinkerDragMode): mode is LinkerEndpointMode {
-    return mode === 'from' || mode === 'to'
-  }
-
-  function resolveMoveEndpointTarget(
-    target: Point,
-    oppositePoint: Point,
-    nextSnapTarget: AnchorHit | null,
-  ): EndpointPatchTarget {
-    if (snapOnMove && nextSnapTarget) {
-      return {
-        shapeId: nextSnapTarget.shapeId,
-        binding: nextSnapTarget.binding,
-        point: nextSnapTarget.point,
-        angle: nextSnapTarget.angle,
-      }
-    }
-
+  function createFreeEndpoint(point: Point, angle: number): LinkerEndpoint {
     return {
-      shapeId: null,
+      x: point.x,
+      y: point.y,
+      angle,
       binding: { type: 'free' },
-      point: target,
-      angle: Math.atan2(oppositePoint.y - target.y, oppositePoint.x - target.x),
     }
   }
 
-  function normalizeTextPosition(textPosition: { dx: number; dy: number }): LinkerElement['textPosition'] {
-    if (isSameNumber(textPosition.dx, 0) && isSameNumber(textPosition.dy, 0)) {
-      return undefined
-    }
-
-    return {
-      dx: textPosition.dx,
-      dy: textPosition.dy,
-    }
-  }
-
-  function buildEndpointPatch(
-    mode: LinkerEndpointMode,
-    endpoint: LinkerElement['from'] | LinkerElement['to'],
-    target: EndpointPatchTarget,
-  ): LinkerEndpointPatch {
-    const nextEndpoint = {
-      ...endpoint,
-      binding: target.binding,
-      angle: target.angle,
-      x: target.point.x,
-      y: target.point.y,
-    }
-
-    return mode === 'from' ? { from: nextEndpoint } : { to: nextEndpoint }
-  }
   function findNearestAnchor(
     point: Point,
     options: {
       maxDistance: number
       stickDistance: number
-      preferred?: AnchorHit | null
+      preferred?: BoundLinkerEndpoint | null
       oppositePoint?: Point
     },
-  ): AnchorHit | null {
+  ): BoundLinkerEndpoint | null {
     const { maxDistance, stickDistance, preferred, oppositePoint } = options
 
     if (preferred) {
-      const resolved = resolveAnchorHit(preferred)
-      if (resolved && getDistance(point, resolved.point) <= maxDistance + stickDistance) {
+      const resolved = resolveBoundEndpoint(preferred)
+      if (resolved && getDistance(point, pick(resolved, ['x', 'y'])) <= maxDistance + stickDistance) {
         return resolved
       }
     }
 
-    let best: AnchorHit | null = null
+    let best: BoundLinkerEndpoint | null = null
     let bestScore = Infinity
     const weight = Math.max(0, directionBias)
 
@@ -1106,27 +1023,21 @@ export function createLinkerDrag(
         if (oppositePoint && weight > 0) {
           const desiredAngle = Math.atan2(oppositePoint.y - anchor.point.y, oppositePoint.x - anchor.point.x)
           const diff = normalizeAngleDiff(desiredAngle, anchor.angle)
-          // 角度差越大惩罚越高，避免临近锚点间频繁抖动。
           score += (diff / Math.PI) * weight * maxDistance
         }
-        // 同等条件下优先固定锚点，再回退到 perimeter。
         score -= fixedAnchorBias * maxDistance
 
         if (score <= bestScore) {
           bestScore = score
           best = {
-            shapeId: shape.id,
+            x: anchor.point.x,
+            y: anchor.point.y,
+            angle: anchor.angle,
+            target: shape.id,
             binding: {
               type: 'fixed',
-              target: {
-                kind: 'element',
-                id: shape.id,
-              },
               anchorId: anchor.id,
             },
-            anchorId: anchor.id,
-            point: anchor.point,
-            angle: anchor.angle,
           }
         }
       }
@@ -1145,19 +1056,16 @@ export function createLinkerDrag(
       if (score <= bestScore) {
         bestScore = score
         best = {
-          shapeId: shape.id,
+          x: perimeter.point.x,
+          y: perimeter.point.y,
+          angle: perimeter.angle,
+          target: shape.id,
           binding: {
             type: 'perimeter',
-            target: {
-              kind: 'element',
-              id: shape.id,
-            },
             pathIndex: perimeter.pathIndex,
             segmentIndex: perimeter.segmentIndex,
             t: perimeter.t,
           },
-          point: perimeter.point,
-          angle: perimeter.angle,
         }
       }
     }
@@ -1187,11 +1095,11 @@ export function createLinkerDrag(
     state: getDragSnapshot,
     isShapeLinkable: (shapeId: string) => isShapeLinkable(shapeId, session.state() ?? undefined),
     snapTarget,
-    hitTestWithRoute,
     hitTest,
+    resolveHitResult,
     beginEdit,
     beginCreate,
-    removeControlPoint,
+    removeWaypoint,
     move,
     end,
     cancel,

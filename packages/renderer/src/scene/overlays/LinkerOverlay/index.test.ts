@@ -9,7 +9,7 @@ function flushEffects(): Promise<void> {
 }
 
 describe('LinkerOverlay', () => {
-  it('选中连线时应渲染端点手柄与控制点手柄', async () => {
+  it('选中连线时应渲染端点手柄与路径点手柄', async () => {
     const harness = await createRendererTestHarness({
       shapes: [
         { id: 'shape_link_a', x: 100, y: 100, w: 100, h: 80 },
@@ -51,12 +51,12 @@ describe('LinkerOverlay', () => {
       const fromHandle = harness.overlayLayer.querySelector('.dg-linker-overlay__from-endpoint')
       const toHandle = harness.overlayLayer.querySelector('.dg-linker-overlay__to-endpoint')
       const path = harness.overlayLayer.querySelector('path')
-      const controlHandles = harness.overlayLayer.querySelectorAll('.dg-linker-overlay__control-point')
+      const waypointHandles = harness.overlayLayer.querySelectorAll('.dg-linker-overlay__waypoint')
 
       expect(fromHandle).toBeTruthy()
       expect(toHandle).toBeTruthy()
       expect(path).toBeTruthy()
-      expect(controlHandles).toHaveLength(2)
+      expect(waypointHandles).toHaveLength(2)
     } finally {
       harness.dispose()
     }
@@ -145,7 +145,7 @@ describe('LinkerOverlay', () => {
     }
   })
 
-  it('双击 broken 连线控制点后应删除该点并更新 overlay', async () => {
+  it('双击 broken 连线路径点后应删除该点并更新 overlay', async () => {
     const harness = await createRendererTestHarness({
       shapes: [
         { id: 'shape_control_remove_a', x: 100, y: 100, w: 100, h: 80 },
@@ -180,12 +180,12 @@ describe('LinkerOverlay', () => {
       harness.designer.selection.replace([linker.id])
       await flushEffects()
 
-      const controlHandle = harness.overlayLayer.querySelector(
-        '.dg-linker-overlay__control-point[data-linker-control-index="0"]',
+      const waypointHandle = harness.overlayLayer.querySelector(
+        '.dg-linker-overlay__waypoint[data-linker-waypoint-index="0"]',
       ) as HTMLElement | null
-      expect(controlHandle).toBeTruthy()
+      expect(waypointHandle).toBeTruthy()
 
-      controlHandle!.dispatchEvent(
+      waypointHandle!.dispatchEvent(
         new MouseEvent('dblclick', {
           bubbles: true,
           cancelable: true,

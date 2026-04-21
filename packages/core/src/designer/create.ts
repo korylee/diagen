@@ -55,9 +55,33 @@ function serializeDesignerDiagram(diagram: Diagram): string {
   return JSON.stringify(diagram, null, 2)
 }
 
+function assertNoLegacyLinkerEndpointTarget(input: unknown): void {
+  if (!input || typeof input !== 'object') return
+
+  const diagram = input as {
+    elements?: Record<string, { type?: string; from?: unknown; to?: unknown }>
+  }
+
+  for (const element of Object.values(diagram.elements ?? {})) {
+    if (!element || element.type !== 'linker') continue
+    for (const endpoint of [element.from, element.to]) {
+      if (!endpoint || typeof endpoint !== 'object') continue
+      const binding = (endpoint as { binding?: { target?: unknown } }).binding
+      if (binding && typeof binding === 'object' && 'target' in binding) {
+        throw new Error('Legacy linker endpoint format `binding.target` is no longer supported. Please migrate the diagram data.')
+      }
+
+      if ('target' in endpoint && typeof (endpoint as { target?: unknown }).target !== 'string') {
+        throw new Error('Legacy linker endpoint target object format is no longer supported. Please migrate the diagram data.')
+      }
+    }
+  }
+}
+
 function loadDesignerDiagram(input: string | Diagram): Diagram {
   // Designer 内部统一在加载时补齐 Diagram 缺省结构，并断开外部引用。
   const raw = typeof input === 'string' ? (JSON.parse(input) as Diagram) : input
+  assertNoLegacyLinkerEndpointTarget(raw)
   return createDiagram(unwrapClone(raw))
 }
 

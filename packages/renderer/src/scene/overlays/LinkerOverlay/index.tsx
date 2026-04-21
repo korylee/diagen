@@ -10,7 +10,7 @@ import { createRoutePath } from './createRoutePath'
 import { LinkQuickCreatePanel } from './LinkQuickCreatePanel'
 import { LinkTargetHighlights } from './LinkTargetHighlights'
 import { SelectedLinkerOverlay } from './SelectedLinkerOverlay'
-import type { LinkerControlHandle, QuickCreateAction, QuickCreatePanel, QuickCreatePlacement } from './types'
+import type { LinkerWaypointHandle, QuickCreateAction, QuickCreatePanel, QuickCreatePlacement } from './types'
 
 import './index.scss'
 
@@ -38,7 +38,7 @@ export function LinkerOverlay() {
 
   const targetItems = createMemo(() => {
     if (!isLinkEndDragging()) return []
-    const activeId = pointer.linkerDrag.snapTarget()?.shapeId ?? null
+    const activeId = pointer.linkerDrag.snapTarget()?.target ?? null
 
     return element
       .shapes()
@@ -143,7 +143,7 @@ export function LinkerOverlay() {
     }
   })
 
-  const controlHandles = createMemo<LinkerControlHandle[]>(() => {
+  const waypointHandles = createMemo<LinkerWaypointHandle[]>(() => {
     const linker = selectedLinker()
     if (!linker) return []
     return linker.points.map((point, index) => ({
@@ -185,7 +185,7 @@ export function LinkerOverlay() {
   const anchorItems = createMemo(() => {
     const candidate = fixedSnapTarget()
     if (!candidate) return []
-    const target = element.getElementById(candidate.shapeId)
+    const target = element.getElementById(candidate.target)
     if (!target || !isShape(target)) return []
 
     const anchorSize = state.config.anchorSize
@@ -195,10 +195,10 @@ export function LinkerOverlay() {
       const anchor = getAnchorInfo(target, index)
       if (!anchor) continue
       const screenPoint = coordinate.canvasToScreen(anchor.point)
-      const isActive = candidate.anchorId === anchor.id
+      const isActive = candidate.binding.type === 'fixed' && candidate.binding.anchorId === anchor.id
 
       items.push({
-        id: `${candidate.shapeId}:anchor-preview:${anchor.id}:${index}`,
+        id: `${candidate.target}:anchor-preview:${anchor.id}:${index}`,
         bounds: {
           x: screenPoint.x - anchorSize / 2,
           y: screenPoint.y - anchorSize / 2,
@@ -209,7 +209,7 @@ export function LinkerOverlay() {
         background: isActive ? 'var(--dg-anchor-color)' : 'var(--dg-anchor-background)',
         radius: anchorSize / 2,
         dataAttrs: {
-          'data-shape-highlight-id': candidate.shapeId,
+          'data-shape-highlight-id': candidate.target,
           'data-shape-highlight-kind': 'anchor-preview',
           'data-shape-highlight-state': 'armed',
           'data-shape-highlight-part': 'anchor',
@@ -253,13 +253,13 @@ export function LinkerOverlay() {
     })
   }
 
-  const removeControlPoint = (e: MouseEvent, index: number) => {
+  const removeWaypoint = (e: MouseEvent, index: number) => {
     const linker = selectedLinker()
     if (!linker) return
 
     e.stopPropagation()
     e.preventDefault()
-    pointer.linkerDrag.removeControlPoint(linker.id, index)
+    pointer.linkerDrag.removeWaypoint(linker.id, index)
   }
 
   const overlayModel = createMemo(() => {
@@ -269,7 +269,7 @@ export function LinkerOverlay() {
     return {
       routePath: routePath(),
       endpointHandles: handles,
-      controlHandles: controlHandles(),
+      waypointHandles: waypointHandles(),
       textBounds: textBounds(),
       anchorItems: anchorItems(),
     }
@@ -288,7 +288,7 @@ export function LinkerOverlay() {
         model={overlayModel()}
         onStartEndpointDrag={startEndpointDrag}
         onStartControlDrag={(event, handle) => startControlDrag(event, handle.index, handle.canvas)}
-        onRemoveControlPoint={(event, handle) => removeControlPoint(event, handle.index)}
+        onRemoveWaypoint={(event, handle) => removeWaypoint(event, handle.index)}
       />
     </>
   )

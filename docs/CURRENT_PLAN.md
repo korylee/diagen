@@ -33,6 +33,21 @@
 - 当前最直接影响编辑器生产力的剩余短板，已经转移到样式操作效率与导航效率。
 - 多 page、持久化与导入导出仍重要，但继续后置，优先补齐更直接影响日常编辑体验的能力。
 
+### 并行专项
+
+在不切换当前主阶段的前提下，允许并行推进 `LinkerEndpoint` 交互收口专项。
+
+专项目标：
+
+- 清理 `binding.target` 迁移后的少量旧测试口径
+- 补齐 `perimeter` 附着点预览
+- 增加 `fixed / perimeter` 的显式切换能力
+- 继续降低端点拖拽过程中的吸附跳变
+
+专项文档：
+
+- `docs/LINKER_ENDPOINT_OPTIMIZATION.md`
+
 ## 2. 本阶段范围
 
 本阶段建议先做：
@@ -96,13 +111,15 @@
 2. 再统一导航动作在 UI action、快捷键与 renderer 手势中的行为
 3. 然后收口默认样式入口
 4. 再完成选中元素的批量样式应用
-5. 最后评估 minimap 与阶段文档收尾
+5. 并行推进 `LinkerEndpoint` 交互收口专项：先清理旧测试口径，再补 `perimeter` 预览、显式切换与吸附稳定性微调
+6. 最后评估 minimap 与阶段文档收尾
 
 原因：
 
 - `view manager`、`createPan` 与现有 toolbar action 已经具备导航基础，继续补齐入口和一致性，返工成本最低
 - 默认样式入口虽然重要，但当前代码明显先进入了导航与工具态一致性收口，先顺势收口这部分更符合当前分支实际状态
 - 批量样式应用依赖默认样式与正式样式入口更稳定之后再做，更不容易重写
+- `LinkerEndpoint` 当前更适合作为并行专项逐步收口，而不是重新切换整个主阶段
 
 ## 6. 样式与导航规则表
 
@@ -189,13 +206,19 @@
 2. 把对应入口接到 `packages/ui/src/toolbar/createToolbarBridge.ts` / `packages/ui/src/toolbar/Toolbar.tsx`
 3. 给 `packages/core/src/designer/managers/view/index.test.ts` 增补 `actual size / fitToSelection` 的明确断言
 4. 给 `packages/renderer/src/scene/Renderer.test.ts` 增补 `Space + drag`、缩放后导航动作与现有拖拽/编辑链路不冲突的回归
-5. 导航闭环稳定后，再开始默认样式入口与批量样式应用的正式 manager 设计
+5. 并行启动 `LinkerEndpoint` 交互收口专项，按 `docs/LINKER_ENDPOINT_OPTIMIZATION.md` 的顺序推进：
+   - 先清理 renderer 集成测试中的旧 `from.id / to.id` 断言
+   - 再补 `perimeter` 附着点预览
+   - 再补 `fixed / perimeter` 显式切换
+   - 最后再做吸附稳定性微调与回归测试
+6. 导航闭环稳定后，再开始默认样式入口与批量样式应用的正式 manager 设计
 
 这样做的原因：
 
 - 现有代码已经有 `view manager + createPan + toolbar/sidebar/tool continuous` 的连续改动轨迹
 - 先把导航闭环做完，可以更快形成本阶段一个可验证、可演示的子里程碑
 - 样式系统目前仍停留在 `Schema` 默认值层，直接推进批量样式应用容易反复调整事实源
+- `LinkerEndpoint` 当前主要是交互体验收口，不需要打断主阶段，但适合并行推进并持续回归
 
 ## 11. 对应测试
 

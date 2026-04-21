@@ -1,5 +1,12 @@
 import { createMemo, type Accessor } from 'solid-js'
-import { isLinker, isShape, type DiagramElement, type LinkerElement, type ShapeElement } from '../../../model'
+import {
+  isBoundLinkerEndpoint,
+  isLinker,
+  isShape,
+  type DiagramElement,
+  type LinkerElement,
+  type ShapeElement,
+} from '../../../model'
 
 interface CreateElementIndexesOptions {
   getElementById: <T extends DiagramElement = DiagramElement>(id: string) => T | undefined
@@ -99,10 +106,9 @@ export function createElementIndexes(options: CreateElementIndexesOptions) {
   }
 
   function getEndpointShapeId(endpoint: LinkerElement['from'] | LinkerElement['to']): string | null {
-    if (endpoint.binding.type === 'free') return null
-    if (endpoint.binding.target.kind !== 'element') return null
+    if (!isBoundLinkerEndpoint(endpoint)) return null
 
-    const target = options.getElementById(endpoint.binding.target.id)
+    const target = options.getElementById(endpoint.target)
     return target && isShape(target) ? target.id : null
   }
 }

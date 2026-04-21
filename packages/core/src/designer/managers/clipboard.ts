@@ -1,7 +1,14 @@
 import { generateId, type Point } from '@diagen/shared'
 import { batch } from 'solid-js'
 import { unwrapClone } from '../../_internal'
-import { type DiagramElement, isLinker, isShape, type LinkerEndpoint, type EndpointTarget } from '../../model'
+import {
+  type DiagramElement,
+  isLinker,
+  isShape,
+  type LinkerEndpoint,
+  type EndpointTarget,
+  isBoundLinkerEndpoint,
+} from '../../model'
 import type { EditManager } from './edit'
 import { createInsertElementsCommand } from './edit/commands'
 import type { ElementManager } from './element'
@@ -38,13 +45,30 @@ function remapLinkerEndpoint(
   idMap: Map<string, string>,
   delta: Point,
 ): LinkerEndpoint {
-  const binding = remapLinkerEndpointBinding(endpoint.binding, sourceElementMap, idMap)
+  if (!isBoundLinkerEndpoint(endpoint)) {
+    return {
+      x: endpoint.x + delta.x,
+      y: endpoint.y + delta.y,
+      angle: endpoint.angle,
+      binding: { type: 'free' },
+    }
+  }
+
+  const nextTarget = remapEndpointTarget(endpoint.target, sourceElementMap, idMap)
+  if (!nextTarget) {
+    return {
+      x: endpoint.x + delta.x,
+      y: endpoint.y + delta.y,
+      angle: endpoint.angle,
+      binding: { type: 'free' },
+    }
+  }
 
   return {
     ...unwrapClone(endpoint),
     x: endpoint.x + delta.x,
     y: endpoint.y + delta.y,
-    binding,
+    target: nextTarget,
   }
 }
 
@@ -53,51 +77,11 @@ function remapEndpointTarget(
   sourceElementMap: Map<string, DiagramElement>,
   idMap: Map<string, string>,
 ): EndpointTarget | null {
-  if (target.kind === 'port') {
-    const nextOwnerId = idMap.get(target.ownerId)
-    if (!nextOwnerId) return null
-    return {
-      kind: 'port',
-      ownerId: nextOwnerId,
-      portId: target.portId,
-    }
-  }
-
-  const sourceTarget = sourceElementMap.get(target.id)
-  const nextId = idMap.get(target.id)
+  const sourceTarget = sourceElementMap.get(target)
+  const nextId = idMap.get(target)
   if (!nextId || !sourceTarget || !isShape(sourceTarget)) return null
 
-  return {
-    kind: 'element',
-    id: nextId,
-  }
-}
-
-function remapLinkerEndpointBinding(
-  binding: LinkerEndpoint['binding'],
-  sourceElementMap: Map<string, DiagramElement>,
-  idMap: Map<string, string>,
-): LinkerEndpoint['binding'] {
-  if (binding.type === 'free') return { type: 'free' }
-
-  const nextTarget = remapEndpointTarget(binding.target, sourceElementMap, idMap)
-  if (!nextTarget) return { type: 'free' }
-
-  if (binding.type === 'fixed') {
-    return {
-      type: 'fixed',
-      target: nextTarget,
-      anchorId: binding.anchorId,
-    }
-  }
-
-  return {
-    type: 'perimeter',
-    target: nextTarget,
-    pathIndex: binding.pathIndex,
-    segmentIndex: binding.segmentIndex,
-    t: binding.t,
-  }
+  return nextId
 }
 
 function createClipboardCutCommand(deps: ClipboardDeps, ids: string[]) {

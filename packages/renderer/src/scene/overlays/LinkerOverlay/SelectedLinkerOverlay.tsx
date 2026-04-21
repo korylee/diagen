@@ -1,15 +1,15 @@
 import { For, Show } from 'solid-js'
 import { createDgBem } from '@diagen/shared'
 import { RectHighlightOverlay } from '../RectHighlightOverlay'
-import type { LinkerControlHandle, SelectedLinkerOverlayModel } from './types'
+import type { LinkerWaypointHandle, SelectedLinkerOverlayModel } from './types'
 
 const bem = createDgBem('linker-overlay')
 
 export function SelectedLinkerOverlay(props: {
   model: SelectedLinkerOverlayModel | null
   onStartEndpointDrag: (event: MouseEvent, type: 'from' | 'to') => void
-  onStartControlDrag: (event: MouseEvent, handle: LinkerControlHandle) => void
-  onRemoveControlPoint: (event: MouseEvent, handle: LinkerControlHandle) => void
+  onStartControlDrag: (event: MouseEvent, handle: LinkerWaypointHandle) => void
+  onRemoveWaypoint: (event: MouseEvent, handle: LinkerWaypointHandle) => void
 }) {
   return (
     <Show when={props.model}>
@@ -67,11 +67,11 @@ export function SelectedLinkerOverlay(props: {
               onMouseDown={event => props.onStartEndpointDrag(event, 'to')}
             />
 
-            <For each={model.controlHandles}>
+            <For each={model.waypointHandles}>
               {handle => (
                 <div
-                  class={bem('control-point')}
-                  data-linker-control-index={handle.index}
+                  class={bem('waypoint')}
+                  data-linker-waypoint-index={handle.index}
                   style={{
                     position: 'absolute',
                     left: `${handle.screen.x}px`,
@@ -86,7 +86,7 @@ export function SelectedLinkerOverlay(props: {
                     'pointer-events': 'auto',
                   }}
                   onMouseDown={event => props.onStartControlDrag(event, handle)}
-                  onDblClick={event => props.onRemoveControlPoint(event, handle)}
+                  onDblClick={event => props.onRemoveWaypoint(event, handle)}
                 />
               )}
             </For>

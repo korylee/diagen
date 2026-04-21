@@ -418,12 +418,14 @@ describe('view manager', () => {
         from: {
           x: a.props.x + a.props.w,
           y: a.props.y + a.props.h / 2,
-          binding: { type: 'fixed', target: { kind: 'element', id: a.id }, anchorId: 'right' },
+          target: a.id,
+          binding: { type: 'fixed', anchorId: 'right' },
         },
         to: {
           x: b.props.x,
           y: b.props.y + b.props.h / 2,
-          binding: { type: 'fixed', target: { kind: 'element', id: b.id }, anchorId: 'left' },
+          target: b.id,
+          binding: { type: 'fixed', anchorId: 'left' },
         },
       })
       designer.edit.add([a, blocker, b, linker], { record: false, select: false })
@@ -450,12 +452,14 @@ describe('view manager', () => {
         from: {
           x: a.props.x + a.props.w,
           y: a.props.y + a.props.h / 2,
-          binding: { type: 'fixed', target: { kind: 'element', id: a.id }, anchorId: 'right' },
+          target: a.id,
+          binding: { type: 'fixed', anchorId: 'right' },
         },
         to: {
           x: b.props.x,
           y: b.props.y + b.props.h / 2,
-          binding: { type: 'fixed', target: { kind: 'element', id: b.id }, anchorId: 'left' },
+          target: b.id,
+          binding: { type: 'fixed', anchorId: 'left' },
         },
       })
       designer.edit.add([a, b, linker], { record: false, select: false })
@@ -487,12 +491,14 @@ describe('view manager', () => {
         from: {
           x: a.props.x + a.props.w,
           y: a.props.y + a.props.h / 2,
-          binding: { type: 'fixed', target: { kind: 'element', id: a.id }, anchorId: 'right' },
+          target: a.id,
+          binding: { type: 'fixed', anchorId: 'right' },
         },
         to: {
           x: b.props.x,
           y: b.props.y + b.props.h / 2,
-          binding: { type: 'fixed', target: { kind: 'element', id: b.id }, anchorId: 'left' },
+          target: b.id,
+          binding: { type: 'fixed', anchorId: 'left' },
         },
       })
       designer.edit.add([a, b, linker], { record: false, select: false })

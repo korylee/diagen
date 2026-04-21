@@ -1,6 +1,6 @@
 import { createRoot } from 'solid-js'
 import { describe, expect, it } from 'vitest'
-import { createLinker, createShape, type ShapeElement } from '../../model'
+import { createLinker, createShape, isBoundLinkerEndpoint, type ShapeElement } from '../../model'
 import { createDesigner } from '../create'
 
 function withDesigner(run: (designer: ReturnType<typeof createDesigner>) => void) {
@@ -35,14 +35,15 @@ describe('clipboard manager', () => {
         from: {
           x: 120,
           y: 40,
-          binding: { type: 'fixed', target: { kind: 'element', id: shapeA.id }, anchorId: 'right' },
+          target: shapeA.id,
+          binding: { type: 'fixed', anchorId: 'right' },
         },
         to: {
           x: 200,
           y: 40,
+          target: shapeB.id,
           binding: {
             type: 'perimeter',
-            target: { kind: 'element', id: shapeB.id },
             pathIndex: 0,
             segmentIndex: 3,
             t: 0.5,
@@ -55,7 +56,8 @@ describe('clipboard manager', () => {
         from: {
           x: 120,
           y: 40,
-          binding: { type: 'fixed', target: { kind: 'element', id: shapeA.id }, anchorId: 'right' },
+          target: shapeA.id,
+          binding: { type: 'fixed', anchorId: 'right' },
         },
         to: { x: 400, y: 40, binding: { type: 'free' } },
       })
@@ -83,14 +85,15 @@ describe('clipboard manager', () => {
         from: {
           x: 120,
           y: 40,
-          binding: { type: 'fixed', target: { kind: 'element', id: shapeA.id }, anchorId: 'right' },
+          target: shapeB.id,
+          binding: { type: 'fixed', anchorId: 'right' },
         },
         to: {
           x: 200,
           y: 40,
+          target: shapeB.id,
           binding: {
             type: 'perimeter',
-            target: { kind: 'element', id: shapeB.id },
             pathIndex: 0,
             segmentIndex: 3,
             t: 0.25,
@@ -117,14 +120,10 @@ describe('clipboard manager', () => {
 
       const pastedShapeIds = new Set(pastedShapes.map(shape => shape?.id))
       expect(
-        pastedLinker?.from.binding.type !== 'free' &&
-          pastedLinker.from.binding.target.kind === 'element' &&
-          pastedShapeIds.has(pastedLinker.from.binding.target.id),
+        pastedLinker?.from && isBoundLinkerEndpoint(pastedLinker?.from) && pastedShapeIds.has(pastedLinker.from.target),
       ).toBe(true)
       expect(
-        pastedLinker?.to.binding.type !== 'free' &&
-          pastedLinker.to.binding.target.kind === 'element' &&
-          pastedShapeIds.has(pastedLinker.to.binding.target.id),
+        pastedLinker?.to && isBoundLinkerEndpoint(pastedLinker?.to) && pastedShapeIds.has(pastedLinker.to.target),
       ).toBe(true)
       expect(pastedLinker?.from.binding.type).toBe('fixed')
       expect(pastedLinker?.to.binding.type).toBe('perimeter')
@@ -142,14 +141,15 @@ describe('clipboard manager', () => {
         from: {
           x: 120,
           y: 40,
-          binding: { type: 'fixed', target: { kind: 'element', id: shapeA.id }, anchorId: 'right' },
+          target: shapeA.id,
+          binding: { type: 'fixed', anchorId: 'right' },
         },
         to: {
           x: 300,
           y: 40,
+          target: shapeB.id,
           binding: {
             type: 'perimeter',
-            target: { kind: 'element', id: shapeB.id },
             pathIndex: 0,
             segmentIndex: 1,
             t: 0.5,
@@ -161,15 +161,11 @@ describe('clipboard manager', () => {
 
       designer.clipboard.copy([shapeA.id, externalLinker.id])
       const pastedIds = designer.clipboard.paste()
-      const pastedLinker = pastedIds
-        .map(id => designer.getElementById(id))
-        .find(element => element?.type === 'linker')
+      const pastedLinker = pastedIds.map(id => designer.getElementById(id)).find(element => element?.type === 'linker')
 
       expect(pastedLinker?.from.binding.type).toBe('fixed')
       expect(
-        pastedLinker?.from.binding.type !== 'free' && pastedLinker.from.binding.target.kind === 'element'
-          ? pastedLinker.from.binding.target.id
-          : null,
+        pastedLinker?.from && isBoundLinkerEndpoint(pastedLinker?.from) ? pastedLinker.from.target : null,
       ).not.toBeNull()
       expect(pastedLinker?.to.binding.type).toBe('free')
       expect(pastedLinker?.to.x).toBe(324)
@@ -224,9 +220,7 @@ describe('clipboard manager', () => {
       designer.clipboard.copy([container.id, child.id])
       const pastedIds = designer.clipboard.paste()
       const pastedElements = pastedIds.map(id => designer.getElementById(id))
-      const pastedContainer = pastedElements.find(
-        element => element?.type === 'shape' && element.attribute.container,
-      )
+      const pastedContainer = pastedElements.find(element => element?.type === 'shape' && element.attribute.container)
       const pastedChild = pastedElements.find(element => element?.type === 'shape' && !element.attribute.container)
 
       expect(pastedContainer?.children).toEqual([pastedChild?.id])

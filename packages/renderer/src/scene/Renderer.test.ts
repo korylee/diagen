@@ -1,9 +1,10 @@
-import { createLinker, createShape, type ShapeElement } from '@diagen/core'
+import { createLinker, createShape, LinkerEndpoint, type ShapeElement } from '@diagen/core'
 import { getAnchorInfo, getPerimeterInfo } from '@diagen/core/anchors'
 import { getLinkerTextBox } from '@diagen/core/text'
 import { rotatePoint } from '@diagen/shared'
 import { describe, expect, it, vi } from 'vitest'
 import { createRendererTestHarness } from '../.test/createRendererTestHarness'
+import { isBoundLinkerEndpoint } from '@diagen/core/model'
 
 type RendererHarness = Awaited<ReturnType<typeof createRendererTestHarness>>
 
@@ -117,14 +118,21 @@ function expectLinkerEndpoint(
   id: string,
   endpoint: 'from' | 'to',
   expected: Partial<{
-    id: string | null
+    targetId: string | null
     x: number
     y: number
   }>,
 ): void {
   const target = getLinkerOrThrow(harness, id)[endpoint]
-  for (const [key, value] of Object.entries(expected) as Array<[keyof typeof expected, string | number | null]>) {
-    expect(target[key]).toBe(value)
+  if ('targetId' in expected) {
+    const targetId = isBoundLinkerEndpoint(target) ? target.target : null
+    expect(targetId).toBe(expected.targetId)
+  }
+  if (expected.x !== undefined) {
+    expect(target.x).toBe(expected.x)
+  }
+  if (expected.y !== undefined) {
+    expect(target.y).toBe(expected.y)
   }
 }
 
@@ -761,8 +769,8 @@ describe('Renderer', () => {
 
       expect(interaction.pointer.machine.mode()).toBe('idle')
       expect(linkers).toHaveLength(1)
-      expect(createdLinker.from.id).toBeNull()
       expect(createdLinker.from.binding.type).toBe('free')
+      expect('target' in createdLinker.from).toBe(false)
       expect(createdLinker.to.binding.type).toBe('free')
       expect(harness.designer.selection.selectedIds()).toEqual([createdLinker.id])
     } finally {
@@ -805,8 +813,8 @@ describe('Renderer', () => {
 
       expect(interaction.pointer.machine.mode()).toBe('idle')
       expect(linkers).toHaveLength(1)
-      expect(createdLinker.from.id).toBe('shape_linker_source')
       expect(createdLinker.from.binding.type).not.toBe('free')
+      expect((createdLinker.from as any).target).toBe('shape_linker_source')
       expect(harness.designer.tool.toolState()).toEqual({
         type: 'create-linker',
         linkerId: 'linker',
@@ -862,8 +870,8 @@ describe('Renderer', () => {
 
       expect(interaction.pointer.machine.mode()).toBe('idle')
       expect(linkers).toHaveLength(1)
-      expect(createdLinker.from.id).toBe('shape_quick_create_source')
-      expect(createdLinker.to.id).toBe('shape_quick_create_target')
+      expect((createdLinker.from as any).target).toBe('shape_quick_create_source')
+      expect((createdLinker.to as any).target).toBe('shape_quick_create_target')
       expect(harness.designer.history.undoStack()).toHaveLength(1)
 
       harness.designer.undo()
@@ -871,8 +879,8 @@ describe('Renderer', () => {
 
       harness.designer.redo()
       const redoneLinker = harness.designer.element.linkers()[0]
-      expect(redoneLinker?.from.id).toBe('shape_quick_create_source')
-      expect(redoneLinker?.to.id).toBe('shape_quick_create_target')
+      expect((redoneLinker?.from as any).target).toBe('shape_quick_create_source')
+      expect((redoneLinker?.to as any).target).toBe('shape_quick_create_target')
     } finally {
       harness.dispose()
     }
@@ -893,13 +901,11 @@ describe('Renderer', () => {
             id: 'linker_edit_zoom_scroll',
             name: 'linker_edit_zoom_scroll',
             from: {
-              id: 'shape_linker_edit_source',
               x: 200,
               y: 140,
               binding: { type: 'free' },
             },
             to: {
-              id: null,
               x: 260,
               y: 140,
               binding: { type: 'free' },
@@ -926,19 +932,19 @@ describe('Renderer', () => {
       await harness.dispatchWindowMouseUp()
 
       expectLinkerEndpoint(harness, 'linker_edit_zoom_scroll', 'to', {
-        id: 'shape_linker_edit_target',
+        targetId: 'shape_linker_edit_target',
       })
       expect(harness.designer.history.undoStack()).toHaveLength(1)
 
       harness.designer.undo()
       expectLinkerEndpoint(harness, 'linker_edit_zoom_scroll', 'to', {
-        id: null,
+        targetId: null,
         x: 260,
       })
 
       harness.designer.redo()
       expectLinkerEndpoint(harness, 'linker_edit_zoom_scroll', 'to', {
-        id: 'shape_linker_edit_target',
+        targetId: 'shape_linker_edit_target',
       })
     } finally {
       harness.dispose()
@@ -972,7 +978,7 @@ describe('Renderer', () => {
             id: 'linker_fixed_to_free',
             name: 'linker_fixed_to_free',
             from: {
-              id: sourceShape.id,
+              target: sourceShape.id,
               x: sourceAnchor.point.x,
               y: sourceAnchor.point.y,
               angle: sourceAnchor.angle,
@@ -982,7 +988,6 @@ describe('Renderer', () => {
               },
             },
             to: {
-              id: null,
               x: 260,
               y: 200,
               binding: { type: 'free' },
@@ -1010,8 +1015,8 @@ describe('Renderer', () => {
         throw new Error('linker_fixed_to_free 未找到')
       }
 
-      expect(moved.from.id).toBeNull()
       expect(moved.from.binding).toEqual({ type: 'free' })
+      expect('target' in moved.from).toBe(false)
       expect(moved.from.x).toBe(40)
       expect(moved.from.y).toBe(40)
       expect(harness.designer.history.undoStack()).toHaveLength(1)
@@ -1023,7 +1028,7 @@ describe('Renderer', () => {
         throw new Error('linker_fixed_to_free undo 后未找到')
       }
 
-      expect(undone.from.id).toBe(sourceShape.id)
+      expect((undone.from as any).target).toBe(sourceShape.id)
       expect(undone.from.binding).toEqual({
         type: 'fixed',
         anchorId: sourceAnchor.id,
@@ -1038,8 +1043,8 @@ describe('Renderer', () => {
         throw new Error('linker_fixed_to_free redo 后未找到')
       }
 
-      expect(redone.from.id).toBeNull()
       expect(redone.from.binding).toEqual({ type: 'free' })
+      expect('target' in redone.from).toBe(false)
       expect(redone.from.x).toBe(40)
       expect(redone.from.y).toBe(40)
     } finally {
@@ -1078,7 +1083,7 @@ describe('Renderer', () => {
             id: 'linker_perimeter_reconnect',
             name: 'linker_perimeter_reconnect',
             from: {
-              id: sourceShape.id,
+              target: sourceShape.id,
               x: sourcePerimeter.point.x,
               y: sourcePerimeter.point.y,
               angle: sourcePerimeter.angle,
@@ -1090,7 +1095,6 @@ describe('Renderer', () => {
               },
             },
             to: {
-              id: null,
               x: 240,
               y: 240,
               binding: { type: 'free' },
@@ -1118,7 +1122,7 @@ describe('Renderer', () => {
         throw new Error('linker_perimeter_reconnect 未找到')
       }
 
-      expect(moved.from.id).toBe(targetShape.id)
+      expect(moved.from.target).toEqual(targetShape.id)
       expect(moved.from.binding).toEqual({
         type: 'fixed',
         anchorId: targetAnchor.id,
@@ -1132,7 +1136,7 @@ describe('Renderer', () => {
         throw new Error('linker_perimeter_reconnect undo 后未找到')
       }
 
-      expect(undone.from.id).toBe(sourceShape.id)
+      expect(undone.from.target).toEqual(sourceShape.id)
       expect(undone.from.binding).toEqual({
         type: 'perimeter',
         pathIndex: sourcePerimeter.pathIndex,
@@ -1147,7 +1151,7 @@ describe('Renderer', () => {
         throw new Error('linker_perimeter_reconnect redo 后未找到')
       }
 
-      expect(redone.from.id).toBe(targetShape.id)
+      expect(redone.from.target).toEqual(targetShape.id)
       expect(redone.from.binding).toEqual({
         type: 'fixed',
         anchorId: targetAnchor.id,
@@ -1173,13 +1177,11 @@ describe('Renderer', () => {
             name: 'linker_remove_control',
             linkerType: 'broken',
             from: {
-              id: 'shape_remove_control_source',
               x: 200,
               y: 140,
               binding: { type: 'free' },
             },
             to: {
-              id: 'shape_remove_control_target',
               x: 320,
               y: 140,
               binding: { type: 'free' },
@@ -1199,7 +1201,7 @@ describe('Renderer', () => {
       await flushMicrotasks()
 
       const controlHandle = harness.overlayLayer.querySelector(
-        '.dg-linker-overlay__control-point[data-linker-control-index="0"]',
+        '.dg-linker-overlay__waypoint[data-linker-waypoint-index="0"]',
       ) as HTMLElement | null
       expect(controlHandle).toBeTruthy()
 
@@ -1245,13 +1247,11 @@ describe('Renderer', () => {
             name: 'linker_orthogonal_control_drag',
             linkerType: 'orthogonal',
             from: {
-              id: null,
               x: 200,
               y: 140,
               binding: { type: 'free' },
             },
             to: {
-              id: null,
               x: 420,
               y: 300,
               binding: { type: 'free' },
@@ -1272,7 +1272,7 @@ describe('Renderer', () => {
       await flushMicrotasks()
 
       const controlHandle = harness.overlayLayer.querySelector(
-        '.dg-linker-overlay__control-point[data-linker-control-index="1"]',
+        '.dg-linker-overlay__waypoint[data-linker-waypoint-index="1"]',
       ) as HTMLElement | null
       expect(controlHandle).toBeTruthy()
 
@@ -1316,13 +1316,11 @@ describe('Renderer', () => {
             name: 'linker_orthogonal_segment_drag',
             linkerType: 'orthogonal',
             from: {
-              id: null,
               x: 100,
               y: 100,
               binding: { type: 'free' },
             },
             to: {
-              id: null,
               x: 300,
               y: 300,
               binding: { type: 'free' },
@@ -1666,13 +1664,11 @@ describe('Renderer', () => {
             name: 'linker_context',
             linkerType: 'straight',
             from: {
-              id: 'shape_context_a',
               x: 200,
               y: 140,
               binding: { type: 'free' },
             },
             to: {
-              id: 'shape_context_b',
               x: 320,
               y: 140,
               binding: { type: 'free' },
@@ -2068,13 +2064,11 @@ describe('Renderer', () => {
             linkerType: 'straight',
             text: '原连线',
             from: {
-              id: 'shape_linker_source',
               x: 200,
               y: 140,
               binding: { type: 'free' },
             },
             to: {
-              id: null,
               x: 320,
               y: 140,
               binding: { type: 'free' },
@@ -2123,13 +2117,11 @@ describe('Renderer', () => {
             linkerType: 'straight',
             text: '短',
             from: {
-              id: null,
               x: 200,
               y: 140,
               binding: { type: 'free' },
             },
             to: {
-              id: null,
               x: 320,
               y: 140,
               binding: { type: 'free' },
@@ -2188,13 +2180,11 @@ describe('Renderer', () => {
               dy: -20,
             },
             from: {
-              id: null,
               x: 200,
               y: 140,
               binding: { type: 'free' },
             },
             to: {
-              id: null,
               x: 320,
               y: 140,
               binding: { type: 'free' },
@@ -2258,13 +2248,11 @@ describe('Renderer', () => {
             linkerType: 'straight',
             text: '标签',
             from: {
-              id: null,
               x: 100,
               y: 100,
               binding: { type: 'free' },
             },
             to: {
-              id: null,
               x: 320,
               y: 100,
               binding: { type: 'free' },
@@ -2304,13 +2292,11 @@ describe('Renderer', () => {
               dy: -20,
             },
             from: {
-              id: null,
               x: 200,
               y: 140,
               binding: { type: 'free' },
             },
             to: {
-              id: null,
               x: 320,
               y: 140,
               binding: { type: 'free' },
@@ -2380,13 +2366,11 @@ describe('Renderer', () => {
               dy: -20,
             },
             from: {
-              id: null,
               x: 200,
               y: 140,
               binding: { type: 'free' },
             },
             to: {
-              id: null,
               x: 320,
               y: 140,
               binding: { type: 'free' },
@@ -2424,13 +2408,11 @@ describe('Renderer', () => {
             linkerType: 'straight',
             text: '可拖拽标签',
             from: {
-              id: null,
               x: 200,
               y: 140,
               binding: { type: 'free' },
             },
             to: {
-              id: null,
               x: 320,
               y: 140,
               binding: { type: 'free' },
@@ -2491,13 +2473,11 @@ describe('Renderer', () => {
               dy: -10,
             },
             from: {
-              id: null,
               x: 100,
               y: 100,
               binding: { type: 'free' },
             },
             to: {
-              id: null,
               x: 220,
               y: 220,
               binding: { type: 'free' },
@@ -2564,13 +2544,11 @@ describe('Renderer', () => {
             linkerType: 'broken',
             text: '折线文本',
             from: {
-              id: null,
               x: 100,
               y: 100,
               binding: { type: 'free' },
             },
             to: {
-              id: null,
               x: 220,
               y: 220,
               binding: { type: 'free' },

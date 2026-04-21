@@ -20,8 +20,8 @@ describe('text', () => {
           id: 'text_linker',
           name: 'text_linker',
           linkerType: 'straight',
-          from: { id: null, x: 0, y: 0, binding: { type: 'free' } },
-          to: { id: null, x: 100, y: 0, binding: { type: 'free' } },
+          from: { x: 0, y: 0, binding: { type: 'free' } },
+          to: { x: 100, y: 0, binding: { type: 'free' } },
         }).fontStyle,
       )
 

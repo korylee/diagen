@@ -3,7 +3,7 @@ import { isSameNumber, isSamePoint, KeyOf, type Point } from '@diagen/shared'
 
 type Axis = KeyOf<Point>
 
-export function supportsManualControlPoints(linkerType: LinkerType): boolean {
+export function supportsManualWaypoints(linkerType: LinkerType): boolean {
   return linkerType === 'broken' || linkerType === 'orthogonal'
 }
 
@@ -11,7 +11,7 @@ export function areSamePoints(a: Point[], b: Point[]): boolean {
   return a.length === b.length && a.every((point, index) => isSamePoint(point, b[index]))
 }
 
-export function removeControlPointAt(points: Point[], index: number): Point[] | null {
+export function removeWaypointAt(points: Point[], index: number): Point[] | null {
   if (index < 0 || index >= points.length) return null
   return points.filter((_, pointIndex) => pointIndex !== index)
 }

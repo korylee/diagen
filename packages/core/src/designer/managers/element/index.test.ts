@@ -37,12 +37,14 @@ describe('element manager', () => {
         from: {
           x: 80,
           y: 30,
-          binding: { type: 'fixed', target: { kind: 'element', id: a.id }, anchorId: 'right' },
+          target: a.id,
+          binding: { type: 'fixed', anchorId: 'right' },
         },
         to: {
           x: 100,
           y: 30,
-          binding: { type: 'fixed', target: { kind: 'element', id: b.id }, anchorId: 'left' },
+          target: b.id,
+          binding: { type: 'fixed', anchorId: 'left' },
         },
       })
       const linkerExternal = createLinker({
@@ -52,12 +54,14 @@ describe('element manager', () => {
         from: {
           x: 80,
           y: 30,
-          binding: { type: 'fixed', target: { kind: 'element', id: a.id }, anchorId: 'right' },
+          target: a.id,
+          binding: { type: 'fixed', anchorId: 'right' },
         },
         to: {
           x: 200,
           y: 30,
-          binding: { type: 'fixed', target: { kind: 'element', id: c.id }, anchorId: 'left' },
+          target: c.id,
+          binding: { type: 'fixed', anchorId: 'left' },
         },
       })
 

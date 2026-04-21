@@ -33,7 +33,7 @@ export interface LinkerEndpointHandles {
   to: LinkerEndpointHandle
 }
 
-export interface LinkerControlHandle {
+export interface LinkerWaypointHandle {
   index: number
   screen: {
     x: number
@@ -55,7 +55,7 @@ export interface LinkerTextBounds {
 export interface SelectedLinkerOverlayModel {
   routePath: string
   endpointHandles: LinkerEndpointHandles
-  controlHandles: LinkerControlHandle[]
+  waypointHandles: LinkerWaypointHandle[]
   textBounds: LinkerTextBounds | null
   anchorItems: RectHighlightItem[]
 }

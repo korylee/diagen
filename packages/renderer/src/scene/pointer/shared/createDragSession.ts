@@ -68,7 +68,7 @@ export function createDragSession<TStartInput extends BaseTStartInput, TState>(
     try {
       const nextState = setup(input)
       if (!nextState) {
-        abortStartedTransaction()
+        abortTransaction()
         resetSession()
         return false
       }
@@ -78,7 +78,7 @@ export function createDragSession<TStartInput extends BaseTStartInput, TState>(
       tracker.begin({ x: event.clientX, y: event.clientY })
       return true
     } catch (error) {
-      abortStartedTransaction()
+      abortTransaction()
       resetSession()
       throw error
     }
@@ -135,12 +135,12 @@ export function createDragSession<TStartInput extends BaseTStartInput, TState>(
 
   function finalizeTransaction(shouldCommit: boolean, currentState: TState | null): void {
     if (!transactionStarted) {
-      notifyTransactionResult(shouldCommit, currentState)
+      notifyTransaction(shouldCommit, currentState)
       return
     }
 
     if (!transaction) {
-      notifyTransactionResult(shouldCommit, currentState)
+      notifyTransaction(shouldCommit, currentState)
       transactionStarted = false
       return
     }
@@ -168,13 +168,13 @@ export function createDragSession<TStartInput extends BaseTStartInput, TState>(
     return started
   }
 
-  function abortStartedTransaction(): void {
+  function abortTransaction(): void {
     if (!transactionStarted || !transaction) return
     transaction.abort()
     transactionStarted = false
   }
 
-  function notifyTransactionResult(shouldCommit: boolean, currentState: TState | null): void {
+  function notifyTransaction(shouldCommit: boolean, currentState: TState | null): void {
     if (shouldCommit) {
       onCommit?.(currentState)
       return

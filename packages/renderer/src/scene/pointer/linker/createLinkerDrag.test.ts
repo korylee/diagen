@@ -4,6 +4,7 @@ import { createRoot } from 'solid-js'
 import { describe, expect, it, vi } from 'vitest'
 import { CoordinateService } from '../../services/createCoordinateService'
 import { createLinkerDrag } from './createLinkerDrag'
+import { BoundLinkerEndpoint } from '@diagen/core/model'
 
 const testContext = vi.hoisted(() => ({
   designer: null as ReturnType<typeof createDesigner> | null,
@@ -136,12 +137,12 @@ describe('createLinkerDrag', () => {
         name: 'broken_control_normalize',
         linkerType: 'broken',
         from: {
- x: 0,
+          x: 0,
           y: 0,
           binding: { type: 'free' },
         },
         to: {
- x: 100,
+          x: 100,
           y: 0,
           binding: { type: 'free' },
         },
@@ -186,12 +187,12 @@ describe('createLinkerDrag', () => {
         name: 'broken_control_keep_diagonal',
         linkerType: 'broken',
         from: {
- x: 0,
+          x: 0,
           y: 0,
           binding: { type: 'free' },
         },
         to: {
- x: 100,
+          x: 100,
           y: 0,
           binding: { type: 'free' },
         },
@@ -224,19 +225,19 @@ describe('createLinkerDrag', () => {
     })
   })
 
-  it('removeControlPoint 应复用统一的控制点提交语义', () => {
+  it('removeWaypoint 应复用统一的路径点提交语义', () => {
     withLinkerDrag({}, ({ designer, linkerDrag }) => {
       const linker = createLinker({
         id: 'broken_remove_control_action',
         name: 'broken_remove_control_action',
         linkerType: 'broken',
         from: {
- x: 0,
+          x: 0,
           y: 0,
           binding: { type: 'free' },
         },
         to: {
- x: 100,
+          x: 100,
           y: 0,
           binding: { type: 'free' },
         },
@@ -247,7 +248,7 @@ describe('createLinkerDrag', () => {
       })
       designer.edit.add([linker], { record: false, select: false })
 
-      expect(linkerDrag.removeControlPoint(linker.id, 0)).toBe(true)
+      expect(linkerDrag.removeWaypoint(linker.id, 0)).toBe(true)
       expect(designer.element.getElementById<LinkerElement>(linker.id)?.points).toEqual([])
       expect(designer.canUndo()).toBe(true)
 
@@ -267,12 +268,12 @@ describe('createLinkerDrag', () => {
         linkerType: 'straight',
         text: '标签',
         from: {
- x: 0,
+          x: 0,
           y: 0,
           binding: { type: 'free' },
         },
         to: {
- x: 100,
+          x: 100,
           y: 0,
           binding: { type: 'free' },
         },
@@ -327,12 +328,12 @@ describe('createLinkerDrag', () => {
         name: 'orthogonal_control_drag',
         linkerType: 'orthogonal',
         from: {
- x: 0,
+          x: 0,
           y: 0,
           binding: { type: 'free' },
         },
         to: {
- x: 120,
+          x: 120,
           y: 120,
           binding: { type: 'free' },
         },
@@ -389,12 +390,12 @@ describe('createLinkerDrag', () => {
         name: 'orthogonal_first_control_drag',
         linkerType: 'orthogonal',
         from: {
- x: 0,
+          x: 0,
           y: 0,
           binding: { type: 'free' },
         },
         to: {
- x: 80,
+          x: 80,
           y: 120,
           binding: { type: 'free' },
         },
@@ -439,12 +440,12 @@ describe('createLinkerDrag', () => {
         name: 'orthogonal_segment_insert_drag',
         linkerType: 'orthogonal',
         from: {
- x: 0,
+          x: 0,
           y: 0,
           binding: { type: 'free' },
         },
         to: {
- x: 100,
+          x: 100,
           y: 100,
           binding: { type: 'free' },
         },
@@ -497,12 +498,12 @@ describe('createLinkerDrag', () => {
         name: 'orthogonal_segment_start_drag',
         linkerType: 'orthogonal',
         from: {
- x: 0,
+          x: 0,
           y: 0,
           binding: { type: 'free' },
         },
         to: {
- x: 100,
+          x: 100,
           y: 100,
           binding: { type: 'free' },
         },
@@ -544,12 +545,12 @@ describe('createLinkerDrag', () => {
         name: 'orthogonal_single_segment_drag',
         linkerType: 'orthogonal',
         from: {
- x: 0,
+          x: 0,
           y: 0,
           binding: { type: 'free' },
         },
         to: {
- x: 0,
+          x: 0,
           y: 100,
           binding: { type: 'free' },
         },
@@ -622,30 +623,27 @@ describe('createLinkerDrag', () => {
 
       linkerDrag.move(createMouseEvent(moveDelta.x, moveDelta.y))
 
-      expect(linkerDrag.snapTarget()?.shapeId).toBe(targetShape.id)
-      expect(linkerDrag.snapTarget()?.anchorId).toBe(targetAnchor!.id)
+      expect(linkerDrag.snapTarget()).toEqual({
+        x: targetAnchor!.point.x,
+        y: targetAnchor!.point.y,
+        angle: targetAnchor!.angle,
+        target: targetShape.id,
+        binding: {
+          type: 'fixed',
+          anchorId: targetAnchor!.id,
+        },
+      })
 
       linkerDrag.end()
 
       const createdId = designer.selection.selectedIds()[0]
-      const createdLinker = designer.element.getElementById<LinkerElement>(createdId)
+      const createdLinker = designer.element.getElementById<LinkerElement>(createdId)!
 
-      expect(createdLinker?.from.binding.type).toBe('fixed')
-      expect(createdLinker?.from.binding.type !== 'free' ? createdLinker.from.binding.target : null).toEqual({
-        kind: 'element',
-        id: sourceShape.id,
-      })
-      expect(createdLinker?.to.binding.type).toBe('fixed')
-      expect(createdLinker?.to.binding.type !== 'free' ? createdLinker.to.binding.target : null).toEqual({
-        kind: 'element',
-        id: targetShape.id,
-      })
-      expect(createdLinker?.to.binding).toEqual({
+      expect(createdLinker.from.binding.type).toBe('fixed')
+      expect((createdLinker.from as BoundLinkerEndpoint).target).toBe(sourceShape.id)
+      expect((createdLinker.to as BoundLinkerEndpoint).target).toBe(targetShape.id)
+      expect(createdLinker.to.binding).toEqual({
         type: 'fixed',
-        target: {
-          kind: 'element',
-          id: targetShape.id,
-        },
         anchorId: targetAnchor!.id,
       })
     })
@@ -706,24 +704,18 @@ describe('createLinkerDrag', () => {
           from: {
             x: 100,
             y: 40,
+            target: sourceShape.id,
             binding: {
               type: 'fixed',
-              target: {
-                kind: 'element',
-                id: sourceShape.id,
-              },
               anchorId: 'right',
             },
           },
           to: {
             x: 300,
             y: 40,
+            target: targetShape.id,
             binding: {
               type: 'fixed',
-              target: {
-                kind: 'element',
-                id: targetShape.id,
-              },
               anchorId: 'left',
             },
           },
@@ -771,12 +763,9 @@ describe('createLinkerDrag', () => {
           x: sourceAnchor!.point.x,
           y: sourceAnchor!.point.y,
           angle: sourceAnchor!.angle,
+          target: sourceShape.id,
           binding: {
             type: 'fixed',
-            target: {
-              kind: 'element',
-              id: sourceShape.id,
-            },
             anchorId: sourceAnchor!.id,
           },
         },
@@ -801,18 +790,14 @@ describe('createLinkerDrag', () => {
 
       expect(started).toBe(true)
       expect(linkerDrag.snapTarget()).toEqual({
-        shapeId: sourceShape.id,
+        x: sourceAnchor!.point.x,
+        y: sourceAnchor!.point.y,
+        angle: sourceAnchor!.angle,
+        target: sourceShape.id,
         binding: {
           type: 'fixed',
-          target: {
-            kind: 'element',
-            id: sourceShape.id,
-          },
           anchorId: sourceAnchor!.id,
         },
-        anchorId: sourceAnchor!.id,
-        point: sourceAnchor!.point,
-        angle: sourceAnchor!.angle,
       })
     })
   })
@@ -833,12 +818,9 @@ describe('createLinkerDrag', () => {
           x: sourcePerimeter!.point.x,
           y: sourcePerimeter!.point.y,
           angle: sourcePerimeter!.angle,
+          target: sourceShape.id,
           binding: {
             type: 'perimeter',
-            target: {
-              kind: 'element',
-              id: sourceShape.id,
-            },
             pathIndex: sourcePerimeter!.pathIndex,
             segmentIndex: sourcePerimeter!.segmentIndex,
             t: sourcePerimeter!.t,
@@ -865,19 +847,16 @@ describe('createLinkerDrag', () => {
 
       expect(started).toBe(true)
       expect(linkerDrag.snapTarget()).toEqual({
-        shapeId: sourceShape.id,
+        x: sourcePerimeter!.point.x,
+        y: sourcePerimeter!.point.y,
+        angle: sourcePerimeter!.angle,
+        target: sourceShape.id,
         binding: {
           type: 'perimeter',
-          target: {
-            kind: 'element',
-            id: sourceShape.id,
-          },
           pathIndex: sourcePerimeter!.pathIndex,
           segmentIndex: sourcePerimeter!.segmentIndex,
           t: sourcePerimeter!.t,
         },
-        point: sourcePerimeter!.point,
-        angle: sourcePerimeter!.angle,
       })
     })
   })
@@ -897,12 +876,9 @@ describe('createLinkerDrag', () => {
           x: 40,
           y: 60,
           angle: 0.4,
+          target: targetLinker.id,
           binding: {
             type: 'fixed',
-            target: {
-              kind: 'element',
-              id: targetLinker.id,
-            },
             anchorId: 'right',
           },
         },
