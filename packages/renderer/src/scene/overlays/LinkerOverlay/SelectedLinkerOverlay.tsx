@@ -1,6 +1,5 @@
 import { For, Show } from 'solid-js'
 import { createDgBem } from '@diagen/shared'
-import { RectHighlightOverlay } from '../RectHighlightOverlay'
 import type { LinkerWaypointHandle, SelectedLinkerOverlayModel } from './types'
 
 const bem = createDgBem('linker-overlay')
@@ -106,7 +105,6 @@ export function SelectedLinkerOverlay(props: {
               )}
             </Show>
 
-            <RectHighlightOverlay items={model.anchorItems} visible={model.anchorItems.length > 0} zIndex={9998} />
           </div>
         )
       }}

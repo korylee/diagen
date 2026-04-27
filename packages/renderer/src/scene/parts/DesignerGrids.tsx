@@ -3,20 +3,21 @@ import { useDesigner } from '../../context/DesignerProvider'
 
 export function DesignerGrids() {
   const { state, view } = useDesigner()
+  const { originOffset, worldSize } = view
   const grid = createMemo(() => {
-    const { page } = state.diagram
-    const { worldSize, originOffset } = state
+    const offset = originOffset()
+    const wSize = worldSize()
     const zoom = view.zoom()
     // world 层本身只处理 transform 变换，这里把运行时原点补偿折算回本地坐标，保证网格与元素继续对齐
-    const patternOffsetX = zoom ? originOffset.x / zoom : 0
-    const patternOffsetY = zoom ? originOffset.y / zoom : 0
+    const offsetX = zoom ? offset.x / zoom : 0
+    const offsetY = zoom ? offset.y / zoom : 0
 
     return {
-      width: worldSize.width,
-      height: worldSize.height,
-      backgroundColor: page.backgroundColor,
-      patternOffsetX,
-      patternOffsetY,
+      width: wSize.width,
+      height: wSize.height,
+      backgroundColor: state.diagram.page.backgroundColor,
+      offsetX,
+      offsetY,
     }
   })
   return (
@@ -37,7 +38,7 @@ export function DesignerGrids() {
           width="61"
           height="61"
           patternUnits="userSpaceOnUse"
-          patternTransform={`translate(${grid().patternOffsetX}, ${grid().patternOffsetY})`}
+          patternTransform={`translate(${grid().offsetX}, ${grid().offsetY})`}
         >
           <path
             id="flow_canvas_grid_path1"
@@ -60,7 +61,7 @@ export function DesignerGrids() {
           id="flow_canvas_watermark_item"
           width="300"
           height="300"
-          patternTransform={`translate(${grid().patternOffsetX}, ${grid().patternOffsetY})`}
+          patternTransform={`translate(${grid().offsetX}, ${grid().offsetY})`}
         >
           <text
             x="150"

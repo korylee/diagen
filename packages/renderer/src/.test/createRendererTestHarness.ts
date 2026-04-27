@@ -26,6 +26,7 @@ export interface CreateRendererTestHarnessOptions {
   pageHeight?: number
   shapes?: HarnessShapeInput[]
   autoGrow?: Partial<AutoGrowConfig>
+  useRendererInitialView?: boolean
   rendererProps?: Omit<Parameters<typeof Renderer>[0], 'children'>
 }
 
@@ -260,6 +261,16 @@ export async function createRendererTestHarness(options: CreateRendererTestHarne
 
   window.dispatchEvent(new Event('resize'))
   await flushEffects()
+
+  if (!options.useRendererInitialView) {
+    designer.view.setPan(0, 0)
+    designer.view.setZoom(1)
+    viewport.scrollLeft = 0
+    viewport.scrollTop = 0
+    viewport.dispatchEvent(new Event('scroll'))
+    window.dispatchEvent(new Event('scroll'))
+    await flushEffects()
+  }
 
   const getInteraction = (): CapturedInteraction => {
     if (!capturedInteraction) {

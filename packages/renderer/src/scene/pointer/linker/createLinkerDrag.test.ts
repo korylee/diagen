@@ -1,5 +1,5 @@
 import { createDesigner, createLinker, createShape, type LinkerElement } from '@diagen/core'
-import { getAnchorInfo, getPerimeterInfo, resolveCreateAnchor } from '@diagen/core/anchors'
+import { getAnchorInfo, getEdgeInfo, resolveCreateAnchor } from '@diagen/core/anchors'
 import { createRoot } from 'solid-js'
 import { describe, expect, it, vi } from 'vitest'
 import { CoordinateService } from '../../services/createCoordinateService'
@@ -57,10 +57,16 @@ function withLinkerDrag(
   })
 }
 
-function createMouseEvent(x: number, y: number): MouseEvent {
+function createMouseEvent(
+  x: number,
+  y: number,
+  init: Pick<MouseEventInit, 'altKey' | 'shiftKey'> = {},
+): MouseEvent {
   return {
     clientX: x,
     clientY: y,
+    altKey: init.altKey ?? false,
+    shiftKey: init.shiftKey ?? false,
   } as MouseEvent
 }
 
@@ -629,7 +635,7 @@ describe('createLinkerDrag', () => {
         angle: targetAnchor!.angle,
         target: targetShape.id,
         binding: {
-          type: 'fixed',
+          type: 'anchor',
           anchorId: targetAnchor!.id,
         },
       })
@@ -639,13 +645,110 @@ describe('createLinkerDrag', () => {
       const createdId = designer.selection.selectedIds()[0]
       const createdLinker = designer.element.getElementById<LinkerElement>(createdId)!
 
-      expect(createdLinker.from.binding.type).toBe('fixed')
+      expect(createdLinker.from.binding.type).toBe('anchor')
       expect((createdLinker.from as BoundLinkerEndpoint).target).toBe(sourceShape.id)
       expect((createdLinker.to as BoundLinkerEndpoint).target).toBe(targetShape.id)
       expect(createdLinker.to.binding).toEqual({
-        type: 'fixed',
+        type: 'anchor',
         anchorId: targetAnchor!.id,
       })
+    })
+  })
+
+  it('按住 Shift 拖拽端点时应强制使用 edge 吸附', () => {
+    withLinkerDrag({}, ({ designer, linkerDrag }) => {
+      const sourceShape = createShapeById('shift_source_shape', 0, 0)
+      const targetShape = createShapeById('shift_target_shape', 300, 0)
+      designer.edit.add([sourceShape, targetShape], { record: false, select: false })
+
+      const sourceAnchor = resolveCreateAnchor(sourceShape)
+      const targetAnchor = getAnchorInfo(targetShape, 3)
+      expect(sourceAnchor).not.toBeNull()
+      expect(targetAnchor).not.toBeNull()
+
+      const started = linkerDrag.beginCreate(createMouseEvent(0, 0), {
+        linkerId: 'linker',
+        from: {
+          type: 'shape',
+          shapeId: sourceShape.id,
+        },
+      })
+      expect(started).toBe(true)
+
+      const moveDelta = {
+        x: targetAnchor!.point.x - sourceAnchor!.point.x,
+        y: targetAnchor!.point.y - sourceAnchor!.point.y,
+      }
+      linkerDrag.move(createMouseEvent(moveDelta.x, moveDelta.y, { shiftKey: true }))
+
+      const snapped = linkerDrag.snapTarget()
+      expect(snapped?.target).toBe(targetShape.id)
+      expect(snapped?.binding.type).toBe('edge')
+
+      linkerDrag.end()
+
+      const createdId = designer.selection.selectedIds()[0]
+      const created = designer.element.getElementById<LinkerElement>(createdId)
+      expect(created?.type).toBe('linker')
+      if (!created || created.type !== 'linker') {
+        throw new Error('Shift 模式创建连线失败')
+      }
+
+      expect(created.to.binding.type).toBe('edge')
+      expect((created.to as BoundLinkerEndpoint).target).toBe(targetShape.id)
+    })
+  })
+
+  it('按住 Alt 拖拽端点时不应回退成 edge 吸附', () => {
+    withLinkerDrag({}, ({ designer, linkerDrag }) => {
+      const sourceShape = createShapeById('alt_source_shape', 0, 0)
+      const targetShape = createShapeById('alt_target_shape', 300, 0)
+      designer.edit.add([sourceShape, targetShape], { record: false, select: false })
+
+      const sourceAnchor = resolveCreateAnchor(sourceShape)
+      const edge = getEdgeInfo(targetShape, {
+        x: targetShape.props.x + 20,
+        y: targetShape.props.y,
+      })
+      expect(sourceAnchor).not.toBeNull()
+      expect(edge).not.toBeNull()
+
+      const started = linkerDrag.beginCreate(createMouseEvent(0, 0), {
+        linkerId: 'linker',
+        from: {
+          type: 'shape',
+          shapeId: sourceShape.id,
+        },
+      })
+      expect(started).toBe(true)
+      const draftId = linkerDrag.state()?.linkerId
+      expect(draftId).toBeTruthy()
+
+      const moveDelta = {
+        x: edge!.point.x - sourceAnchor!.point.x,
+        y: edge!.point.y - sourceAnchor!.point.y,
+      }
+      linkerDrag.move(createMouseEvent(moveDelta.x, moveDelta.y, { altKey: true }))
+      expect(linkerDrag.snapTarget()).toBeNull()
+
+      const moving = designer.element.getElementById<LinkerElement>(draftId!)
+      expect(moving?.type).toBe('linker')
+      if (!moving || moving.type !== 'linker') {
+        throw new Error('Alt 模式拖拽中连线未找到')
+      }
+      expect(moving.to.binding).toEqual({ type: 'free' })
+
+      linkerDrag.end()
+
+      const createdId = designer.selection.selectedIds()[0]
+      const created = designer.element.getElementById<LinkerElement>(createdId)
+      expect(created?.type).toBe('linker')
+      if (!created || created.type !== 'linker') {
+        throw new Error('Alt 模式创建连线失败')
+      }
+
+      expect(created.to.binding).toEqual({ type: 'free' })
+      expect('target' in created.to).toBe(false)
     })
   })
 
@@ -706,7 +809,7 @@ describe('createLinkerDrag', () => {
             y: 40,
             target: sourceShape.id,
             binding: {
-              type: 'fixed',
+              type: 'anchor',
               anchorId: 'right',
             },
           },
@@ -715,7 +818,7 @@ describe('createLinkerDrag', () => {
             y: 40,
             target: targetShape.id,
             binding: {
-              type: 'fixed',
+              type: 'anchor',
               anchorId: 'left',
             },
           },
@@ -747,25 +850,25 @@ describe('createLinkerDrag', () => {
     })
   })
 
-  it('拖拽已绑定 fixed 锚点的端点时，应继承当前 snapTarget', () => {
+  it('拖拽已绑定 anchor 锚点的端点时，应继承当前 snapTarget', () => {
     withLinkerDrag({}, ({ designer, linkerDrag }) => {
-      const sourceShape = createShapeById('fixed_source_shape', 0, 0)
-      const targetShape = createShapeById('fixed_target_shape', 300, 0)
+      const sourceShape = createShapeById('anchor_source_shape', 0, 0)
+      const targetShape = createShapeById('anchor_target_shape', 300, 0)
       designer.edit.add([sourceShape, targetShape], { record: false, select: false })
 
       const sourceAnchor = getAnchorInfo(sourceShape, 1)
       expect(sourceAnchor).not.toBeNull()
 
       const linker = createLinker({
-        id: 'fixed_bound_linker',
-        name: 'fixed_bound_linker',
+        id: 'anchor_bound_linker',
+        name: 'anchor_bound_linker',
         from: {
           x: sourceAnchor!.point.x,
           y: sourceAnchor!.point.y,
           angle: sourceAnchor!.angle,
           target: sourceShape.id,
           binding: {
-            type: 'fixed',
+            type: 'anchor',
             anchorId: sourceAnchor!.id,
           },
         },
@@ -795,35 +898,35 @@ describe('createLinkerDrag', () => {
         angle: sourceAnchor!.angle,
         target: sourceShape.id,
         binding: {
-          type: 'fixed',
+          type: 'anchor',
           anchorId: sourceAnchor!.id,
         },
       })
     })
   })
 
-  it('拖拽已绑定 perimeter 的端点时，应继承当前 snapTarget', () => {
+  it('拖拽已绑定 edge 的端点时，应继承当前 snapTarget', () => {
     withLinkerDrag({}, ({ designer, linkerDrag }) => {
-      const sourceShape = createShapeById('perimeter_source_shape', 0, 0)
-      const targetShape = createShapeById('perimeter_target_shape', 300, 0)
+      const sourceShape = createShapeById('edge_source_shape', 0, 0)
+      const targetShape = createShapeById('edge_target_shape', 300, 0)
       designer.edit.add([sourceShape, targetShape], { record: false, select: false })
 
-      const sourcePerimeter = getPerimeterInfo(sourceShape, { x: 20, y: 0 })
-      expect(sourcePerimeter).not.toBeNull()
+      const sourceEdge = getEdgeInfo(sourceShape, { x: 20, y: 0 })
+      expect(sourceEdge).not.toBeNull()
 
       const linker = createLinker({
-        id: 'perimeter_bound_linker',
-        name: 'perimeter_bound_linker',
+        id: 'edge_bound_linker',
+        name: 'edge_bound_linker',
         from: {
-          x: sourcePerimeter!.point.x,
-          y: sourcePerimeter!.point.y,
-          angle: sourcePerimeter!.angle,
+          x: sourceEdge!.point.x,
+          y: sourceEdge!.point.y,
+          angle: sourceEdge!.angle,
           target: sourceShape.id,
           binding: {
-            type: 'perimeter',
-            pathIndex: sourcePerimeter!.pathIndex,
-            segmentIndex: sourcePerimeter!.segmentIndex,
-            t: sourcePerimeter!.t,
+            type: 'edge',
+            pathIndex: sourceEdge!.pathIndex,
+            segmentIndex: sourceEdge!.segmentIndex,
+            t: sourceEdge!.t,
           },
         },
         to: {
@@ -834,28 +937,28 @@ describe('createLinkerDrag', () => {
       })
       designer.edit.add([linker], { record: false, select: false })
 
-      const started = linkerDrag.beginEdit(createMouseEvent(sourcePerimeter!.point.x, sourcePerimeter!.point.y), {
+      const started = linkerDrag.beginEdit(createMouseEvent(sourceEdge!.point.x, sourceEdge!.point.y), {
         linkerId: linker.id,
-        point: sourcePerimeter!.point,
+        point: sourceEdge!.point,
         hit: { type: 'from' },
         route: {
-          points: [sourcePerimeter!.point, { x: 300, y: 40 }],
-          fromAngle: sourcePerimeter!.angle,
+          points: [sourceEdge!.point, { x: 300, y: 40 }],
+          fromAngle: sourceEdge!.angle,
           toAngle: 0,
         },
       })
 
       expect(started).toBe(true)
       expect(linkerDrag.snapTarget()).toEqual({
-        x: sourcePerimeter!.point.x,
-        y: sourcePerimeter!.point.y,
-        angle: sourcePerimeter!.angle,
+        x: sourceEdge!.point.x,
+        y: sourceEdge!.point.y,
+        angle: sourceEdge!.angle,
         target: sourceShape.id,
         binding: {
-          type: 'perimeter',
-          pathIndex: sourcePerimeter!.pathIndex,
-          segmentIndex: sourcePerimeter!.segmentIndex,
-          t: sourcePerimeter!.t,
+          type: 'edge',
+          pathIndex: sourceEdge!.pathIndex,
+          segmentIndex: sourceEdge!.segmentIndex,
+          t: sourceEdge!.t,
         },
       })
     })
@@ -878,7 +981,7 @@ describe('createLinkerDrag', () => {
           angle: 0.4,
           target: targetLinker.id,
           binding: {
-            type: 'fixed',
+            type: 'anchor',
             anchorId: 'right',
           },
         },

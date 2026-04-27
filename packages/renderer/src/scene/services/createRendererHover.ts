@@ -13,11 +13,11 @@ interface CreateRendererHoverOptions {
   isPointerActive: () => boolean
   isTextEditing: () => boolean
   isToolIdle: () => boolean
-  hitTestHoverTarget: (pointer: { clientX: number; clientY: number }) => SceneHit | null
+  hitTest: (pointer: { clientX: number; clientY: number }) => SceneHit | null
 }
 
 export function createRendererHover(options: CreateRendererHoverOptions) {
-  const { getContainerEl, isPointerActive, isTextEditing, isToolIdle, hitTestHoverTarget } = options
+  const { getContainerEl, isPointerActive, isTextEditing, isToolIdle, hitTest } = options
   const [hoverCursor, setHoverCursor] = createSignal<string | null>(null)
   let latestHoverPointer: HoverPointerSnapshot | null = null
 
@@ -45,7 +45,7 @@ export function createRendererHover(options: CreateRendererHoverOptions) {
       return
     }
 
-    const sceneHit = hitTestHoverTarget({
+    const sceneHit = hitTest({
       clientX: pointerSnapshot.clientX,
       clientY: pointerSnapshot.clientY,
     })
@@ -75,10 +75,6 @@ export function createRendererHover(options: CreateRendererHoverOptions) {
     hoverLoop.resume()
   }
 
-  const onMouseLeave = () => {
-    clearHover()
-  }
-
   createEffect(() => {
     if (isPointerActive() || isTextEditing() || !isToolIdle()) {
       clearHover()
@@ -90,9 +86,9 @@ export function createRendererHover(options: CreateRendererHoverOptions) {
   })
 
   return {
-    hoverCursor,
-    onSceneMouseMove,
-    onMouseLeave,
+    cursor: hoverCursor,
+    move: onSceneMouseMove,
+    leave: clearHover,
   }
 }
 

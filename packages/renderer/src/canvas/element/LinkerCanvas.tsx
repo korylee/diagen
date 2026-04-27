@@ -3,17 +3,17 @@ import { createDevicePixelRatio } from '@diagen/primitives'
 import { expandBounds } from '@diagen/shared'
 import { createEffect, createMemo } from 'solid-js'
 import { useDesigner, useInteraction } from '../../context'
-import { renderLinker } from '../../utils'
+import { renderLinker } from '../render'
 
 export interface LinkerCanvasProps {
-  linker: LinkerElement
+  element: LinkerElement
 }
 
 export function LinkerCanvas(props: LinkerCanvasProps) {
   const { view, state } = useDesigner()
   const { scroll } = useInteraction()
   const pixelRatio = createDevicePixelRatio()
-  const layout = createMemo(() => view.getLinkerLayout(props.linker))
+  const layout = createMemo(() => view.getLinkerLayout(props.element))
 
   let canvasRef: HTMLCanvasElement | undefined
   let containerRef: HTMLDivElement | undefined
@@ -67,7 +67,7 @@ export function LinkerCanvas(props: LinkerCanvasProps) {
     ctx.scale(frame.ratio, frame.ratio)
     ctx.scale(frame.zoom, frame.zoom)
     ctx.translate(-frame.bounds.x + padding / frame.zoom, -frame.bounds.y + padding / frame.zoom)
-    renderLinker(ctx, props.linker, frame.route)
+    renderLinker(ctx, props.element, frame.route)
     ctx.restore()
   }
 

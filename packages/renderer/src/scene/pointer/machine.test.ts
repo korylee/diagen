@@ -117,7 +117,7 @@ describe('createPointerMachine', () => {
       expect(machine.startPan(createMouseEvent(5, 6))).toBe(true)
       expect(pan.start).toHaveBeenCalledTimes(1)
       expect(machine.mode()).toBe('panning')
-      expect(machine.shouldShowGrabbingCursor()).toBe(true)
+      expect(machine.showGrabbingCursor()).toBe(true)
       expect(machine.shouldAutoScroll()).toBe(false)
 
       machine.end()
@@ -137,13 +137,13 @@ describe('createPointerMachine', () => {
       expect(shapeDrag.start).toHaveBeenCalledTimes(1)
       expect(machine.mode()).toBe('draggingShape')
       expect(machine.shouldAutoScroll()).toBe(true)
-      expect(machine.shouldShowGrabbingCursor()).toBe(true)
+      expect(machine.showGrabbingCursor()).toBe(true)
 
       machine.end()
 
       expect(shapeDrag.end).toHaveBeenCalledTimes(1)
       expect(machine.mode()).toBe('idle')
-      expect(machine.shouldShowGrabbingCursor()).toBe(false)
+      expect(machine.showGrabbingCursor()).toBe(false)
 
       dispose()
     })
@@ -157,7 +157,7 @@ describe('createPointerMachine', () => {
       expect(boxSelect.start).toHaveBeenCalledTimes(1)
       expect(machine.mode()).toBe('boxSelecting')
       expect(machine.shouldAutoScroll()).toBe(true)
-      expect(machine.shouldShowGrabbingCursor()).toBe(false)
+      expect(machine.showGrabbingCursor()).toBe(false)
 
       machine.cancel()
 
@@ -176,7 +176,7 @@ describe('createPointerMachine', () => {
       expect(machine.startRotate('shape-id', createMouseEvent(50, 60))).toBe(false)
       expect(machine.mode()).toBe('idle')
       expect(machine.isActive()).toBe(false)
-      expect(machine.shouldShowGrabbingCursor()).toBe(false)
+      expect(machine.showGrabbingCursor()).toBe(false)
 
       dispose()
     })

@@ -1,10 +1,10 @@
-import { createLinker, createShape, LinkerEndpoint, type ShapeElement } from '@diagen/core'
-import { getAnchorInfo, getPerimeterInfo } from '@diagen/core/anchors'
+import { createLinker, createShape, type ShapeElement } from '@diagen/core'
+import { getAnchorInfo, getEdgeInfo } from '@diagen/core/anchors'
+import { isBoundLinkerEndpoint } from '@diagen/core/model'
 import { getLinkerTextBox } from '@diagen/core/text'
 import { rotatePoint } from '@diagen/shared'
 import { describe, expect, it, vi } from 'vitest'
 import { createRendererTestHarness } from '../.test/createRendererTestHarness'
-import { isBoundLinkerEndpoint } from '@diagen/core/model'
 
 type RendererHarness = Awaited<ReturnType<typeof createRendererTestHarness>>
 
@@ -27,14 +27,20 @@ function isMacPlatform() {
   return /Mac|iPod|iPhone|iPad/.test(window.navigator.platform ?? '')
 }
 
+function getModKeyState() {
+  return {
+    ctrlKey: !isMacPlatform(),
+    metaKey: isMacPlatform(),
+  }
+}
+
 async function dispatchModShortcut(key: string): Promise<KeyboardEvent> {
   const event = new KeyboardEvent('keydown', {
     bubbles: true,
     cancelable: true,
     key,
     code: `Key${key.toUpperCase()}`,
-    ctrlKey: !isMacPlatform(),
-    metaKey: isMacPlatform(),
+    ...getModKeyState(),
   })
   window.dispatchEvent(event)
   await Promise.resolve()
@@ -258,6 +264,7 @@ describe('Renderer', () => {
     const harness = await createRendererTestHarness({
       pageWidth: 200,
       pageHeight: 200,
+      useRendererInitialView: true,
       autoGrow: {
         enabled: true,
         growPadding: 40,
@@ -951,39 +958,39 @@ describe('Renderer', () => {
     }
   })
 
-  it('拖拽 fixed 端点到空白区域后应解除绑定，并支持 undo/redo', async () => {
+  it('拖拽 anchor 端点到空白区域后应解除绑定，并支持 undo/redo', async () => {
     const harness = await createRendererTestHarness({
       shapes: [
-        { id: 'shape_linker_fixed_source', x: 100, y: 100, w: 100, h: 80 },
-        { id: 'shape_linker_fixed_target', x: 340, y: 100, w: 100, h: 80 },
+        { id: 'shape_linker_anchor_source', x: 100, y: 100, w: 100, h: 80 },
+        { id: 'shape_linker_anchor_target', x: 340, y: 100, w: 100, h: 80 },
       ],
     })
 
     try {
-      const sourceShape = harness.designer.getElementById('shape_linker_fixed_source')
+      const sourceShape = harness.designer.getElementById('shape_linker_anchor_source')
       expect(sourceShape?.type).toBe('shape')
       if (!sourceShape || sourceShape.type !== 'shape') {
-        throw new Error('shape_linker_fixed_source 未找到')
+        throw new Error('shape_linker_anchor_source 未找到')
       }
 
       const sourceAnchor = getAnchorInfo(sourceShape, 1)
       expect(sourceAnchor).toBeTruthy()
       if (!sourceAnchor) {
-        throw new Error('shape_linker_fixed_source 锚点未找到')
+        throw new Error('shape_linker_anchor_source 锚点未找到')
       }
 
       harness.designer.edit.add(
         [
           createLinker({
-            id: 'linker_fixed_to_free',
-            name: 'linker_fixed_to_free',
+            id: 'linker_anchor_to_free',
+            name: 'linker_anchor_to_free',
             from: {
               target: sourceShape.id,
               x: sourceAnchor.point.x,
               y: sourceAnchor.point.y,
               angle: sourceAnchor.angle,
               binding: {
-                type: 'fixed',
+                type: 'anchor',
                 anchorId: sourceAnchor.id,
               },
             },
@@ -999,7 +1006,7 @@ describe('Renderer', () => {
           select: false,
         },
       )
-      harness.designer.selection.replace(['linker_fixed_to_free'])
+      harness.designer.selection.replace(['linker_anchor_to_free'])
       await Promise.resolve()
 
       const endpoint = harness.overlayLayer.querySelector('.dg-linker-overlay__from-endpoint') as HTMLElement | null
@@ -1009,10 +1016,10 @@ describe('Renderer', () => {
       await harness.dispatchWindowMouseMoveAtCanvas({ x: 40, y: 40 })
       await harness.dispatchWindowMouseUp()
 
-      const moved = harness.designer.getElementById('linker_fixed_to_free')
+      const moved = harness.designer.getElementById('linker_anchor_to_free')
       expect(moved?.type).toBe('linker')
       if (!moved || moved.type !== 'linker') {
-        throw new Error('linker_fixed_to_free 未找到')
+        throw new Error('linker_anchor_to_free 未找到')
       }
 
       expect(moved.from.binding).toEqual({ type: 'free' })
@@ -1022,25 +1029,25 @@ describe('Renderer', () => {
       expect(harness.designer.history.undoStack()).toHaveLength(1)
 
       harness.designer.undo()
-      const undone = harness.designer.getElementById('linker_fixed_to_free')
+      const undone = harness.designer.getElementById('linker_anchor_to_free')
       expect(undone?.type).toBe('linker')
       if (!undone || undone.type !== 'linker') {
-        throw new Error('linker_fixed_to_free undo 后未找到')
+        throw new Error('linker_anchor_to_free undo 后未找到')
       }
 
       expect((undone.from as any).target).toBe(sourceShape.id)
       expect(undone.from.binding).toEqual({
-        type: 'fixed',
+        type: 'anchor',
         anchorId: sourceAnchor.id,
       })
       expect(undone.from.x).toBe(sourceAnchor.point.x)
       expect(undone.from.y).toBe(sourceAnchor.point.y)
 
       harness.designer.redo()
-      const redone = harness.designer.getElementById('linker_fixed_to_free')
+      const redone = harness.designer.getElementById('linker_anchor_to_free')
       expect(redone?.type).toBe('linker')
       if (!redone || redone.type !== 'linker') {
-        throw new Error('linker_fixed_to_free redo 后未找到')
+        throw new Error('linker_anchor_to_free redo 后未找到')
       }
 
       expect(redone.from.binding).toEqual({ type: 'free' })
@@ -1052,46 +1059,46 @@ describe('Renderer', () => {
     }
   })
 
-  it('拖拽 perimeter 端点重连后，undo/redo 应恢复原 perimeter 绑定', async () => {
+  it('拖拽 edge 端点重连后，undo/redo 应恢复原 edge 绑定', async () => {
     const harness = await createRendererTestHarness({
       shapes: [
-        { id: 'shape_linker_perimeter_source', x: 100, y: 100, w: 100, h: 80 },
-        { id: 'shape_linker_perimeter_target', x: 340, y: 100, w: 100, h: 80 },
+        { id: 'shape_linker_edge_source', x: 100, y: 100, w: 100, h: 80 },
+        { id: 'shape_linker_edge_target', x: 340, y: 100, w: 100, h: 80 },
       ],
     })
 
     try {
-      const sourceShape = harness.designer.getElementById('shape_linker_perimeter_source')
-      const targetShape = harness.designer.getElementById('shape_linker_perimeter_target')
+      const sourceShape = harness.designer.getElementById('shape_linker_edge_source')
+      const targetShape = harness.designer.getElementById('shape_linker_edge_target')
       expect(sourceShape?.type).toBe('shape')
       expect(targetShape?.type).toBe('shape')
       if (!sourceShape || sourceShape.type !== 'shape' || !targetShape || targetShape.type !== 'shape') {
-        throw new Error('perimeter 测试图形未找到')
+        throw new Error('edge 测试图形未找到')
       }
 
-      const sourcePerimeter = getPerimeterInfo(sourceShape, { x: 120, y: 100 })
+      const sourceEdge = getEdgeInfo(sourceShape, { x: 120, y: 100 })
       const targetAnchor = getAnchorInfo(targetShape, 3)
-      expect(sourcePerimeter).toBeTruthy()
+      expect(sourceEdge).toBeTruthy()
       expect(targetAnchor).toBeTruthy()
-      if (!sourcePerimeter || !targetAnchor) {
-        throw new Error('perimeter 或 target 锚点未找到')
+      if (!sourceEdge || !targetAnchor) {
+        throw new Error('edge 或 target 锚点未找到')
       }
 
       harness.designer.edit.add(
         [
           createLinker({
-            id: 'linker_perimeter_reconnect',
-            name: 'linker_perimeter_reconnect',
+            id: 'linker_edge_reconnect',
+            name: 'linker_edge_reconnect',
             from: {
               target: sourceShape.id,
-              x: sourcePerimeter.point.x,
-              y: sourcePerimeter.point.y,
-              angle: sourcePerimeter.angle,
+              x: sourceEdge.point.x,
+              y: sourceEdge.point.y,
+              angle: sourceEdge.angle,
               binding: {
-                type: 'perimeter',
-                pathIndex: sourcePerimeter.pathIndex,
-                segmentIndex: sourcePerimeter.segmentIndex,
-                t: sourcePerimeter.t,
+                type: 'edge',
+                pathIndex: sourceEdge.pathIndex,
+                segmentIndex: sourceEdge.segmentIndex,
+                t: sourceEdge.t,
               },
             },
             to: {
@@ -1106,54 +1113,63 @@ describe('Renderer', () => {
           select: false,
         },
       )
-      harness.designer.selection.replace(['linker_perimeter_reconnect'])
+      harness.designer.selection.replace(['linker_edge_reconnect'])
       await Promise.resolve()
 
       const endpoint = harness.overlayLayer.querySelector('.dg-linker-overlay__from-endpoint') as HTMLElement | null
       expect(endpoint).toBeTruthy()
 
-      await harness.dispatchElementMouseDownAtClient(endpoint!, harness.canvasToClient(sourcePerimeter.point))
+      await harness.dispatchElementMouseDownAtClient(endpoint!, harness.canvasToClient(sourceEdge.point))
       await harness.dispatchWindowMouseMoveAtCanvas(targetAnchor.point)
       await harness.dispatchWindowMouseUp()
 
-      const moved = harness.designer.getElementById('linker_perimeter_reconnect')
+      const moved = harness.designer.getElementById('linker_edge_reconnect')
       expect(moved?.type).toBe('linker')
       if (!moved || moved.type !== 'linker') {
-        throw new Error('linker_perimeter_reconnect 未找到')
+        throw new Error('linker_edge_reconnect 未找到')
+      }
+      if (!isBoundLinkerEndpoint(moved.from)) {
+        throw new Error('moved.from 应为已绑定端点')
       }
 
       expect(moved.from.target).toEqual(targetShape.id)
       expect(moved.from.binding).toEqual({
-        type: 'fixed',
+        type: 'anchor',
         anchorId: targetAnchor.id,
       })
       expect(harness.designer.history.undoStack()).toHaveLength(1)
 
       harness.designer.undo()
-      const undone = harness.designer.getElementById('linker_perimeter_reconnect')
+      const undone = harness.designer.getElementById('linker_edge_reconnect')
       expect(undone?.type).toBe('linker')
       if (!undone || undone.type !== 'linker') {
-        throw new Error('linker_perimeter_reconnect undo 后未找到')
+        throw new Error('linker_edge_reconnect undo 后未找到')
+      }
+      if (!isBoundLinkerEndpoint(undone.from)) {
+        throw new Error('undone.from 应为已绑定端点')
       }
 
       expect(undone.from.target).toEqual(sourceShape.id)
       expect(undone.from.binding).toEqual({
-        type: 'perimeter',
-        pathIndex: sourcePerimeter.pathIndex,
-        segmentIndex: sourcePerimeter.segmentIndex,
-        t: sourcePerimeter.t,
+        type: 'edge',
+        pathIndex: sourceEdge.pathIndex,
+        segmentIndex: sourceEdge.segmentIndex,
+        t: sourceEdge.t,
       })
 
       harness.designer.redo()
-      const redone = harness.designer.getElementById('linker_perimeter_reconnect')
+      const redone = harness.designer.getElementById('linker_edge_reconnect')
       expect(redone?.type).toBe('linker')
       if (!redone || redone.type !== 'linker') {
-        throw new Error('linker_perimeter_reconnect redo 后未找到')
+        throw new Error('linker_edge_reconnect redo 后未找到')
+      }
+      if (!isBoundLinkerEndpoint(redone.from)) {
+        throw new Error('redone.from 应为已绑定端点')
       }
 
       expect(redone.from.target).toEqual(targetShape.id)
       expect(redone.from.binding).toEqual({
-        type: 'fixed',
+        type: 'anchor',
         anchorId: targetAnchor.id,
       })
     } finally {
@@ -1483,6 +1499,126 @@ describe('Renderer', () => {
     }
   })
 
+  it('连线拖拽命中 edge 候选时应显示 edge 预览点', async () => {
+    const harness = await createRendererTestHarness({
+      shapes: [
+        { id: 'shape_edge_source', x: 100, y: 100, w: 100, h: 80 },
+        { id: 'shape_edge_target', x: 320, y: 100, w: 100, h: 80 },
+      ],
+    })
+
+    try {
+      harness.designer.edit.add(
+        [
+          createLinker({
+            id: 'linker_edge_preview',
+            name: 'linker_edge_preview',
+            from: {
+              x: 200,
+              y: 140,
+              binding: { type: 'free' },
+            },
+            to: {
+              x: 260,
+              y: 140,
+              binding: { type: 'free' },
+            },
+          }),
+        ],
+        {
+          record: false,
+          select: false,
+        },
+      )
+      harness.designer.selection.replace(['linker_edge_preview'])
+      await Promise.resolve()
+
+      const endpoint = harness.overlayLayer.querySelector('.dg-linker-overlay__to-endpoint') as HTMLElement | null
+      expect(endpoint).toBeTruthy()
+      await harness.dispatchElementMouseDownAtClient(endpoint!, harness.canvasToClient({ x: 260, y: 140 }))
+
+      await harness.dispatchWindowMouseMoveAtCanvas(
+        { x: 320, y: 140 },
+        {
+          shiftKey: true,
+        },
+      )
+
+      const edgePreview = harness.overlayLayer.querySelector(
+        '[data-linker-edge-preview="true"][data-shape-highlight-id="shape_edge_target"]',
+      )
+      expect(edgePreview).toBeTruthy()
+
+      const anchorPreview = harness.overlayLayer.querySelectorAll('[data-shape-highlight-kind="anchor-preview"]')
+      expect(anchorPreview).toHaveLength(0)
+
+      await harness.dispatchWindowMouseUp()
+      const moved = getLinkerOrThrow(harness, 'linker_edge_preview')
+      expect(moved.to.binding.type).toBe('edge')
+    } finally {
+      harness.dispose()
+    }
+  })
+
+  it('连线拖拽命中 anchor 候选时不应显示 edge 预览点', async () => {
+    const harness = await createRendererTestHarness({
+      shapes: [
+        { id: 'shape_anchor_source', x: 100, y: 100, w: 100, h: 80 },
+        { id: 'shape_anchor_target', x: 320, y: 100, w: 100, h: 80 },
+      ],
+    })
+
+    try {
+      harness.designer.edit.add(
+        [
+          createLinker({
+            id: 'linker_anchor_preview',
+            name: 'linker_anchor_preview',
+            from: {
+              x: 200,
+              y: 140,
+              binding: { type: 'free' },
+            },
+            to: {
+              x: 260,
+              y: 140,
+              binding: { type: 'free' },
+            },
+          }),
+        ],
+        {
+          record: false,
+          select: false,
+        },
+      )
+      harness.designer.selection.replace(['linker_anchor_preview'])
+      await Promise.resolve()
+
+      const endpoint = harness.overlayLayer.querySelector('.dg-linker-overlay__to-endpoint') as HTMLElement | null
+      expect(endpoint).toBeTruthy()
+      await harness.dispatchElementMouseDownAtClient(endpoint!, harness.canvasToClient({ x: 260, y: 140 }))
+
+      await harness.dispatchWindowMouseMoveAtCanvas(
+        { x: 320, y: 140 },
+        {
+          altKey: true,
+        },
+      )
+
+      const edgePreview = harness.overlayLayer.querySelector('[data-linker-edge-preview="true"]')
+      expect(edgePreview).toBeNull()
+
+      const anchorPreview = harness.overlayLayer.querySelectorAll('[data-shape-highlight-kind="anchor-preview"]')
+      expect(anchorPreview.length).toBeGreaterThan(0)
+
+      await harness.dispatchWindowMouseUp()
+      const moved = getLinkerOrThrow(harness, 'linker_anchor_preview')
+      expect(moved.to.binding.type).toBe('anchor')
+    } finally {
+      harness.dispose()
+    }
+  })
+
   it('单选可连线图形时应显示 quick-create 面板', async () => {
     const harness = await createRendererTestHarness({
       shapes: [{ id: 'shape_source_panel', x: 100, y: 100, w: 100, h: 80 }],
@@ -1506,9 +1642,9 @@ describe('Renderer', () => {
       shapes: [{ id: 'shape_clipboard', x: 100, y: 100, w: 100, h: 80 }],
     })
 
-    const copySpy = vi.spyOn(harness.designer.clipboard, 'copy').mockImplementation(() => undefined)
+    const copySpy = vi.spyOn(harness.designer.clipboard, 'copy').mockImplementation(() => true)
     const pasteSpy = vi.spyOn(harness.designer.clipboard, 'paste').mockImplementation(() => [])
-    const cutSpy = vi.spyOn(harness.designer.clipboard, 'cut').mockImplementation(() => undefined)
+    const cutSpy = vi.spyOn(harness.designer.clipboard, 'cut').mockImplementation(() => true)
     const duplicateSpy = vi.spyOn(harness.designer.clipboard, 'duplicate').mockImplementation(() => [])
 
     try {
@@ -2004,7 +2140,7 @@ describe('Renderer', () => {
                   italic: false,
                   underline: false,
                   textAlign: 'right',
-                  vAlign: 'bottom',
+                  verticalAlign: 'bottom',
                   orientation: 'horizontal',
                 },
               },

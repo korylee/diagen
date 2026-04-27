@@ -6,7 +6,7 @@ import {
   type LinkerRoute,
   type ShapeElement,
 } from '@diagen/core'
-import { getAnchorInfo, getPerimeterInfo, resolveCreateAnchor, resolvePerimeterInfo } from '@diagen/core/anchors'
+import { getAnchorInfo, getEdgeInfo, resolveCreateAnchor, resolveEdgeInfo } from '@diagen/core/anchors'
 import type { Point } from '@diagen/shared'
 import { getDistance, isSameNumber, pick } from '@diagen/shared'
 import { createSignal, onCleanup } from 'solid-js'
@@ -26,6 +26,7 @@ import { isBoundLinkerEndpoint, LinkerTextPosition, type BoundLinkerEndpoint } f
 
 export type LinkerDragMode = 'from' | 'to' | 'control' | 'line' | 'text'
 type LinkerEndpointMode = Extract<LinkerDragMode, 'from' | 'to'>
+type LinkerSnapMode = 'auto' | 'anchor' | 'edge'
 
 interface DragState {
   linkerId: string
@@ -41,6 +42,7 @@ interface DragState {
   startRawTo: LinkerElement['to']
   startPoints: Point[]
   startTextPosition: LinkerTextPosition
+  snapMode: LinkerSnapMode
 }
 
 interface CreateContext {
@@ -113,12 +115,12 @@ export interface CreateLinkerDragOptions extends CreatePointerDragTrackerOptions
   snapOnMove?: boolean
   snapStickDistance?: number
   directionBias?: number
-  fixedAnchorBias?: number
-  perimeterPenalty?: number
+  anchorBias?: number
+  edgePenalty?: number
   allowSelfConnect?: boolean
 }
 
-interface FixedAnchorCandidate {
+interface AnchorCandidate {
   id: string
   point: Point
   angle: number
@@ -126,7 +128,7 @@ interface FixedAnchorCandidate {
 
 interface SnapShapeCandidate {
   shape: ShapeElement
-  fixedAnchors: FixedAnchorCandidate[]
+  anchorCandidates: AnchorCandidate[]
 }
 
 interface SnapCandidateCollection {
@@ -155,6 +157,17 @@ function createEmptySnapCandidates(): SnapCandidateCollection {
     list: [],
     byId: new Map(),
   }
+}
+
+function resolveSnapMode(event: Pick<MouseEvent, 'altKey' | 'shiftKey'>): LinkerSnapMode {
+  if (event.altKey) return 'anchor'
+  if (event.shiftKey) return 'edge'
+  return 'auto'
+}
+
+function isSnapTargetAllowed(target: BoundLinkerEndpoint, snapMode: LinkerSnapMode): boolean {
+  if (snapMode === 'auto') return true
+  return snapMode === target.binding.type
 }
 
 interface OrthogonalSegmentDragState {
@@ -190,8 +203,8 @@ export function createLinkerDrag(
     snapOnMove = true,
     snapStickDistance = 8,
     directionBias = 0.35,
-    fixedAnchorBias = 0.18,
-    perimeterPenalty = 0.12,
+    anchorBias = 0.18,
+    edgePenalty = 0.12,
     allowSelfConnect = true,
   } = options
 
@@ -210,6 +223,7 @@ export function createLinkerDrag(
       input.prepare?.()
       setCreateContext(input.createContext ?? null)
       snapCandidates = buildSnapCandidates(input.state)
+      input.state.snapMode = resolveSnapMode(input.event)
       setSnapTarget(resolveInitialSnapTarget(input.state))
       pointerDelta.begin(input.event)
       return input.state
@@ -244,7 +258,7 @@ export function createLinkerDrag(
       }
 
       if (isEndpointMode(state.mode)) {
-        moveEndpoint(state, delta, zoom, linker)
+        moveEndpoint(state, delta, zoom, linker, event)
       }
     },
     finalize: ({ state, shouldCommit }) => {
@@ -288,11 +302,11 @@ export function createLinkerDrag(
     for (const shape of element.shapes()) {
       if (!isShapeLinkable(shape, state)) continue
 
-      const fixedAnchors: FixedAnchorCandidate[] = []
+      const anchorCandidates: AnchorCandidate[] = []
       for (let index = 0; index < shape.anchors.length; index++) {
         const info = getAnchorInfo(shape, index)
         if (!info) continue
-        fixedAnchors.push({
+        anchorCandidates.push({
           id: info.id,
           point: info.point,
           angle: info.angle,
@@ -301,7 +315,7 @@ export function createLinkerDrag(
 
       const candidate: SnapShapeCandidate = {
         shape,
-        fixedAnchors,
+        anchorCandidates,
       }
       list.push(candidate)
       byId.set(shape.id, candidate)
@@ -332,8 +346,8 @@ export function createLinkerDrag(
     if (!candidate) return null
     const { shape } = candidate
 
-    if (binding.type === 'fixed') {
-      const info = candidate.fixedAnchors.find(anchor => anchor.id === binding.anchorId)
+    if (binding.type === 'anchor') {
+      const info = candidate.anchorCandidates.find(anchor => anchor.id === binding.anchorId)
       if (!info) return null
       return {
         x: info.point.x,
@@ -341,13 +355,13 @@ export function createLinkerDrag(
         angle: info.angle,
         target: shape.id,
         binding: {
-          type: 'fixed',
+          type: 'anchor',
           anchorId: info.id,
         },
       }
     }
 
-    const info = resolvePerimeterInfo(shape, binding)
+    const info = resolveEdgeInfo(shape, binding)
     if (!info) return null
     return {
       x: info.point.x,
@@ -355,7 +369,7 @@ export function createLinkerDrag(
       angle: info.angle,
       target: shape.id,
       binding: {
-        type: 'perimeter',
+        type: 'edge',
         pathIndex: info.pathIndex,
         segmentIndex: info.segmentIndex,
         t: info.t,
@@ -467,6 +481,7 @@ export function createLinkerDrag(
           dx: linker.textPosition?.dx ?? 0,
           dy: linker.textPosition?.dy ?? 0,
         },
+        snapMode: 'auto',
       },
       shouldInsertSegmentWaypoint: hit.type === 'segment',
     }
@@ -553,14 +568,14 @@ export function createLinkerDrag(
     if (!preferredAnchor) return false
 
     const fromEndpoint: LinkerEndpoint =
-      preferredAnchor.type === 'fixed'
+      preferredAnchor.type === 'anchor'
         ? {
             x: preferredAnchor.point.x,
             y: preferredAnchor.point.y,
             angle: preferredAnchor.angle,
             target: sourceShape.id,
             binding: {
-              type: 'fixed',
+              type: 'anchor',
               anchorId: preferredAnchor.id,
             },
           }
@@ -570,7 +585,7 @@ export function createLinkerDrag(
             angle: preferredAnchor.angle,
             target: sourceShape.id,
             binding: {
-              type: 'perimeter',
+              type: 'edge',
               pathIndex: preferredAnchor.pathIndex,
               segmentIndex: preferredAnchor.segmentIndex,
               t: preferredAnchor.t,
@@ -630,6 +645,7 @@ export function createLinkerDrag(
         dx: linker.textPosition?.dx ?? 0,
         dy: linker.textPosition?.dy ?? 0,
       },
+      snapMode: 'auto',
     }
 
     return beginSession(e, state, {
@@ -649,6 +665,7 @@ export function createLinkerDrag(
     } = {},
   ): boolean {
     const { context, prepare } = options
+    state.snapMode = resolveSnapMode(e)
     return session.begin({
       event: e,
       state,
@@ -926,7 +943,15 @@ export function createLinkerDrag(
     })
   }
 
-  function moveEndpoint(state: DragState, delta: Point, zoom: number, linkerElement: LinkerElement): void {
+  function moveEndpoint(
+    state: DragState,
+    delta: Point,
+    zoom: number,
+    linkerElement: LinkerElement,
+    event: MouseEvent,
+  ): void {
+    state.snapMode = resolveSnapMode(event)
+    const snapMode = state.snapMode
     const mode = state.mode
     const startPoint = mode === 'from' ? state.startFrom : state.startTo
     const target = {
@@ -937,6 +962,7 @@ export function createLinkerDrag(
     const stickDistance = snapStickDistance / zoom
     const oppositePoint = mode === 'from' ? linkerElement.to : linkerElement.from
     const nextSnapTarget = findNearestAnchor(target, {
+      snapMode,
       maxDistance,
       stickDistance,
       preferred: snapTarget(),
@@ -972,6 +998,7 @@ export function createLinkerDrag(
     const target =
       snapTarget() ??
       findNearestAnchor(currentPoint, {
+        snapMode: state.snapMode,
         maxDistance,
         stickDistance,
         oppositePoint,
@@ -993,17 +1020,22 @@ export function createLinkerDrag(
   function findNearestAnchor(
     point: Point,
     options: {
+      snapMode: LinkerSnapMode
       maxDistance: number
       stickDistance: number
       preferred?: BoundLinkerEndpoint | null
       oppositePoint?: Point
     },
   ): BoundLinkerEndpoint | null {
-    const { maxDistance, stickDistance, preferred, oppositePoint } = options
+    const { snapMode, maxDistance, stickDistance, preferred, oppositePoint } = options
 
     if (preferred) {
       const resolved = resolveBoundEndpoint(preferred)
-      if (resolved && getDistance(point, pick(resolved, ['x', 'y'])) <= maxDistance + stickDistance) {
+      if (
+        resolved &&
+        isSnapTargetAllowed(resolved, snapMode) &&
+        getDistance(point, pick(resolved, ['x', 'y'])) <= maxDistance + stickDistance
+      ) {
         return resolved
       }
     }
@@ -1013,58 +1045,62 @@ export function createLinkerDrag(
     const weight = Math.max(0, directionBias)
 
     for (const candidate of snapCandidates.list) {
-      const { shape, fixedAnchors } = candidate
+      const { shape, anchorCandidates } = candidate
 
-      for (const anchor of fixedAnchors) {
-        const distance = getDistance(point, anchor.point)
-        if (distance > maxDistance) continue
+      if (snapMode !== 'edge') {
+        for (const anchor of anchorCandidates) {
+          const distance = getDistance(point, anchor.point)
+          if (distance > maxDistance) continue
 
-        let score = distance
-        if (oppositePoint && weight > 0) {
-          const desiredAngle = Math.atan2(oppositePoint.y - anchor.point.y, oppositePoint.x - anchor.point.x)
-          const diff = normalizeAngleDiff(desiredAngle, anchor.angle)
-          score += (diff / Math.PI) * weight * maxDistance
-        }
-        score -= fixedAnchorBias * maxDistance
+          let score = distance
+          if (oppositePoint && weight > 0) {
+            const desiredAngle = Math.atan2(oppositePoint.y - anchor.point.y, oppositePoint.x - anchor.point.x)
+            const diff = normalizeAngleDiff(desiredAngle, anchor.angle)
+            score += (diff / Math.PI) * weight * maxDistance
+          }
+          score -= anchorBias * maxDistance
 
-        if (score <= bestScore) {
-          bestScore = score
-          best = {
-            x: anchor.point.x,
-            y: anchor.point.y,
-            angle: anchor.angle,
-            target: shape.id,
-            binding: {
-              type: 'fixed',
-              anchorId: anchor.id,
-            },
+          if (score <= bestScore) {
+            bestScore = score
+            best = {
+              x: anchor.point.x,
+              y: anchor.point.y,
+              angle: anchor.angle,
+              target: shape.id,
+              binding: {
+                type: 'anchor',
+                anchorId: anchor.id,
+              },
+            }
           }
         }
       }
 
-      const perimeter = getPerimeterInfo(shape, point)
-      if (!perimeter || perimeter.distance > maxDistance) continue
+      if (snapMode === 'anchor') continue
 
-      let score = perimeter.distance
+      const edgeInfo = getEdgeInfo(shape, point)
+      if (!edgeInfo || edgeInfo.distance > maxDistance) continue
+
+      let score = edgeInfo.distance
       if (oppositePoint && weight > 0) {
-        const desiredAngle = Math.atan2(oppositePoint.y - perimeter.point.y, oppositePoint.x - perimeter.point.x)
-        const diff = normalizeAngleDiff(desiredAngle, perimeter.angle)
+        const desiredAngle = Math.atan2(oppositePoint.y - edgeInfo.point.y, oppositePoint.x - edgeInfo.point.x)
+        const diff = normalizeAngleDiff(desiredAngle, edgeInfo.angle)
         score += (diff / Math.PI) * weight * maxDistance
       }
-      score += perimeterPenalty * maxDistance
+      score += edgePenalty * maxDistance
 
       if (score <= bestScore) {
         bestScore = score
         best = {
-          x: perimeter.point.x,
-          y: perimeter.point.y,
-          angle: perimeter.angle,
+          x: edgeInfo.point.x,
+          y: edgeInfo.point.y,
+          angle: edgeInfo.angle,
           target: shape.id,
           binding: {
-            type: 'perimeter',
-            pathIndex: perimeter.pathIndex,
-            segmentIndex: perimeter.segmentIndex,
-            t: perimeter.t,
+            type: 'edge',
+            pathIndex: edgeInfo.pathIndex,
+            segmentIndex: edgeInfo.segmentIndex,
+            t: edgeInfo.t,
           },
         }
       }

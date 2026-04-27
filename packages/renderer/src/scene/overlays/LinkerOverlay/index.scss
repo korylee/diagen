@@ -58,4 +58,15 @@
     pointer-events: none;
     box-sizing: border-box;
   }
+
+  &__edge-preview {
+    width: calc(var(--dg-anchor-size) - 1px);
+    height: calc(var(--dg-anchor-size) - 1px);
+    transform: translate(-50%, -50%) rotate(45deg);
+    border: 2px solid var(--dg-selection-color);
+    border-radius: 2px;
+    background: rgba(6, 123, 239, 0.2);
+    box-sizing: border-box;
+    pointer-events: none;
+  }
 }

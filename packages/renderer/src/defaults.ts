@@ -4,6 +4,7 @@ import type { DeepPartial } from '@diagen/shared'
 export interface RendererInteractionDefaults {
   panButton: number
   shapeDragThreshold: number
+  /** shape 拖拽吸附容差（画布坐标） */
   shapeGuideTolerance?: number
   linkerDragThreshold: number
   linkerSnapDistance: number
@@ -13,6 +14,7 @@ export interface RendererInteractionDefaults {
   linkerAllowSelfConnect: boolean
   resizeMinWidth: number
   resizeMinHeight: number
+  /** resize 吸附容差（画布坐标） */
   resizeGuideTolerance?: number
   boxSelectMinSize: number
   rotateThreshold: number

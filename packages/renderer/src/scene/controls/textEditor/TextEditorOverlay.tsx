@@ -1,8 +1,8 @@
 import { isLinker, isShape, type FontStyle } from '@diagen/core'
 import { getLinkerTextBox, getShapeTextBox } from '@diagen/core/text'
 import { createEffect, createMemo, createSignal, type Accessor } from 'solid-js'
+import { parseColor } from '../../../canvas'
 import { useDesigner } from '../../../context/DesignerProvider'
-import { parseColor } from '../../../utils/render-utils'
 import type { TextEditorSession } from './createTextEditorControl'
 
 const BasePaddingX = 6
@@ -17,14 +17,14 @@ function getVerticalPadding(text: string, fontStyle: FontStyle, boxHeight: numbe
   const contentHeight = lineCount * lineHeight
   const freeSpace = Math.max(0, boxHeight - contentHeight - BasePaddingY * 2)
 
-  if (fontStyle.vAlign === 'bottom') {
+  if (fontStyle.verticalAlign === 'bottom') {
     return {
       top: BasePaddingY + freeSpace,
       bottom: BasePaddingY,
     }
   }
 
-  if (fontStyle.vAlign === 'middle') {
+  if (fontStyle.verticalAlign === 'middle') {
     const offset = BasePaddingY + freeSpace / 2
     return {
       top: offset,

@@ -1,6 +1,6 @@
-import { createLinker } from '@diagen/core'
+import { createLinker, createShape } from '@diagen/core'
 import { describe, expect, it, vi } from 'vitest'
-import { renderLinker } from './render-utils'
+import { renderLinker, renderShape } from '../canvas/render'
 import { getLinkerTextBox } from '@diagen/core/text'
 
 function createContextMock() {
@@ -23,6 +23,7 @@ function createContextMock() {
     measureText: vi.fn(() => ({ width: 0 })),
     closePath: vi.fn(),
     arc: vi.fn(),
+    rect: vi.fn(),
     strokeStyle: '',
     fillStyle: '',
     lineWidth: 0,
@@ -39,13 +40,11 @@ function createStraightLinkerById(id: string) {
     name: id,
     linkerType: 'straight',
     from: {
-      id: null,
       x: 0,
       y: 0,
       binding: { type: 'free' },
     },
     to: {
-      id: null,
       x: 100,
       y: 0,
       binding: { type: 'free' },
@@ -298,7 +297,80 @@ describe('renderLinker', () => {
       toAngle: 0,
     })
 
-    expect(ctx.fillRect).toHaveBeenCalledWith(expect.any(Number), expect.any(Number), expect.any(Number), expect.any(Number))
+    expect(ctx.fillRect).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      expect.any(Number),
+      expect.any(Number),
+    )
     expect(ctx.fillText).toHaveBeenCalledWith('标签', 80, -12)
+  })
+
+  it('预览模式下可抑制连线文本绘制', () => {
+    const ctx = createContextMock()
+    const linker = createStraightLinkerById('render_preview_linker')
+    linker.text = '不应绘制'
+
+    renderLinker(
+      ctx,
+      linker,
+      {
+        points: [
+          { x: 0, y: 0 },
+          { x: 100, y: 0 },
+        ],
+        fromAngle: 0,
+        toAngle: 0,
+      },
+      { suppressText: true },
+    )
+
+    expect(ctx.fillRect).not.toHaveBeenCalled()
+    expect(ctx.fillText).not.toHaveBeenCalled()
+  })
+})
+
+describe('renderShape', () => {
+  it('默认 textBlock 应按形状中心线绘制文本', () => {
+    const ctx = createContextMock()
+    const shape = createShape({
+      id: 'shape_text_block_center',
+      name: 'shape_text_block_center',
+      textBlock: [{ position: { x: 10, y: 0, w: 'w-20', h: 'h' }, text: '居中' }],
+      props: {
+        x: 0,
+        y: 0,
+        w: 120,
+        h: 80,
+        angle: 0,
+      },
+      path: [],
+    })
+
+    renderShape(ctx, shape)
+
+    expect(ctx.fillText).toHaveBeenCalledTimes(1)
+    expect(ctx.fillText).toHaveBeenCalledWith('居中', 60, expect.any(Number))
+  })
+
+  it('预览模式下可抑制 shape 文本绘制', () => {
+    const ctx = createContextMock()
+    const shape = createShape({
+      id: 'shape_text_block_suppressed',
+      name: 'shape_text_block_suppressed',
+      textBlock: [{ position: { x: 10, y: 0, w: 'w-20', h: 'h' }, text: '隐藏' }],
+      props: {
+        x: 0,
+        y: 0,
+        w: 120,
+        h: 80,
+        angle: 0,
+      },
+      path: [],
+    })
+
+    renderShape(ctx, shape, { suppressText: true })
+
+    expect(ctx.fillText).not.toHaveBeenCalled()
   })
 })

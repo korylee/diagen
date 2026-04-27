@@ -1,5 +1,3 @@
-import type { RectHighlightItem } from '../RectHighlightOverlay'
-
 export interface QuickCreateAction {
   id: string
   label: string
@@ -57,5 +55,4 @@ export interface SelectedLinkerOverlayModel {
   endpointHandles: LinkerEndpointHandles
   waypointHandles: LinkerWaypointHandle[]
   textBounds: LinkerTextBounds | null
-  anchorItems: RectHighlightItem[]
 }

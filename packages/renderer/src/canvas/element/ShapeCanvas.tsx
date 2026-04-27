@@ -3,10 +3,10 @@ import { createDevicePixelRatio } from '@diagen/primitives'
 import { expandBounds, getRotatedBounds } from '@diagen/shared'
 import { createEffect, createMemo } from 'solid-js'
 import { useDesigner, useInteraction } from '../../context'
-import { renderShape } from '../../utils'
+import { renderShape } from '../render'
 
 export interface ShapeCanvasProps {
-  shape: ShapeElement
+  element: ShapeElement
 }
 
 export function ShapeCanvas(props: ShapeCanvasProps) {
@@ -16,7 +16,7 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
   const { selection, view, state } = useDesigner()
   const { scroll } = useInteraction()
   const pixelRatio = createDevicePixelRatio()
-  const renderBounds = createMemo(() => getRotatedBounds(props.shape.props))
+  const renderBounds = createMemo(() => getRotatedBounds(props.element.props))
 
   const padding = 4
 
@@ -50,8 +50,8 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
       ratio: pixelRatio(),
       pixelWidth: width * pixelRatio(),
       pixelHeight: height * pixelRatio(),
-      offsetX: props.shape.props.x - rotatedBounds.x,
-      offsetY: props.shape.props.y - rotatedBounds.y,
+      offsetX: props.element.props.x - rotatedBounds.x,
+      offsetY: props.element.props.y - rotatedBounds.y,
     }
   })
 
@@ -65,7 +65,7 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
     ctx.scale(frame.ratio, frame.ratio)
     ctx.scale(frame.zoom, frame.zoom)
     ctx.translate(frame.offsetX + padding / frame.zoom, frame.offsetY + padding / frame.zoom)
-    renderShape(ctx, props.shape)
+    renderShape(ctx, props.element)
     ctx.restore()
   }
 
@@ -101,7 +101,7 @@ export function ShapeCanvas(props: ShapeCanvasProps) {
         top: `${getScreenBounds().y}px`,
         width: `${getScreenBounds().w}px`,
         height: `${getScreenBounds().h}px`,
-        cursor: selection.isSelected(props.shape.id) ? 'move' : 'pointer',
+        cursor: selection.isSelected(props.element.id) ? 'move' : 'pointer',
         'pointer-events': 'auto',
       }}
     >

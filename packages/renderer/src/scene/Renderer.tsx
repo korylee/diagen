@@ -1,11 +1,12 @@
 import { DesignerToolState, Schema } from '@diagen/core'
-import { createEventListener, createKeyboard } from '@diagen/primitives'
+import { useEventListener, useKeyboard } from '@diagen/primitives'
 import { createDgBem, type Point } from '@diagen/shared'
-import { createEffect, createMemo, createSignal, JSX, onCleanup, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, JSX, Show } from 'solid-js'
 import { isServer } from 'solid-js/web'
 import { CanvasRenderer } from '../canvas'
 import { InteractionProvider } from '../context'
 import { useDesigner } from '../context/DesignerProvider'
+import { resolveRendererDefaults, type RendererDefaultsOverrides } from '../defaults'
 import { hitTestScene, type SceneHit } from '../utils'
 import { createTextEditorControl, TextEditorOverlay } from './controls/textEditor'
 import { BoxSelectionOverlay } from './overlays/BoxSelectionOverlay'
@@ -18,7 +19,6 @@ import { createPointerInteraction } from './pointer'
 import { createCoordinateService } from './services/createCoordinateService'
 import { createRendererHover } from './services/createRendererHover'
 import { createScrollService } from './services/createScrollService'
-import { resolveRendererDefaults, type RendererDefaultsOverrides } from '../defaults'
 
 import './Renderer.scss'
 
@@ -96,16 +96,12 @@ export function Renderer(props: {
   class?: string
   /** Optional inline styles */
   style?: Record<string, string>
-  /** shape 拖拽吸附容差（画布坐标） */
-  shapeGuideTolerance?: number
-  /** resize 吸附容差（画布坐标） */
-  resizeGuideTolerance?: number
   /** renderer 默认配置覆写 */
   defaults?: RendererDefaultsOverrides
   /** 右键菜单上下文请求 */
   onContextMenu?: (request: RendererContextMenuRequest) => void
 }) {
-  const { selection, edit, view, state, history, tool, clipboard, element } = useDesigner()
+  const { selection, edit, view, state, history, tool, clipboard, element, emitter } = useDesigner()
   const rendererDefaults = resolveRendererDefaults(props.defaults)
   const interactionDefaults = rendererDefaults.interaction
   const zoomDefaults = rendererDefaults.zoom
@@ -119,24 +115,8 @@ export function Renderer(props: {
     screenToCanvas: view.toCanvas,
     canvasToScreen: view.toScreen,
   })
-  const pointer = createPointerInteraction(coordinate, {
-    panButton: interactionDefaults.panButton,
-    shapeDragThreshold: interactionDefaults.shapeDragThreshold,
-    shapeGuideTolerance: props.shapeGuideTolerance ?? interactionDefaults.shapeGuideTolerance,
-    linkerDragThreshold: interactionDefaults.linkerDragThreshold,
-    linkerSnapDistance: interactionDefaults.linkerSnapDistance,
-    linkerSnapOnMove: interactionDefaults.linkerSnapOnMove,
-    linkerSnapStickDistance: interactionDefaults.linkerSnapStickDistance,
-    linkerDirectionBias: interactionDefaults.linkerDirectionBias,
-    linkerAllowSelfConnect: interactionDefaults.linkerAllowSelfConnect,
-    resizeMinWidth: interactionDefaults.resizeMinWidth,
-    resizeMinHeight: interactionDefaults.resizeMinHeight,
-    resizeGuideTolerance: props.resizeGuideTolerance ?? interactionDefaults.resizeGuideTolerance,
-    boxSelectMinSize: interactionDefaults.boxSelectMinSize,
-    rotateThreshold: interactionDefaults.rotateThreshold,
-    rotateSnapStep: interactionDefaults.rotateSnapStep,
-  })
-  const keyboard = createKeyboard()
+  const pointer = createPointerInteraction(coordinate, interactionDefaults)
+  const keyboard = useKeyboard()
 
   keyboard.bind('delete', () => edit.remove(selection.selectedIds()))
   keyboard.bind('mod+a', () => selection.selectAll())
@@ -191,7 +171,7 @@ export function Renderer(props: {
     isPointerActive: pointer.machine.isActive,
     isTextEditing: textEditor.isEditing,
     isToolIdle: tool.isIdle,
-    hitTestHoverTarget: pointerSnapshot =>
+    hitTest: pointerSnapshot =>
       hitScene(
         coordinate.eventToCanvas({
           clientX: pointerSnapshot.clientX,
@@ -381,9 +361,9 @@ export function Renderer(props: {
       'background-color': `var(--dg-page-background)`,
       'box-sizing': 'content-box',
       cursor: getCursor({
-        isGrabbing: pointer.machine.shouldShowGrabbingCursor(),
+        isGrabbing: pointer.machine.showGrabbingCursor(),
         toolType: state.tool.type,
-        hoverCursor: hover.hoverCursor(),
+        hoverCursor: hover.cursor(),
       }),
     } as const
   })
@@ -450,10 +430,10 @@ export function Renderer(props: {
   }
 
   if (!isServer) {
-    createEventListener(window, 'mousemove', e => {
+    useEventListener(window, 'mousemove', e => {
       onMouseMove(e)
     })
-    createEventListener(window, 'mouseup', () => {
+    useEventListener(window, 'mouseup', () => {
       onMouseUp()
     })
   }
@@ -461,14 +441,6 @@ export function Renderer(props: {
   createEffect(() => {
     const { width, height } = coordinate.viewportRect()
     view.setViewportSize(width, height)
-  })
-
-  createEffect(() => {
-    scroll.syncOriginOffset(view.originOffset())
-  })
-
-  onCleanup(() => {
-    scroll.reset()
   })
 
   return (
@@ -494,8 +466,8 @@ export function Renderer(props: {
             ref={setSceneRef}
             class={bem('scene')}
             style={sceneStyle()}
-            onMouseMove={hover.onSceneMouseMove}
-            onMouseLeave={hover.onMouseLeave}
+            onMouseMove={hover.move}
+            onMouseLeave={hover.leave}
             on:mousedown={onSceneMouseDown}
             onDblClick={textEditor.onDoubleClick}
           >
@@ -503,7 +475,7 @@ export function Renderer(props: {
           </div>
 
           {/*交互覆盖层（屏幕坐标，不做 transform）*/}
-          <div class="dg-renderer__overlay" style={overlayStyle()}>
+          <div class={bem('overlay')} style={overlayStyle()}>
             <Show when={!textEditor.isEditing()}>
               <BoxSelectionOverlay />
               <GuideOverlay />

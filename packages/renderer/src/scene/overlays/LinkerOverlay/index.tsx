@@ -2,15 +2,20 @@ import { isLinker, isShape } from '@diagen/core'
 import { getAnchorInfo } from '@diagen/core/anchors'
 import { getLinkerTextBox } from '@diagen/core/text'
 import { type Point } from '@diagen/shared'
-import { createMemo } from 'solid-js'
+import { createMemo, Show } from 'solid-js'
 import { useDesigner } from '../../../context/DesignerProvider'
 import { useInteraction } from '../../../context/InteractionProvider'
-import type { RectHighlightItem } from '../RectHighlightOverlay'
+import { RectHighlightOverlay, type RectHighlightItem } from '../RectHighlightOverlay'
 import { createRoutePath } from './createRoutePath'
 import { LinkQuickCreatePanel } from './LinkQuickCreatePanel'
 import { LinkTargetHighlights } from './LinkTargetHighlights'
 import { SelectedLinkerOverlay } from './SelectedLinkerOverlay'
-import type { LinkerWaypointHandle, QuickCreateAction, QuickCreatePanel, QuickCreatePlacement } from './types'
+import type {
+  LinkerWaypointHandle,
+  QuickCreateAction,
+  QuickCreatePanel,
+  QuickCreatePlacement,
+} from './types'
 
 import './index.scss'
 
@@ -178,12 +183,12 @@ export function LinkerOverlay() {
     }
   })
   const snapTarget = createMemo(() => pointer.linkerDrag.snapTarget())
-  const fixedSnapTarget = createMemo(() => {
+  const anchorSnapTarget = createMemo(() => {
     const candidate = snapTarget()
-    return candidate && candidate.binding.type === 'fixed' ? candidate : null
+    return candidate && candidate.binding.type === 'anchor' ? candidate : null
   })
   const anchorItems = createMemo(() => {
-    const candidate = fixedSnapTarget()
+    const candidate = anchorSnapTarget()
     if (!candidate) return []
     const target = element.getElementById(candidate.target)
     if (!target || !isShape(target)) return []
@@ -195,7 +200,7 @@ export function LinkerOverlay() {
       const anchor = getAnchorInfo(target, index)
       if (!anchor) continue
       const screenPoint = coordinate.canvasToScreen(anchor.point)
-      const isActive = candidate.binding.type === 'fixed' && candidate.binding.anchorId === anchor.id
+      const isActive = candidate.binding.type === 'anchor' && candidate.binding.anchorId === anchor.id
 
       items.push({
         id: `${candidate.target}:anchor-preview:${anchor.id}:${index}`,
@@ -221,6 +226,17 @@ export function LinkerOverlay() {
     }
 
     return items
+  })
+  const edgePreview = createMemo(() => {
+    const candidate = snapTarget()
+    if (!candidate || candidate.binding.type !== 'edge') return null
+
+    const screenPoint = coordinate.canvasToScreen(candidate)
+    return {
+      x: screenPoint.x,
+      y: screenPoint.y,
+      targetId: candidate.target,
+    }
   })
 
   const startEndpointDrag = (e: MouseEvent, type: 'from' | 'to') => {
@@ -271,7 +287,6 @@ export function LinkerOverlay() {
       endpointHandles: handles,
       waypointHandles: waypointHandles(),
       textBounds: textBounds(),
-      anchorItems: anchorItems(),
     }
   })
 
@@ -290,6 +305,25 @@ export function LinkerOverlay() {
         onStartControlDrag={(event, handle) => startControlDrag(event, handle.index, handle.canvas)}
         onRemoveWaypoint={(event, handle) => removeWaypoint(event, handle.index)}
       />
+
+      <Show when={edgePreview()}>
+        {preview => (
+          <div
+            class="dg-linker-overlay__edge-preview"
+            data-linker-edge-preview="true"
+            data-shape-highlight-kind="edge-preview"
+            data-shape-highlight-id={preview().targetId}
+            style={{
+              position: 'absolute',
+              left: `${preview().x}px`,
+              top: `${preview().y}px`,
+              'z-index': 9998,
+            }}
+          />
+        )}
+      </Show>
+
+      <RectHighlightOverlay items={anchorItems()} visible={anchorItems().length > 0} zIndex={9998} />
     </>
   )
 }

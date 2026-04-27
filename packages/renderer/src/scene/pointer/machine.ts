@@ -27,7 +27,7 @@ interface ModeHandler {
   end: () => void
   cancel: () => void
   shouldAutoScroll: boolean
-  shouldShowGrabbingCursor: boolean
+  showGrabbingCursor: boolean
 }
 
 interface CreatePointerMachineOptions {
@@ -49,51 +49,51 @@ export function createPointerMachine(options: CreatePointerMachineOptions) {
       end: () => pan.end(),
       cancel: () => pan.end(),
       shouldAutoScroll: false,
-      shouldShowGrabbingCursor: true,
+      showGrabbingCursor: true,
     },
     draggingShape: {
       move: event => shapeDrag.move(event),
       end: () => shapeDrag.end(),
       cancel: () => shapeDrag.cancel(),
       shouldAutoScroll: true,
-      shouldShowGrabbingCursor: true,
+      showGrabbingCursor: true,
     },
     draggingLinker: {
       move: event => linkerDrag.move(event),
       end: () => linkerDrag.end(),
       cancel: () => linkerDrag.cancel(),
       shouldAutoScroll: true,
-      shouldShowGrabbingCursor: true,
+      showGrabbingCursor: true,
     },
     resizing: {
       move: event => resize.move(event),
       end: () => resize.end(),
       cancel: () => resize.cancel(),
       shouldAutoScroll: true,
-      shouldShowGrabbingCursor: false,
+      showGrabbingCursor: false,
     },
     rotatingShape: {
       move: event => rotate.move(event),
       end: () => rotate.end(),
       cancel: () => rotate.cancel(),
       shouldAutoScroll: true,
-      shouldShowGrabbingCursor: true,
+      showGrabbingCursor: true,
     },
     boxSelecting: {
       move: event => boxSelect.move(eventToCanvas(event)),
       end: () => boxSelect.end(),
       cancel: () => boxSelect.cancel(),
       shouldAutoScroll: true,
-      shouldShowGrabbingCursor: false,
+      showGrabbingCursor: false,
     },
   }
 
   const isIdle = (): boolean => mode() === 'idle'
   const isActive = (): boolean => mode() !== 'idle'
-  const shouldShowGrabbingCursor = (): boolean => {
+  const showGrabbingCursor = (): boolean => {
     const current = mode()
     if (current === 'idle') return false
-    return modeHandlers[current].shouldShowGrabbingCursor
+    return modeHandlers[current].showGrabbingCursor
   }
   const shouldAutoScroll = (): boolean => {
     const current = mode()
@@ -151,7 +151,7 @@ export function createPointerMachine(options: CreatePointerMachineOptions) {
     mode,
     isIdle,
     isActive,
-    shouldShowGrabbingCursor,
+    showGrabbingCursor,
     shouldAutoScroll,
     startPan,
     startBoxSelect,

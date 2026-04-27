@@ -1,7 +1,8 @@
-import { createRafLoop, createScroll, type ElementRect } from '@diagen/primitives'
+import { createRafLoop, createScroll, tryOnCleanup, type ElementRect } from '@diagen/primitives'
 import type { Point } from '@diagen/shared'
-import type { Accessor } from 'solid-js'
+import { createEffect, onCleanup, type Accessor } from 'solid-js'
 import type { CreatePointerInteraction } from '../pointer'
+import { useDesigner } from '../../context'
 
 interface ScrollServiceOptions {
   viewportRef: Accessor<HTMLDivElement | null>
@@ -69,6 +70,7 @@ function getRawScrollPosition(input: { left: number; top: number }) {
 }
 
 export function createScrollService(options: ScrollServiceOptions) {
+  const { emitter, view, state } = useDesigner()
   const { viewportRef, viewportRect, pointer } = options
   const { edgeGap = 28, maxStep = 26 } = options
   const viewportScroll = createScroll(viewportRef, {
@@ -83,7 +85,7 @@ export function createScrollService(options: ScrollServiceOptions) {
   let lastPointer: MouseSnap | null = null
   let lastOriginOffset: Point | null = null
 
-  const commitScroll = (input: { left: number; top: number }, options: { clamp?: boolean } = {}): boolean => {
+  const commit = (input: { left: number; top: number }, options: { clamp?: boolean } = {}): boolean => {
     const viewportEl = viewportRef()
     if (!viewportEl) return false
 
@@ -116,7 +118,7 @@ export function createScrollService(options: ScrollServiceOptions) {
     )
     if (dx === 0 && dy === 0) return false
 
-    return commitScroll(
+    return commit(
       {
         left: viewportEl.scrollLeft + dx,
         top: viewportEl.scrollTop + dy,
@@ -179,23 +181,39 @@ export function createScrollService(options: ScrollServiceOptions) {
   }
 
   const scrollTo = (left: number, top: number): boolean => {
-    return commitScroll({ left, top })
+    return commit({ left, top })
   }
 
   const scrollBy = (dx: number, dy: number): boolean => {
     const viewportEl = viewportRef()
     if (!viewportEl) return false
 
-    return commitScroll({
+    return commit({
       left: viewportEl.scrollLeft + dx,
       top: viewportEl.scrollTop + dy,
     })
   }
 
-  const syncOriginOffset = (nextOffset: Point): void => {
+  const isActive = () => !!lastPointer && (isPointerActive() || shouldAutoScroll())
+
+  const dispose = emitter.on('view:navigated', () => {
+    const inset = state.config.containerInset
+    const originOffset = view.originOffset()
     const normalizedOffset = {
-      x: nextOffset.x,
-      y: nextOffset.y,
+      x: originOffset.x,
+      y: originOffset.y,
+    }
+
+    lastOriginOffset = normalizedOffset
+
+    return scrollTo(inset + normalizedOffset.x, inset + normalizedOffset.y)
+  })
+
+  createEffect(() => {
+    const offset = view.originOffset()
+    const normalizedOffset = {
+      x: offset.x,
+      y: offset.y,
     }
 
     if (!viewportRef()) {
@@ -216,15 +234,17 @@ export function createScrollService(options: ScrollServiceOptions) {
 
     // 左/上自动扩展时同步补偿滚动位置，保证用户当前看到的画面不因原点平移而突跳
     scrollBy(deltaX, deltaY)
-  }
+  })
 
-  const isActive = () => !!lastPointer && (isPointerActive() || shouldAutoScroll())
+  onCleanup(() => {
+    reset()
+    dispose()
+  })
 
   return {
     position: viewportScroll.position,
     scrollTo,
     scrollBy,
-    syncOriginOffset,
     move: onPointerMove,
     reset,
     isActive,

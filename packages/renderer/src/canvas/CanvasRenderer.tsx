@@ -14,10 +14,10 @@ export function CanvasRenderer() {
       {item => (
         <Switch>
           <Match when={isShape(item)}>
-            <ShapeCanvas shape={item as ShapeElement} />
+            <ShapeCanvas element={item as ShapeElement} />
           </Match>
           <Match when={isLinker(item)}>
-            <LinkerCanvas linker={item as LinkerElement} />
+            <LinkerCanvas element={item as LinkerElement} />
           </Match>
         </Switch>
       )}
