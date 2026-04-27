@@ -22,4 +22,4 @@ export const isNumString = (str: unknown): boolean => isString(str) && /^\d+(\.\
 
 export const isNumeric = (val: unknown): val is string | number => isNumber(val) || isNumString(val)
 
-export const isMap = (value: unknown): value is Map<any, any> => toRawType(value) === 'Map'
+export const isMap = <K = any, V = any>(value: unknown): value is Map<K, V> => toRawType(value) === 'Map'

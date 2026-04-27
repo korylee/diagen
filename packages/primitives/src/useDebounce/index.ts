@@ -2,7 +2,7 @@ import { AnyFn, PromisifyFn, debounce, DebounceOptions } from '@diagen/shared'
 import { access, MaybeAccessor, tryOnCleanup } from '../helper'
 import { isServer } from 'solid-js/web'
 
-export function createDebounce<T extends AnyFn>(
+export function useDebounce<T extends AnyFn>(
   fn: T,
   ms: MaybeAccessor<number> = 200,
   options: DebounceOptions = {},

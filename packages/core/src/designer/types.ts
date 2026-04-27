@@ -3,7 +3,7 @@ import type { LinkerType } from '../constants'
 import type { Diagram } from '../model'
 import type { LinkerRouteStrategy, RouteConfig, RouteOptions } from '../route'
 import type { Transform } from '../transform'
-import type { ElementEvents, HistoryEvents, SelectionEvents } from './managers'
+import type { ElementEvents, HistoryEvents, SelectionEvents, ViewEvents } from './managers'
 
 /** 画布自增配置 */
 export interface AutoGrowConfig {
@@ -86,7 +86,8 @@ export interface EditorState {
 export type DesignerEmitter = Emitter<
   ElementEvents &
     HistoryEvents &
-    SelectionEvents & {
+    SelectionEvents &
+    ViewEvents & {
       [k: string]: any
     }
 >

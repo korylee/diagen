@@ -1,14 +1,14 @@
 import { createRoot } from 'solid-js'
 import { describe, expect, it, vi } from 'vitest'
-import { createKeyboard, type CreateKeyboardOptions } from '../index'
+import { useKeyboard, type UseKeyboardOptions } from '../index'
 
 function withKeyboard(
-  options: CreateKeyboardOptions = {},
-  run: (keyboard: ReturnType<typeof createKeyboard>) => void | Promise<void>,
+  options: UseKeyboardOptions = {},
+  run: (keyboard: ReturnType<typeof useKeyboard>) => void | Promise<void>,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     createRoot(dispose => {
-      const keyboard = createKeyboard({
+      const keyboard = useKeyboard({
         window,
         ...options,
       })
@@ -48,7 +48,7 @@ function createKeyboardTarget(platform: string) {
   }) as Window
 }
 
-describe('createKeyboard', () => {
+describe('useKeyboard', () => {
   it('mod 应按平台解析，并支持 command/cmd 别名', async () => {
     const macTarget = createKeyboardTarget('MacIntel')
 
@@ -166,7 +166,7 @@ describe('createKeyboard', () => {
       const event = await dispatchKeyDown(target, {
         key: '+',
         code: 'Equal',
-        metaKey: true,
+        ctrlKey: true,
         shiftKey: true,
       })
 

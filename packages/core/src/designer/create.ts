@@ -264,6 +264,11 @@ export function createDesigner(options: DesignerOptions = {}) {
     canUndo: history.canUndo,
     canRedo: history.canRedo,
 
+    emitter,
+    on: emitter.on,
+    off: emitter.off,
+    once: emitter.once,
+
     serialize,
     loadFromJSON,
   }

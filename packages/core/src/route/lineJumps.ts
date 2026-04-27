@@ -22,7 +22,7 @@ interface OrthogonalSegment {
   orientation: SegmentOrientation
   min: number
   max: number
-  fixed: number
+  axis: number
 }
 
 export function calculateLineJumps(
@@ -95,7 +95,7 @@ function collectOrthogonalSegments(route: LinkerRoute): OrthogonalSegment[] {
       orientation,
       min: Math.min(start, end),
       max: Math.max(start, end),
-      fixed: orientation === 'horizontal' ? from.y : from.x,
+      axis: orientation === 'horizontal' ? from.y : from.x,
     })
   }
 
@@ -108,8 +108,8 @@ function getOrthogonalIntersection(segment: OrthogonalSegment, otherSegment: Ort
   const horizontal = segment.orientation === 'horizontal' ? segment : otherSegment
   const vertical = segment.orientation === 'vertical' ? segment : otherSegment
   const center = {
-    x: vertical.fixed,
-    y: horizontal.fixed,
+    x: vertical.axis,
+    y: horizontal.axis,
   }
 
   if (!isCoordinateInside(center.x, horizontal.min, horizontal.max)) return null

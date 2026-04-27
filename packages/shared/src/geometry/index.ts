@@ -5,6 +5,8 @@ export interface Point {
   y: number
 }
 
+export type Axis = keyof Point
+
 export interface Size {
   width: number
   height: number

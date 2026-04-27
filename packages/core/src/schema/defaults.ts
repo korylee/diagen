@@ -22,7 +22,7 @@ export const DEFAULT_FONT_STYLE: FontStyle = {
   italic: false,
   underline: false,
   textAlign: 'center',
-  vAlign: 'middle',
+  verticalAlign: 'middle',
   orientation: 'horizontal',
 }
 

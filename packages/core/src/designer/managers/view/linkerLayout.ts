@@ -11,7 +11,7 @@ import {
 } from '../../../route'
 import type { LinkerRouteConfig } from '../../types'
 import type { ElementManager } from '../element'
-import { calculateLinkerBounds } from './shared'
+import { calculateLinkerBounds } from './linkerBounds'
 
 export interface LinkerLayout {
   route: LinkerRoute

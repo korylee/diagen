@@ -1,7 +1,7 @@
-import type { Bounds, Point } from '@diagen/shared'
+import type { Bounds, Point, Axis } from '@diagen/shared'
 import { normalizeBounds } from '@diagen/shared'
 
-type GuideAxis = 'x' | 'y'
+type GuideAxis = Axis
 type GuideLineKind = 'start' | 'center' | 'end'
 
 export type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
@@ -314,7 +314,8 @@ function findBestSnapFromLines(
         if (
           best === null ||
           absDelta < Math.abs(best.delta) ||
-          (absDelta === Math.abs(best.delta) && getLineKindPriority(target.kind) > getLineKindPriority(best.target.kind))
+          (absDelta === Math.abs(best.delta) &&
+            getLineKindPriority(target.kind) > getLineKindPriority(best.target.kind))
         ) {
           best = {
             delta,

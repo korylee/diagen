@@ -1,10 +1,13 @@
 export * from './helper'
-export * from './createEventListener'
-export * from './createDebounce'
+export * from './useEventListener'
+export * from './useDebounce'
+
+export * from './onClickOutside'
+
 export * from './createScroll'
 export * from './createIntersectionObserver'
 export * from './createResizeObserver'
-export * from './createKeyboard'
+export * from './useKeyboard'
 export * from './createDevicePixelRatio'
 export * from './createElementSize'
 export * from './createElementRect'

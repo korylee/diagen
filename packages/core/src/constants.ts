@@ -13,7 +13,6 @@ import {
 export const ElementType = {
   SHAPE: 'shape',
   LINKER: 'linker',
-  GROUP: 'group',
   TEXT: 'text',
   IMAGE: 'image',
   GRID: 'grid',

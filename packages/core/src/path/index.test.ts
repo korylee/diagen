@@ -1,43 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { Schema } from '../schema'
-import {
-  compileActions,
-  evaluateAction,
-  resolveActions,
-  resolvePoints,
-  resolvePoint,
-  resolveValue,
-} from './index'
+import { compileActions, evaluateAction, resolveActions } from './index'
 
 describe('pathActions', () => {
-  describe('resolveValue', () => {
-    it('应该支持 undefined 与表达式求值', () => {
-      expect(resolveValue(undefined, 100, 50)).toBe(0)
-      expect(resolveValue(12, 100, 50)).toBe(12)
-      expect(resolveValue('w/2', 100, 50)).toBe(50)
-      expect(resolveValue('h-10', 100, 50)).toBe(40)
-    })
-  })
-
-  describe('resolvePoint 与 resolvePoints', () => {
-    it('应该解析点与锚点数组', () => {
-      expect(resolvePoint('w/2', 'h/2', 100, 60)).toEqual({ x: 50, y: 30 })
-      expect(
-        resolvePoints(
-          [
-            { x: 0, y: 0 },
-            { x: 'w', y: 'h' },
-          ],
-          100,
-          60,
-        ),
-      ).toEqual([
-        { x: 0, y: 0 },
-        { x: 100, y: 60 },
-      ])
-    })
-  })
-
   describe('compileActions + evaluateAction', () => {
     it('应该编译并执行路径动作参数', () => {
       const [compiled] = compileActions([

@@ -1,6 +1,6 @@
 import { createRoot } from 'solid-js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createRafMergeQueue } from './shared'
+import { createRafMergeQueue } from './autoGrow'
 
 function createFrameScheduler() {
   let nextId = 1
@@ -61,7 +61,7 @@ function withQueue<R>(
   })
 }
 
-describe('view shared createRafMergeQueue', () => {
+describe('view autoGrow createRafMergeQueue', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
   })

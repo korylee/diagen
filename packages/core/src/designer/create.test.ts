@@ -39,7 +39,7 @@ describe('createDesigner', () => {
               x: 0,
               y: 0,
               binding: {
-                type: 'fixed',
+                type: 'anchor',
                 target: 'shape_1',
                 anchorId: 'right',
               },

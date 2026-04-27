@@ -1,7 +1,7 @@
 import { access, MaybeAccessor, MaybeElement } from '../helper'
 import { createEffect, createSignal, onMount } from 'solid-js'
 import { createResizeObserver } from '../createResizeObserver'
-import { createEventListener } from '../createEventListener'
+import { useEventListener } from '../useEventListener'
 import { ConfigurableWindow, defaultWindow } from '../_configurable.ts'
 import { pick } from '@diagen/shared'
 
@@ -84,9 +84,9 @@ export function createElementRect(target: MaybeAccessor<MaybeElement>, options: 
 
   createResizeObserver(target, update)
 
-  windowScroll && createEventListener(window, 'scroll', update, { capture: true, passive: true })
+  windowScroll && useEventListener(window, 'scroll', update, { capture: true, passive: true })
 
-  windowResize && createEventListener(window, 'resize', update, { passive: true })
+  windowResize && useEventListener(window, 'resize', update, { passive: true })
 
   onMount(() => {
     immediate && update()

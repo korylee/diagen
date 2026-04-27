@@ -69,8 +69,8 @@ describe('anchors', () => {
 
       const anchor = resolveCreateAnchor(shape)
       expect(anchor).not.toBeNull()
-      expect(anchor?.type).toBe('fixed')
-      if (anchor?.type !== 'fixed') throw new Error('应返回 fixed 锚点')
+      expect(anchor?.type).toBe('anchor')
+      if (anchor?.type !== 'anchor') throw new Error('应返回 anchor 锚点')
       expect(anchor.id).toBe('right')
       expect(anchor.direction).toBe('right')
       expect(anchor.point.x).toBeCloseTo(110)
@@ -90,16 +90,16 @@ describe('anchors', () => {
 
       const anchor = resolveCreateAnchor(shape)
       expect(anchor).not.toBeNull()
-      expect(anchor?.type).toBe('fixed')
-      if (anchor?.type !== 'fixed') throw new Error('应返回 fixed 锚点')
+      expect(anchor?.type).toBe('anchor')
+      if (anchor?.type !== 'anchor') throw new Error('应返回 anchor 锚点')
       expect(anchor.id).toBe('top')
       expect(anchor.direction).toBe('top')
     })
 
     it('应在无 direction 时稳定选择最接近右上的固定锚点', () => {
       const shape = createShape({
-        id: 'shape_quadrant_fixed',
-        name: 'shape_quadrant_fixed',
+        id: 'shape_quadrant_anchor',
+        name: 'shape_quadrant_anchor',
         props: { x: 0, y: 0, w: 100, h: 60, angle: 0 },
         anchors: [
           { id: 'left_top', x: '10', y: '10' },
@@ -110,26 +110,26 @@ describe('anchors', () => {
 
       const anchor = resolveCreateAnchor(shape)
       expect(anchor).not.toBeNull()
-      expect(anchor?.type).toBe('fixed')
-      if (anchor?.type !== 'fixed') throw new Error('应返回 fixed 锚点')
+      expect(anchor?.type).toBe('anchor')
+      if (anchor?.type !== 'anchor') throw new Error('应返回 anchor 锚点')
       expect(anchor.id).toBe('near_right_top')
       expect(anchor.direction).toBe('center')
       expect(anchor.point.x).toBeCloseTo(100)
       expect(anchor.point.y).toBeCloseTo(10)
     })
 
-    it('应在无固定锚点时回退到 perimeter 绑定', () => {
+    it('应在无固定锚点时回退到 edge 绑定', () => {
       const shape = createShape({
-        id: 'shape_perimeter_fallback',
-        name: 'shape_perimeter_fallback',
+        id: 'shape_edge_fallback',
+        name: 'shape_edge_fallback',
         props: { x: 0, y: 0, w: 100, h: 60, angle: 0 },
         anchors: [],
       })
 
       const anchor = resolveCreateAnchor(shape)
       expect(anchor).not.toBeNull()
-      expect(anchor?.type).toBe('perimeter')
-      if (anchor?.type !== 'perimeter') throw new Error('应返回 perimeter 绑定')
+      expect(anchor?.type).toBe('edge')
+      if (anchor?.type !== 'edge') throw new Error('应返回 edge 绑定')
       expect(anchor.point.x).toBeCloseTo(100)
       expect(anchor.point.y).toBeCloseTo(0)
     })
@@ -157,13 +157,13 @@ describe('anchors', () => {
         linkerType: 'curved',
         from: {
           target: fromShape.id,
-          binding: { type: 'fixed', anchorId: 'top' },
+          binding: { type: 'anchor', anchorId: 'top' },
           x: 0,
           y: 0,
         },
         to: {
           target: toShape.id,
-          binding: { type: 'fixed', anchorId: 'left' },
+          binding: { type: 'anchor', anchorId: 'left' },
           x: 0,
           y: 0,
         },
@@ -201,13 +201,13 @@ describe('anchors', () => {
         linkerType: 'orthogonal',
         from: {
           target: fromShape.id,
-          binding: { type: 'fixed', anchorId: 'right' },
+          binding: { type: 'anchor', anchorId: 'right' },
           x: 0,
           y: 0,
         },
         to: {
           target: toShape.id,
-          binding: { type: 'fixed', anchorId: 'left' },
+          binding: { type: 'anchor', anchorId: 'left' },
           x: 0,
           y: 0,
         },
@@ -253,13 +253,13 @@ describe('anchors', () => {
         linkerType: 'straight',
         from: {
           target: fromShape.id,
-          binding: { type: 'fixed', anchorId: 'right' },
+          binding: { type: 'anchor', anchorId: 'right' },
           x: 0,
           y: 0,
         },
         to: {
           target: toShape.id,
-          binding: { type: 'fixed', anchorId: 'left' },
+          binding: { type: 'anchor', anchorId: 'left' },
           x: 0,
           y: 0,
         },
@@ -285,7 +285,7 @@ describe('anchors', () => {
         linkerType: 'straight',
         from: {
           target: linkerTarget.id,
-          binding: { type: 'fixed', anchorId: 'right' },
+          binding: { type: 'anchor', anchorId: 'right' },
           x: 20,
           y: 30,
           angle: 0.5,

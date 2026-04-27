@@ -2,8 +2,8 @@ import { batch, createSignal, onMount } from 'solid-js'
 import { createMutable, createStore } from 'solid-js/store'
 import { type ConfigurableWindow, defaultWindow } from '../_configurable'
 import { access, MaybeAccessor } from '../helper'
-import { createEventListener, EventListenerOptions } from '../createEventListener'
-import { createDebounce } from '../createDebounce'
+import { useEventListener, EventListenerOptions } from '../useEventListener'
+import { useDebounce } from '../useDebounce'
 
 export interface CreateScrollOptions extends ConfigurableWindow {
   /**
@@ -115,7 +115,7 @@ export function createScroll(element: MaybeAccessor<ScrollTarget>, options: Crea
     onStop?.(e)
   }
 
-  const onScrollEndDebounced = createDebounce(onScrollEnd, throttle + idle)
+  const onScrollEndDebounced = useDebounce(onScrollEnd, throttle + idle)
 
   const updateArrivedState = (target: ScrollTarget) => {
     if (!window) return
@@ -180,7 +180,7 @@ export function createScroll(element: MaybeAccessor<ScrollTarget>, options: Crea
     onScroll?.(e)
   }
 
-  createEventListener(element, 'scroll', onScrollHandler, eventListenerOptions)
+  useEventListener(element, 'scroll', onScrollHandler, eventListenerOptions)
 
   onMount(() => {
     try {

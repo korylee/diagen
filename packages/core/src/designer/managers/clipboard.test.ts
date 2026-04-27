@@ -36,14 +36,14 @@ describe('clipboard manager', () => {
           x: 120,
           y: 40,
           target: shapeA.id,
-          binding: { type: 'fixed', anchorId: 'right' },
+          binding: { type: 'anchor', anchorId: 'right' },
         },
         to: {
           x: 200,
           y: 40,
           target: shapeB.id,
           binding: {
-            type: 'perimeter',
+            type: 'edge',
             pathIndex: 0,
             segmentIndex: 3,
             t: 0.5,
@@ -57,7 +57,7 @@ describe('clipboard manager', () => {
           x: 120,
           y: 40,
           target: shapeA.id,
-          binding: { type: 'fixed', anchorId: 'right' },
+          binding: { type: 'anchor', anchorId: 'right' },
         },
         to: { x: 400, y: 40, binding: { type: 'free' } },
       })
@@ -86,14 +86,14 @@ describe('clipboard manager', () => {
           x: 120,
           y: 40,
           target: shapeB.id,
-          binding: { type: 'fixed', anchorId: 'right' },
+          binding: { type: 'anchor', anchorId: 'right' },
         },
         to: {
           x: 200,
           y: 40,
           target: shapeB.id,
           binding: {
-            type: 'perimeter',
+            type: 'edge',
             pathIndex: 0,
             segmentIndex: 3,
             t: 0.25,
@@ -125,8 +125,8 @@ describe('clipboard manager', () => {
       expect(
         pastedLinker?.to && isBoundLinkerEndpoint(pastedLinker?.to) && pastedShapeIds.has(pastedLinker.to.target),
       ).toBe(true)
-      expect(pastedLinker?.from.binding.type).toBe('fixed')
-      expect(pastedLinker?.to.binding.type).toBe('perimeter')
+      expect(pastedLinker?.from.binding.type).toBe('anchor')
+      expect(pastedLinker?.to.binding.type).toBe('edge')
       expect(pastedLinker?.points[0]).toEqual({ x: 184, y: 64 })
     })
   })
@@ -142,14 +142,14 @@ describe('clipboard manager', () => {
           x: 120,
           y: 40,
           target: shapeA.id,
-          binding: { type: 'fixed', anchorId: 'right' },
+          binding: { type: 'anchor', anchorId: 'right' },
         },
         to: {
           x: 300,
           y: 40,
           target: shapeB.id,
           binding: {
-            type: 'perimeter',
+            type: 'edge',
             pathIndex: 0,
             segmentIndex: 1,
             t: 0.5,
@@ -163,7 +163,7 @@ describe('clipboard manager', () => {
       const pastedIds = designer.clipboard.paste()
       const pastedLinker = pastedIds.map(id => designer.getElementById(id)).find(element => element?.type === 'linker')
 
-      expect(pastedLinker?.from.binding.type).toBe('fixed')
+      expect(pastedLinker?.from.binding.type).toBe('anchor')
       expect(
         pastedLinker?.from && isBoundLinkerEndpoint(pastedLinker?.from) ? pastedLinker.from.target : null,
       ).not.toBeNull()

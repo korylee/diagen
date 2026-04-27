@@ -1,7 +1,7 @@
 import type { Point } from '@diagen/shared'
 import type { LinkerType } from '../constants'
 import { isBoundLinkerEndpoint, type DiagramElement, type LinkerElement, type LinkerEndpoint } from '../model'
-import { getAnchorInfoById, resolvePerimeterInfo } from '../anchors'
+import { getAnchorInfoById, resolveEdgeInfo } from '../anchors'
 import type { Obstacle, RouteConfig } from './types'
 import { getObstacleRoute, getObstacles, type RouteOptions } from './obstacleRoute'
 
@@ -227,8 +227,8 @@ function calculateBasicRoutePoints(
 
 /**
  * 端点解析优先级：
- * 1. 固定锚点（fixed）
- * 2. 周边附着（perimeter）
+ * 1. 锚点绑定（anchor）
+ * 2. 贴边附着（edge）
  * 3. 回退到端点原始坐标（free/fallback）
  */
 function resolveEndpoint(
@@ -248,7 +248,7 @@ function resolveEndpoint(
   const shape = target?.type === 'shape' ? target : null
   if (!shape) return fallback
 
-  if (binding.type === 'fixed') {
+  if (binding.type === 'anchor') {
     const info = getAnchorInfoById(shape, binding.anchorId)
     if (!info) return fallback
     return {
@@ -257,7 +257,7 @@ function resolveEndpoint(
     }
   }
 
-  const info = resolvePerimeterInfo(shape, binding)
+  const info = resolveEdgeInfo(shape, binding)
   if (!info) return fallback
   return {
     point: info.point,

@@ -1,13 +1,14 @@
-import { ensureArray } from '@diagen/shared'
-import type { ValueOf } from '@diagen/shared'
+import type { MaybeArray, ValueOf } from '@diagen/shared'
+import { ensureArray, isIOS } from '@diagen/shared'
 import { onCleanup, onMount } from 'solid-js'
 import type { ConfigurableWindow } from '../_configurable'
 import { defaultWindow } from '../_configurable'
-import { makeEventListener } from '../createEventListener'
+import { tryOnCleanup } from '../helper'
+import { makeEventListener } from '../useEventListener'
 
-export type KeyCombo = string | string[]
+export type KeyCombo = MaybeArray<string>
 
-export interface CreateKeyboardOptions extends ConfigurableWindow {
+export interface UseKeyboardOptions extends ConfigurableWindow {
   ignore?: (e: KeyboardEvent, target: Element | null, combo: string | null) => boolean
 }
 
@@ -125,17 +126,15 @@ const MODIFIER_ORDER: Modifier[] = ['ctrl', 'alt', 'shift', 'meta']
 
 const isModifier = (key: string): key is Modifier => MODIFIER_ORDER.includes(key as Modifier)
 
-const isMacPlatform = (platform?: string): boolean => /Mac|iPod|iPhone|iPad/.test(platform ?? '')
-
 const sortModifiers = (modifiers: Modifier[]): Modifier[] =>
   [...modifiers].sort((left, right) => MODIFIER_ORDER.indexOf(left) - MODIFIER_ORDER.indexOf(right))
 
-function normalizeKeyToken(key: string, platform?: string): string {
+function normalizeKeyToken(key: string): string {
   const normalized = key.trim().toLowerCase()
   if (!normalized) return ''
 
   if (normalized === 'mod') {
-    return isMacPlatform(platform) ? 'meta' : 'ctrl'
+    return isIOS ? 'meta' : 'ctrl'
   }
 
   if (normalized in MODIFIER_ALIASES) {
@@ -192,7 +191,7 @@ function normalizeEventKey(e: KeyboardEvent): string | null {
   return normalizedCode || null
 }
 
-function parseCombo(combo: string, platform?: string): ParsedCombo {
+function parseCombo(combo: string): ParsedCombo {
   const normalizedCombo = combo.trim().toLowerCase()
   if (!normalizedCombo) {
     return { key: null, modifiers: [] }
@@ -211,7 +210,7 @@ function parseCombo(combo: string, platform?: string): ParsedCombo {
   let key: string | null = null
 
   for (const token of tokens) {
-    const normalizedKey = normalizeKeyToken(token, platform)
+    const normalizedKey = normalizeKeyToken(token)
     if (!normalizedKey) continue
 
     if (isModifier(normalizedKey)) {
@@ -230,14 +229,14 @@ function parseCombo(combo: string, platform?: string): ParsedCombo {
   }
 }
 
-function parseKeys(key: KeyCombo, platform?: string): ParsedCombo[][] {
+function parseKeys(key: KeyCombo): ParsedCombo[][] {
   return ensureArray(key)
     .map(combo => combo.trim())
     .filter(Boolean)
     .map(combo =>
       combo
         .split(/\s+/)
-        .map(part => parseCombo(part, platform))
+        .map(part => parseCombo(part))
         .filter(parsed => parsed.key !== null || parsed.modifiers.length > 0),
     )
     .filter(combos => combos.length > 0)
@@ -343,10 +342,8 @@ function defaultIgnoreCallback(_e: KeyboardEvent, target: Element | null): boole
   )
 }
 
-export function createKeyboard(options: CreateKeyboardOptions = {}) {
+export function useKeyboard(options: UseKeyboardOptions = {}) {
   const { window: targetWindow = defaultWindow, ignore = defaultIgnoreCallback } = options
-
-  const platform = targetWindow?.navigator?.platform
 
   const bindings = new Map<string, Binding>()
   const lookup = new Map<string, Map<string, Binding>>()
@@ -453,20 +450,22 @@ export function createKeyboard(options: CreateKeyboardOptions = {}) {
   }
 
   const bind = (key: KeyCombo, action: () => void): (() => void) => {
-    const ids = parseKeys(key, platform).map(combos => addBinding(combos, action))
-    return () => {
+    const ids = parseKeys(key).map(combos => addBinding(combos, action))
+    const off = () => {
       ids.forEach(removeBinding)
     }
+    tryOnCleanup(off)
+    return off
   }
 
   const unbind = (key: KeyCombo): void => {
-    parseKeys(key, platform).forEach(combos => {
+    parseKeys(key).forEach(combos => {
       removeBinding(getBindingId(combos))
     })
   }
 
   const trigger = (key: KeyCombo): void => {
-    parseKeys(key, platform).forEach(combos => {
+    parseKeys(key).forEach(combos => {
       bindings.get(getBindingId(combos))?.action()
     })
   }
@@ -481,11 +480,9 @@ export function createKeyboard(options: CreateKeyboardOptions = {}) {
     targetWindow && makeEventListener(targetWindow, 'keydown', handleKeyDown as EventListener)
   })
 
-  onCleanup(() => {
-    resetSequence()
-  })
+  onCleanup(reset)
 
   return { bind, unbind, trigger, reset }
 }
 
-export type CreateKeyboard = ReturnType<typeof createKeyboard>
+export type UseKeyboard = ReturnType<typeof useKeyboard>

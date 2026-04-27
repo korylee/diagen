@@ -2,7 +2,7 @@ import { createEffect, createMemo, createSignal } from 'solid-js'
 import { ConfigurableWindow, defaultWindow } from '../_configurable'
 import { access, MaybeAccessor } from '../helper'
 import { isFunction } from '@diagen/shared'
-import { createEventListener } from '../createEventListener'
+import { useEventListener } from '../useEventListener'
 
 export function createMediaQuery(query: MaybeAccessor<string>, options: ConfigurableWindow = {}) {
   const { window = defaultWindow } = options
@@ -21,7 +21,7 @@ export function createMediaQuery(query: MaybeAccessor<string>, options: Configur
     setMatches(mediaQuery()!.matches)
   })
 
-  createEventListener(mediaQuery, 'change', handler, { passive: true })
+  useEventListener(mediaQuery, 'change', handler, { passive: true })
 
   return matches
 }

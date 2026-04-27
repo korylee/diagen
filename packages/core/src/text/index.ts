@@ -1,8 +1,8 @@
 import { Bounds, isPointInBounds, rotatePoint, type Point } from '@diagen/shared'
 import { isShape, type FontStyle, type LinkerTextPosition, type ShapeElement } from '../model'
-import { resolveValue } from '../path'
+import { evaluateExpression as resolveValue } from '../expression'
 import type { LinkerRoute } from '../route/linkerRoute'
-import { getRouteCenter } from '../route/routeGeometry'
+import { getRouteCenter } from '../route/geometry'
 
 const BoxPadX = 6
 const BoxPadY = 4
@@ -54,7 +54,7 @@ export function getLinkerTextBox(
   const fontSize = fontStyle?.size || 13
   const lineHeight = fontSize * (fontStyle?.lineHeight || 1.25)
   const contentWidth = Math.max(
-    ...lines.map(line => options.measureText?.(line) ?? estimateTextWidth(line, fontStyle)),
+    ...lines.map(line => options.measureText?.(line) ?? Math.max(line.length, 1) * (fontStyle?.size || 13) * 0.6),
     fontSize,
   )
   const w = contentWidth + BoxPadX * 2
@@ -72,20 +72,17 @@ export function getLinkerTextBox(
   }
 }
 
-export function estimateTextWidth(line: string, fontStyle: FontStyle | undefined): number {
-  return Math.max(line.length, 1) * (fontStyle?.size || 13) * 0.6
-}
-
 export function getShapeTextBox(shape: ShapeElement): ShapeTextBox | null {
   if (!isShape(shape)) return null
 
   const block = shape.textBlock[0]
   if (!block) return null
 
-  const x = resolveValue(block.position.x, shape.props.w, shape.props.h)
-  const y = resolveValue(block.position.y, shape.props.w, shape.props.h)
-  const w = resolveValue(block.position.w, shape.props.w, shape.props.h)
-  const h = resolveValue(block.position.h, shape.props.w, shape.props.h)
+  const size = { w: shape.props.w, h: shape.props.h }
+  const x = resolveValue(block.position.x, size)
+  const y = resolveValue(block.position.y, size)
+  const w = resolveValue(block.position.w, size)
+  const h = resolveValue(block.position.h, size)
   const angle = shape.props.angle ?? 0
   const shapeCenter = {
     x: shape.props.x + shape.props.w / 2,

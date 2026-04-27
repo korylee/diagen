@@ -38,13 +38,13 @@ describe('element manager', () => {
           x: 80,
           y: 30,
           target: a.id,
-          binding: { type: 'fixed', anchorId: 'right' },
+          binding: { type: 'anchor', anchorId: 'right' },
         },
         to: {
           x: 100,
           y: 30,
           target: b.id,
-          binding: { type: 'fixed', anchorId: 'left' },
+          binding: { type: 'anchor', anchorId: 'left' },
         },
       })
       const linkerExternal = createLinker({
@@ -55,13 +55,13 @@ describe('element manager', () => {
           x: 80,
           y: 30,
           target: a.id,
-          binding: { type: 'fixed', anchorId: 'right' },
+          binding: { type: 'anchor', anchorId: 'right' },
         },
         to: {
           x: 200,
           y: 30,
           target: c.id,
-          binding: { type: 'fixed', anchorId: 'left' },
+          binding: { type: 'anchor', anchorId: 'left' },
         },
       })
 

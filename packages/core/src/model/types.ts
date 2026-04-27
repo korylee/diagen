@@ -95,7 +95,7 @@ export interface FontStyle {
   italic: boolean
   underline: boolean
   textAlign: TextAlign
-  vAlign: VerticalAlign
+  verticalAlign: VerticalAlign
   orientation: TextOrientation
 }
 

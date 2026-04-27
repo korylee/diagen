@@ -1,5 +1,5 @@
 import type { Bounds, Point } from '@diagen/shared'
-import { createHeap, expandBounds } from '@diagen/shared'
+import { createHeap, expandBounds, isPointInBounds } from '@diagen/shared'
 import type { Obstacle, RouteConfig, RouteResult } from './types'
 import { calculateBounds, simplifyOrthogonalPath } from './utils'
 
@@ -93,13 +93,15 @@ export function aStarRoute(
     closedSet.add(currentKey)
 
     for (const [dx, dy, dir] of directions) {
-      const nx = current.x + dx
-      const ny = current.y + dy
-      const neighborKey = toKey(nx, ny)
+      const p = {
+        x: current.x + dx,
+        y: current.y + dy,
+      }
+      const neighborKey = toKey(p.x, p.y)
 
       if (closedSet.has(neighborKey)) continue
-      if (!isInBounds(nx, ny, bounds)) continue
-      if (isBlocked(nx, ny, obstacleGrid, gridSize, bounds)) continue
+      if (!isPointInBounds(p, bounds)) continue
+      if (isBlocked(p, obstacleGrid, gridSize, bounds)) continue
 
       // 方向变化会产生额外代价，促使结果减少无意义折线。
       const isBend = current.direction !== null && current.direction !== dir
@@ -111,10 +113,9 @@ export function aStarRoute(
 
       if (!neighbor) {
         neighbor = {
-          x: nx,
-          y: ny,
+          ...p,
           g: tentativeG,
-          h: heuristicFunc(nx, ny, endX, endY, heuristic),
+          h: heuristicFunc(p.x, p.y, endX, endY, heuristic),
           f: 0,
           parent: current,
           direction: dir,
@@ -183,14 +184,10 @@ function buildObstacleGrid(obstacles: Obstacle[], bounds: Bounds, gridSize: numb
   return blocked
 }
 
-function isBlocked(x: number, y: number, obstacleGrid: Set<number>, gridSize: number, bounds: Bounds): boolean {
-  const gx = Math.floor((x - bounds.x) / gridSize)
-  const gy = Math.floor((y - bounds.y) / gridSize)
+function isBlocked(p: Point, obstacleGrid: Set<number>, gridSize: number, bounds: Bounds): boolean {
+  const gx = Math.floor((p.x - bounds.x) / gridSize)
+  const gy = Math.floor((p.y - bounds.y) / gridSize)
   return obstacleGrid.has(toKey(gx, gy))
-}
-
-function isInBounds(x: number, y: number, bounds: Bounds): boolean {
-  return x >= bounds.x && x <= bounds.x + bounds.w && y >= bounds.y && y <= bounds.y + bounds.h
 }
 
 function reconstructPath(node: AStarNode): Point[] {
@@ -284,19 +281,19 @@ export function createObstacleFromBounds(id: string, bounds: Bounds, padding: nu
   return { id, bounds: bounds, padding }
 }
 
+const DEFAULT_ROUTE_CONFIG: RouteConfig = {
+  gridSize: 10,
+  padding: 15,
+  maxIterations: 5000,
+  diagonalCost: 1.414,
+  orthogonalCost: 1,
+}
+
 export function findRoute(
   from: Point,
   to: Point,
   obstacles: Obstacle[],
   config: Partial<RouteConfig> = {},
 ): RouteResult {
-  const defaultConfig: RouteConfig = {
-    gridSize: 10,
-    padding: 15,
-    maxIterations: 5000,
-    diagonalCost: 1.414,
-    orthogonalCost: 1,
-  }
-
-  return aStarRoute(from, to, obstacles, { ...defaultConfig, ...config })
+  return aStarRoute(from, to, obstacles, { ...DEFAULT_ROUTE_CONFIG, ...config })
 }

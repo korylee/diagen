@@ -5,7 +5,7 @@
 
 import type { Point } from '@diagen/shared'
 import type { ShapeElement } from '../model'
-import { evaluateExpression, resolvePoints } from '../expression'
+import { evaluateExpression, evaluatePoint } from '../expression'
 
 /**
  * 关键点定义（相对坐标表达式）
@@ -20,10 +20,10 @@ export interface KeypointDefinition {
  */
 function keypointsToAbsolute(
   keypoints: KeypointDefinition[],
-  props: { x: number; y: number; w: number; h: number }
+  props: { x: number; y: number; w: number; h: number },
 ): Point[] {
   const { x, y, w, h } = props
-  const relativePoints = resolvePoints(keypoints, w, h)
+  const relativePoints = keypoints.map(kp => evaluatePoint(kp, { w, h }))
   return relativePoints.map(p => ({ x: x + p.x, y: y + p.y }))
 }
 
@@ -88,7 +88,7 @@ const BUILTIN_KEYPOINTS: Record<string, KeypointDefinition[]> = {
  */
 function extractKeypointsFromPath(
   path: ShapeElement['path'],
-  props: { x: number; y: number; w: number; h: number }
+  props: { x: number; y: number; w: number; h: number },
 ): Point[] {
   const points: Point[] = []
   const { x, y, w, h } = props
@@ -97,8 +97,8 @@ function extractKeypointsFromPath(
     for (const action of pathDef.actions) {
       if (action.action === 'move' || action.action === 'line') {
         if (action.x !== undefined && action.y !== undefined) {
-          const px = evaluateExpression(action.x, w, h)
-          const py = evaluateExpression(action.y, w, h)
+          const px = evaluateExpression(action.x, props)
+          const py = evaluateExpression(action.y, props)
           points.push({ x: x + px, y: y + py })
         }
       }

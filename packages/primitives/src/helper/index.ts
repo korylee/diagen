@@ -1,5 +1,5 @@
 import { Accessor, getOwner, onCleanup } from 'solid-js'
-import { isDev } from 'solid-js/web'
+import { isDev, isServer } from 'solid-js/web'
 import { isFunction } from '@diagen/shared'
 
 export type MaybeAccessor<T = any> = Accessor<T> | T

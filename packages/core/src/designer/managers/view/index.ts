@@ -1,22 +1,23 @@
-import { type Bounds, DeepPartial, normalizeBounds, type Point } from '@diagen/shared'
+import { type Bounds, DeepPartial, type Point } from '@diagen/shared'
 import { batch, createMemo, createSignal } from 'solid-js'
-import { isLinker, isShape } from '../../../model'
 import type { DiagramElement, DiagramPage, LinkerElement } from '../../../model'
-import { canvasToScreen, clampZoom, screenToCanvas } from '../../../transform'
+import { canvasToScreen, screenToCanvas, type Transform } from '../../../transform'
 import type { LinkerRoute } from '../../../route'
 import type { ElementManager } from '../element'
 import type { DesignerContext } from '../types'
 import type { SelectionManager } from '../selection'
-import { createLinkerLayoutController, type LinkerLayout } from './linkerLayout'
+import { createRafMergeQueue, resolveContainerSizeForContent } from './autoGrow'
 import {
   areBoundsEqual,
   createPageBounds,
-  createRafMergeQueue,
+  getElementBounds as resolveElementBounds,
+  getElementsBounds as resolveElementsBounds,
   getShapeBounds,
   normalizeCanvasSize,
-  resolveContainerSizeForContent,
   unionNormalizedBounds,
-} from './shared'
+} from './bounds'
+import { createLinkerLayoutController, type LinkerLayout } from './linkerLayout'
+import { createViewNavigation } from './navigation'
 
 /** 视图管理器 */
 export function createViewManager(
@@ -45,30 +46,6 @@ export function createViewManager(
     return getElementsBounds(element.getElementsByIds(ids))
   })
 
-  function setZoom(val: number, center?: Point): void {
-    const newZoom = clampZoom(val)
-
-    if (center) {
-      const currentTransform = transform()
-      setState('transform', {
-        zoom: newZoom,
-        // center 使用画布坐标。保持该画布点视觉位置不变时，transform 只需补偿缩放前后的画布位移差。
-        x: currentTransform.x + center.x * (currentTransform.zoom - newZoom),
-        y: currentTransform.y + center.y * (currentTransform.zoom - newZoom),
-      })
-    } else {
-      setState('transform', 'zoom', newZoom)
-    }
-  }
-
-  function setPan(x: number, y: number): void {
-    setState('transform', { x, y })
-  }
-
-  function pan(deltaX: number, deltaY: number): void {
-    setPan(transform().x + deltaX, transform().y + deltaY)
-  }
-
   /** 屏幕坐标 → 画布坐标 */
   function toCanvas<T extends Point | Bounds>(val: T): T extends Bounds ? Bounds : Point {
     return screenToCanvas(val, transform(), originOffset())
@@ -77,52 +54,6 @@ export function createViewManager(
   /** 画布坐标 → 屏幕坐标 */
   function toScreen<T extends Point | Bounds>(val: T): T extends Bounds ? Bounds : Point {
     return canvasToScreen(val, transform(), originOffset())
-  }
-
-  function centerTo(point: Point): void {
-    const { width, height } = viewportSize()
-    const offset = originOffset()
-    setState('transform', {
-      // 当画布原点已发生运行时补偿时，centerTo 需要扣除这部分偏移，才能维持真实居中结果
-      x: width / 2 - point.x * zoom() - offset.x,
-      y: height / 2 - point.y * zoom() - offset.y,
-    })
-  }
-
-  function fitBounds(bounds: Bounds | null): void {
-    if (!bounds) return
-    if (bounds.w <= 0 || bounds.h <= 0) {
-      setZoom(1)
-      return
-    }
-
-    const { width, height } = viewportSize()
-    const offset = originOffset()
-    const zoomX = width / bounds.w
-    const zoomY = height / bounds.h
-    const newZoom = clampZoom(Math.min(zoomX, zoomY))
-
-    setState('transform', {
-      zoom: newZoom,
-      // fitBounds 需要同时考虑画布原点补偿，否则左/上扩展后会出现居中偏差
-      x: (width - bounds.w * newZoom) / 2 - bounds.x * newZoom - offset.x,
-      y: (height - bounds.h * newZoom) / 2 - bounds.y * newZoom - offset.y,
-    })
-  }
-
-  function fitToContent(): void {
-    fitBounds(getContentBounds())
-  }
-
-  function fitToSelection(): void {
-    fitBounds(selectionBounds())
-  }
-
-  function zoomIn(): void {
-    setZoom(zoom() + 0.1)
-  }
-  function zoomOut(): void {
-    setZoom(zoom() - 0.1)
   }
 
   function patchDiagramPage(patch: Partial<DiagramPage>): void {
@@ -172,6 +103,22 @@ export function createViewManager(
       y: offset.y,
     })
   }
+
+  function setTransform(next: Partial<Transform> | Transform): void {
+    setState('transform', next)
+  }
+
+  const navigation = createViewNavigation({
+    transform,
+    viewportSize,
+    originOffset,
+    selectionBounds,
+    getContentBounds,
+    setTransform,
+    onNavigated: () => {
+      emitter.emit('view:navigated')
+    },
+  })
 
   function getPageBounds(): Bounds {
     const { width, height } = diagramPage()
@@ -227,7 +174,7 @@ export function createViewManager(
     const offsetChanged = nextOffset.x !== currentOffset.x || nextOffset.y !== currentOffset.y
 
     if (!sizeChanged && !offsetChanged) return false
-    
+
     batch(() => {
       if (sizeChanged) {
         setWorldSize(nextGrowth.width, nextGrowth.height)
@@ -283,23 +230,15 @@ export function createViewManager(
   }
 
   function getElementBounds(element: DiagramElement): Bounds | null {
-    if (isShape(element)) {
-      return getShapeBounds(element)
-    }
-
-    if (isLinker(element)) {
-      return getLinkerBounds(element)
-    }
-
-    return null
+    return resolveElementBounds(element, {
+      getLinkerBounds,
+    })
   }
 
   function getElementsBounds(elements: Array<DiagramElement | null | undefined>): Bounds | null {
-    return elements.reduce<Bounds | null>((acc, element) => {
-      const nextBounds = element ? getElementBounds(element) : null
-      if (!nextBounds) return acc
-      return acc ? unionNormalizedBounds(acc, nextBounds) : normalizeBounds(nextBounds)
-    }, null)
+    return resolveElementsBounds(elements, {
+      getLinkerBounds,
+    })
   }
 
   function setLinkerRouteConfig(next: DeepPartial<typeof state.config.linkerRoute>): void {
@@ -351,15 +290,15 @@ export function createViewManager(
     bounds,
     selectionBounds,
 
-    setZoom,
-    setPan,
-    zoomIn,
-    zoomOut,
-    fitBounds,
-    fitToContent,
-    fitToSelection,
-    pan,
-    centerTo,
+    setZoom: navigation.setZoom,
+    setPan: navigation.setPan,
+    zoomIn: navigation.zoomIn,
+    zoomOut: navigation.zoomOut,
+    fitBounds: navigation.fitBounds,
+    fitToContent: navigation.fitToContent,
+    fitToSelection: navigation.fitToSelection,
+    pan: navigation.pan,
+    centerTo: navigation.centerTo,
     toCanvas,
     toScreen,
     setPageSize,
@@ -383,4 +322,7 @@ export function createViewManager(
 }
 
 export type ViewManager = ReturnType<typeof createViewManager>
+export interface ViewEvents {
+  'view:navigated': void
+}
 export type { LinkerLayout } from './linkerLayout'

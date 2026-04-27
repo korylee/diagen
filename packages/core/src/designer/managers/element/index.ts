@@ -1,20 +1,19 @@
 import {
   ensureArray,
-  isNonNullable,
   keys,
   type MaybeArray,
   type UnionKeyOf,
   type UnionNestedKeyOf,
   type UnionNestedValue,
-  type UnionValue,
+  type UnionValue
 } from '@diagen/shared'
 import { createMemo } from 'solid-js'
 import { produce, type StoreSetter } from 'solid-js/store'
-import { isLinker, isShape } from '../../../model'
 import type { BoxProps, DiagramElement, LinkerElement, LinkerEndpoint, ShapeElement } from '../../../model'
+import { isLinker, isShape } from '../../../model'
 import { Schema } from '../../../schema'
 import type { DesignerContext } from '../types'
-import { createElementArrangeActions, type ElementAlignType, type ElementDistributeType } from './arrange'
+import { createElementArrangeActions } from './arrange'
 import { createElementIndexes } from './indexes'
 
 const CreateMethods = {

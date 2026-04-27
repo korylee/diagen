@@ -10,8 +10,8 @@ export type EndpointTarget = string
 
 export type LinkerEndpointBinding =
   | { type: 'free' }
-  | { type: 'fixed'; anchorId: string }
-  | { type: 'perimeter'; pathIndex: number; segmentIndex: number; t: number }
+  | { type: 'anchor'; anchorId: string }
+  | { type: 'edge'; pathIndex: number; segmentIndex: number; t: number }
 
 type EndpointTransform = Point & {
   angle?: number

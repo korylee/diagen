@@ -3,9 +3,10 @@
  * 用于计算图形锚点（连线连接点）的位置
  */
 
-import { getDistance, isSamePoint, rotatePoint, type Point } from '@diagen/shared'
+import { isSamePoint, rotatePoint, type Point } from '@diagen/shared'
 import type { Anchor, LinkerEndpointBinding, ShapeElement } from '../model'
-import { evaluateExpression, resolvePoints } from '../expression'
+import { evaluateExpression, evaluatePoint } from '../expression'
+import { getCubicPoint } from '../_internal'
 
 export type AnchorDirection = 'top' | 'right' | 'bottom' | 'left' | 'center'
 
@@ -17,19 +18,19 @@ export interface AnchorInfo {
   angle: number
 }
 
-export interface CreateFixedAnchorInfo extends AnchorInfo {
-  type: 'fixed'
+export interface CreateAnchorInfo extends AnchorInfo {
+  type: 'anchor'
 }
 
-export type CreateAnchor = CreateFixedAnchorInfo | PerimeterInfo
+export type CreateAnchor = CreateAnchorInfo | EdgeInfo
 
 export interface ResolveCreateAnchorOptions {
   preferredDirections?: AnchorDirection[]
 }
 
-type PerimeterBinding = Extract<LinkerEndpointBinding, { type: 'perimeter' }>
+type EdgeBinding = Extract<LinkerEndpointBinding, { type: 'edge' }>
 
-export interface PerimeterInfo extends PerimeterBinding {
+export interface EdgeInfo extends EdgeBinding {
   point: Point
   angle: number
   distance: number
@@ -41,7 +42,7 @@ interface PathPolyline {
   closed: boolean
 }
 
-interface ShapePerimeterSegment {
+interface ShapeEdgeSegment {
   pathIndex: number
   segmentIndex: number
   fromLocal: Point
@@ -69,7 +70,7 @@ function pushPoint(points: Point[], point: Point): void {
 
 function evaluatePathValue(value: number | string | undefined, w: number, h: number): number {
   if (value === undefined) return 0
-  return evaluateExpression(value, w, h)
+  return evaluateExpression(value, { w, h })
 }
 
 function sampleQuadraticBezier(p0: Point, p1: Point, p2: Point, segments: number): Point[] {
@@ -89,11 +90,7 @@ function sampleCubicBezier(p0: Point, p1: Point, p2: Point, p3: Point, segments:
   const points: Point[] = []
   for (let i = 0; i <= segments; i++) {
     const t = i / segments
-    const mt = 1 - t
-    points.push({
-      x: mt * mt * mt * p0.x + 3 * mt * mt * t * p1.x + 3 * mt * t * t * p2.x + t * t * t * p3.x,
-      y: mt * mt * mt * p0.y + 3 * mt * mt * t * p1.y + 3 * mt * t * t * p2.y + t * t * t * p3.y,
-    })
+    points.push(getCubicPoint(p0, p1, p2, p3, t))
   }
   return points
 }
@@ -121,7 +118,7 @@ export function resolveAnchors(
   w: number,
   h: number,
 ): Point[] {
-  return resolvePoints(anchors, w, h)
+  return anchors.map(anchor => evaluatePoint(anchor, { w, h }))
 }
 
 function getAnchorId(shape: ShapeElement, anchorIndex: number): string {
@@ -158,8 +155,8 @@ export function getAnchorPoint(shape: ShapeElement, anchorIndex: number): Point 
   if (!shape.anchors || anchorIndex < 0 || anchorIndex >= shape.anchors.length) return null
   const anchor = shape.anchors[anchorIndex]
   const { props } = shape
-  const ax = evaluateExpression(anchor.x, props.w, props.h)
-  const ay = evaluateExpression(anchor.y, props.w, props.h)
+  const ax = evaluateExpression(anchor.x, props)
+  const ay = evaluateExpression(anchor.y, props)
   const rotated = rotatePoint({ x: ax, y: ay }, props.angle, { x: props.w / 2, y: props.h / 2 })
 
   return {
@@ -299,9 +296,8 @@ function resolveShapePathPolylines(shape: ShapeElement): PathPolyline[] {
   return polylines
 }
 
-function resolveShapePerimeterSegments(shape: ShapeElement): ShapePerimeterSegment[] {
-  const polylines = resolveShapePathPolylines(shape)
-  const segments: ShapePerimeterSegment[] = []
+function resolveShapeEdgeSegments(shape: ShapeElement, polylines: PathPolyline[]): ShapeEdgeSegment[] {
+  const segments: ShapeEdgeSegment[] = []
 
   for (const polyline of polylines) {
     for (let i = 0; i < polyline.points.length - 1; i++) {
@@ -322,29 +318,29 @@ function resolveShapePerimeterSegments(shape: ShapeElement): ShapePerimeterSegme
   return segments
 }
 
-function distancePointToSegment(point: Point, start: Point, end: Point): number {
+function projectPointToSegment(point: Point, start: Point, end: Point): { t: number; distance: number } {
   const dx = end.x - start.x
   const dy = end.y - start.y
   const lengthSquared = dx * dx + dy * dy
 
-  if (lengthSquared === 0) return getDistance(point, start)
+  if (lengthSquared <= 1e-8) {
+    return {
+      t: 0,
+      distance: Math.hypot(point.x - start.x, point.y - start.y),
+    }
+  }
 
-  const t = ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared
-  const clampedT = Math.max(0, Math.min(1, t))
+  const rawT = ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared
+  const t = Math.max(0, Math.min(1, rawT))
+  const projected = {
+    x: start.x + t * dx,
+    y: start.y + t * dy,
+  }
 
-  return getDistance(point, {
-    x: start.x + clampedT * dx,
-    y: start.y + clampedT * dy,
-  })
-}
-
-function getSegmentParam(point: Point, from: Point, to: Point): number {
-  const dx = to.x - from.x
-  const dy = to.y - from.y
-  const lengthSquared = dx * dx + dy * dy
-  if (lengthSquared <= 1e-8) return 0
-  const t = ((point.x - from.x) * dx + (point.y - from.y) * dy) / lengthSquared
-  return Math.max(0, Math.min(1, t))
+  return {
+    t,
+    distance: Math.hypot(point.x - projected.x, point.y - projected.y),
+  }
 }
 
 function isPointInPolygon(point: Point, points: Point[]): boolean {
@@ -422,13 +418,13 @@ function resolveOutwardNormalAngle(
   return normalizeAngle(Math.atan2(outward.y, outward.x))
 }
 
-function buildPerimeterInfo(
+function buildEdgeInfo(
   shape: ShapeElement,
   paths: PathPolyline[],
-  segment: ShapePerimeterSegment,
+  segment: ShapeEdgeSegment,
   t: number,
   distance: number,
-): PerimeterInfo | null {
+): EdgeInfo | null {
   const clampedT = Math.max(0, Math.min(1, t))
   const localPoint = {
     x: segment.fromLocal.x + (segment.toLocal.x - segment.fromLocal.x) * clampedT,
@@ -447,7 +443,7 @@ function buildPerimeterInfo(
   if (angle === null) return null
 
   return {
-    type: 'perimeter',
+    type: 'edge',
     pathIndex: segment.pathIndex,
     segmentIndex: segment.segmentIndex,
     t: clampedT,
@@ -457,27 +453,24 @@ function buildPerimeterInfo(
   }
 }
 
-export function resolvePerimeterInfo(shape: ShapeElement, binding: PerimeterBinding): PerimeterInfo | null {
+export function resolveEdgeInfo(shape: ShapeElement, binding: EdgeBinding): EdgeInfo | null {
   const paths = resolveShapePathPolylines(shape)
-  const segments = resolveShapePerimeterSegments(shape)
+  const segments = resolveShapeEdgeSegments(shape, paths)
   const segment = segments.find(s => s.pathIndex === binding.pathIndex && s.segmentIndex === binding.segmentIndex)
   if (!segment) return null
-  return buildPerimeterInfo(shape, paths, segment, binding.t, 0)
+  return buildEdgeInfo(shape, paths, segment, binding.t, 0)
 }
 
-export function getPerimeterInfo(shape: ShapeElement, point: Point): PerimeterInfo | null {
+export function getEdgeInfo(shape: ShapeElement, point: Point): EdgeInfo | null {
   const paths = resolveShapePathPolylines(shape)
-  const segments = resolveShapePerimeterSegments(shape)
+  const segments = resolveShapeEdgeSegments(shape, paths)
   if (segments.length === 0) return null
 
-  let bestSegment: ShapePerimeterSegment | null = null
+  let bestSegment: ShapeEdgeSegment | null = null
   let bestProjection: { t: number; distance: number } | null = null
 
   for (const segment of segments) {
-    const projection = {
-      t: getSegmentParam(point, segment.fromCanvas, segment.toCanvas),
-      distance: distancePointToSegment(point, segment.fromCanvas, segment.toCanvas),
-    }
+    const projection = projectPointToSegment(point, segment.fromCanvas, segment.toCanvas)
     if (!bestProjection || projection.distance < bestProjection.distance) {
       bestProjection = projection
       bestSegment = segment
@@ -485,7 +478,7 @@ export function getPerimeterInfo(shape: ShapeElement, point: Point): PerimeterIn
   }
 
   if (!bestSegment || !bestProjection) return null
-  return buildPerimeterInfo(shape, paths, bestSegment, bestProjection.t, bestProjection.distance)
+  return buildEdgeInfo(shape, paths, bestSegment, bestProjection.t, bestProjection.distance)
 }
 
 /**
@@ -494,8 +487,8 @@ export function getPerimeterInfo(shape: ShapeElement, point: Point): PerimeterIn
  */
 export function getBoundaryNormalAngle(shape: ShapeElement, localPoint: Point): number | null {
   const canvasPoint = localToCanvasPoint(shape, localPoint)
-  const perimeter = getPerimeterInfo(shape, canvasPoint)
-  return perimeter?.angle ?? null
+  const edgeInfo = getEdgeInfo(shape, canvasPoint)
+  return edgeInfo?.angle ?? null
 }
 
 /**
@@ -514,8 +507,8 @@ export function getAnchorAngle(shape: ShapeElement, anchorIndex: number): number
   }
 
   const localAnchor = {
-    x: evaluateExpression(anchorDef.x, shape.props.w, shape.props.h),
-    y: evaluateExpression(anchorDef.y, shape.props.w, shape.props.h),
+    x: evaluateExpression(anchorDef.x, shape.props),
+    y: evaluateExpression(anchorDef.y, shape.props),
   }
 
   const boundaryAngle = getBoundaryNormalAngle(shape, localAnchor)
@@ -558,38 +551,60 @@ export function getAnchorInfoById(shape: ShapeElement, anchorId: string): Anchor
   return getAnchorInfo(shape, index)
 }
 
-function getCreateAnchorReferencePoint(shape: ShapeElement): Point {
+interface CreateAnchorCandidate {
+  index: number
+  id: string
+  direction: AnchorDirection
+  point: Point
+}
+
+function toCreateAnchor(shape: ShapeElement, candidate: CreateAnchorCandidate): CreateAnchorInfo | null {
+  const angle = getAnchorAngle(shape, candidate.index)
+  if (angle === null) return null
   return {
-    x: shape.props.x + shape.props.w,
-    y: shape.props.y,
+    type: 'anchor',
+    ...candidate,
+    angle,
   }
 }
 
-function toCreateFixedAnchor(anchor: AnchorInfo): CreateFixedAnchorInfo {
-  return {
-    type: 'fixed',
-    ...anchor,
-  }
-}
-
-function getFixedAnchorInfos(shape: ShapeElement): AnchorInfo[] {
-  const anchors: AnchorInfo[] = []
+function getAnchorCandidates(shape: ShapeElement): CreateAnchorCandidate[] {
+  const anchors: CreateAnchorCandidate[] = []
   for (let index = 0; index < shape.anchors.length; index++) {
-    const info = getAnchorInfo(shape, index)
-    if (info) anchors.push(info)
+    const point = getAnchorPoint(shape, index)
+    if (!point) continue
+    const anchorDef = shape.anchors[index]
+    anchors.push({
+      index,
+      id: getAnchorId(shape, index),
+      direction: anchorDef.direction ?? 'center',
+      point,
+    })
   }
   return anchors
 }
 
-function findAnchorByDirections(anchors: AnchorInfo[], directions: AnchorDirection[]): AnchorInfo | null {
+function findAnchorByDirections(
+  anchors: CreateAnchorCandidate[],
+  directions: AnchorDirection[],
+): CreateAnchorCandidate | null {
+  if (anchors.length === 0 || directions.length === 0) return null
+
+  const anchorByDirection = new Map<AnchorDirection, CreateAnchorCandidate>()
+  for (const anchor of anchors) {
+    if (!anchorByDirection.has(anchor.direction)) {
+      anchorByDirection.set(anchor.direction, anchor)
+    }
+  }
+
   for (const direction of directions) {
-    const matched = anchors.find(anchor => anchor.direction === direction)
+    const matched = anchorByDirection.get(direction)
     if (matched) return matched
   }
   return null
 }
 
-function comparePreferredFixedAnchors(a: AnchorInfo, b: AnchorInfo, reference: Point): number {
+function comparePreferredAnchors(a: CreateAnchorCandidate, b: CreateAnchorCandidate, reference: Point): number {
   const aDistance = Math.hypot(a.point.x - reference.x, a.point.y - reference.y)
   const bDistance = Math.hypot(b.point.x - reference.x, b.point.y - reference.y)
   const distanceDiff = aDistance - bDistance
@@ -609,29 +624,30 @@ function comparePreferredFixedAnchors(a: AnchorInfo, b: AnchorInfo, reference: P
  * 规则：
  * - 优先使用指定 direction 的固定锚点
  * - 否则选择最靠近图形右上参考点的固定锚点
- * - 最后回退到 perimeter 绑定
+ * - 最后回退到 edge 绑定
  */
-export function resolveCreateAnchor(
-  shape: ShapeElement,
-  options?: ResolveCreateAnchorOptions,
-): CreateAnchor | null {
+export function resolveCreateAnchor(shape: ShapeElement, options?: ResolveCreateAnchorOptions): CreateAnchor | null {
   const directions = options?.preferredDirections ?? ['right', 'top']
-  const reference = getCreateAnchorReferencePoint(shape)
-  const fixedAnchors = getFixedAnchorInfos(shape)
-  const matched = findAnchorByDirections(fixedAnchors, directions)
+  const anchorCandidates = getAnchorCandidates(shape)
+  const matched = findAnchorByDirections(anchorCandidates, directions)
 
-  if (matched) return toCreateFixedAnchor(matched)
-  if (fixedAnchors.length === 0) return getPerimeterInfo(shape, reference)
+  if (matched) {
+    const anchor = toCreateAnchor(shape, matched)
+    if (anchor) return anchor
+  }
+  const reference = {
+    x: shape.props.x + shape.props.w,
+    y: shape.props.y,
+  }
+  if (anchorCandidates.length === 0) return getEdgeInfo(shape, reference)
 
-  const bestAnchor = fixedAnchors.reduce(
-    (best, anchor) => {
-      if (!best) return anchor
-      return comparePreferredFixedAnchors(anchor, best, reference) < 0 ? anchor : best
-    },
-    null as AnchorInfo | null,
-  )
+  const sortedCandidates = [...anchorCandidates].sort((a, b) => comparePreferredAnchors(a, b, reference))
+  for (const candidate of sortedCandidates) {
+    const anchor = toCreateAnchor(shape, candidate)
+    if (anchor) return anchor
+  }
 
-  return bestAnchor ? toCreateFixedAnchor(bestAnchor) : getPerimeterInfo(shape, reference)
+  return getEdgeInfo(shape, reference)
 }
 
 /**

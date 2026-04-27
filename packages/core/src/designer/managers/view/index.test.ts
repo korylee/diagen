@@ -155,6 +155,52 @@ describe('view manager', () => {
     })
   })
 
+  it('centerTo 与 fitBounds 应触发 view:navigated，普通缩放不应触发', () => {
+    withDesigner(designer => {
+      designer.view.setViewportSize(1000, 500)
+      const onNavigated = vi.fn()
+      const dispose = designer.on('view:navigated', onNavigated)
+
+      designer.view.setZoom(2)
+      expect(onNavigated).not.toHaveBeenCalled()
+
+      designer.view.centerTo({ x: 100, y: 100 })
+      expect(onNavigated).toHaveBeenCalledTimes(1)
+
+      designer.view.fitBounds({ x: 0, y: 0, w: 200, h: 100 })
+      expect(onNavigated).toHaveBeenCalledTimes(2)
+
+      dispose()
+    })
+  })
+
+  it('fitToSelection 在无选中时不应改动当前视图', () => {
+    withDesigner(designer => {
+      designer.view.setPan(80, -30)
+      designer.view.setZoom(1.7)
+      const before = designer.view.transform()
+
+      designer.view.fitToSelection()
+
+      expect(designer.view.transform()).toEqual(before)
+    })
+  })
+
+  it('fitToSelection 应按选区边界计算缩放与平移', () => {
+    withDesigner(designer => {
+      const shape = createShapeById('view_fit_selection_shape', 0, 0, 100, 100)
+      designer.edit.add([shape], { record: false, select: false })
+      designer.selection.replace([shape.id])
+      designer.view.setViewportSize(1000, 500)
+
+      designer.view.fitToSelection()
+
+      expect(designer.view.transform().zoom).toBe(5)
+      expect(designer.view.transform().x).toBe(250)
+      expect(designer.view.transform().y).toBe(0)
+    })
+  })
+
   it('selectionBounds 应随选择变化', () => {
     withDesigner(designer => {
       const a = createShapeById('view_sel_a', 0, 0, 100, 80)
@@ -419,13 +465,13 @@ describe('view manager', () => {
           x: a.props.x + a.props.w,
           y: a.props.y + a.props.h / 2,
           target: a.id,
-          binding: { type: 'fixed', anchorId: 'right' },
+          binding: { type: 'anchor', anchorId: 'right' },
         },
         to: {
           x: b.props.x,
           y: b.props.y + b.props.h / 2,
           target: b.id,
-          binding: { type: 'fixed', anchorId: 'left' },
+          binding: { type: 'anchor', anchorId: 'left' },
         },
       })
       designer.edit.add([a, blocker, b, linker], { record: false, select: false })
@@ -453,13 +499,13 @@ describe('view manager', () => {
           x: a.props.x + a.props.w,
           y: a.props.y + a.props.h / 2,
           target: a.id,
-          binding: { type: 'fixed', anchorId: 'right' },
+          binding: { type: 'anchor', anchorId: 'right' },
         },
         to: {
           x: b.props.x,
           y: b.props.y + b.props.h / 2,
           target: b.id,
-          binding: { type: 'fixed', anchorId: 'left' },
+          binding: { type: 'anchor', anchorId: 'left' },
         },
       })
       designer.edit.add([a, b, linker], { record: false, select: false })
@@ -492,13 +538,13 @@ describe('view manager', () => {
           x: a.props.x + a.props.w,
           y: a.props.y + a.props.h / 2,
           target: a.id,
-          binding: { type: 'fixed', anchorId: 'right' },
+          binding: { type: 'anchor', anchorId: 'right' },
         },
         to: {
           x: b.props.x,
           y: b.props.y + b.props.h / 2,
           target: b.id,
-          binding: { type: 'fixed', anchorId: 'left' },
+          binding: { type: 'anchor', anchorId: 'left' },
         },
       })
       designer.edit.add([a, b, linker], { record: false, select: false })

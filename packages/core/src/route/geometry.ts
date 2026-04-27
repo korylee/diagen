@@ -1,5 +1,6 @@
 import { getDistance, type Point } from '@diagen/shared'
 import type { LinkerRoute } from './linkerRoute'
+import { getCubicPoint } from '../_internal'
 
 export function getRouteCenter(route: LinkerRoute, curved: boolean): Point | null {
   if (curved && route.points.length === 4) {
@@ -43,13 +44,4 @@ function getPolylineCenter(points: Point[]): Point | null {
   }
 
   return points[points.length - 1]
-}
-
-function getCubicPoint(p0: Point, p1: Point, p2: Point, p3: Point, t: number): Point {
-  const mt = 1 - t
-
-  return {
-    x: mt * mt * mt * p0.x + 3 * mt * mt * t * p1.x + 3 * mt * t * t * p2.x + t * t * t * p3.x,
-    y: mt * mt * mt * p0.y + 3 * mt * mt * t * p1.y + 3 * mt * t * t * p2.y + t * t * t * p3.y,
-  }
 }

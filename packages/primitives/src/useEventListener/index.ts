@@ -215,7 +215,7 @@ export function makeEventListener(
   return off
 }
 
-export function createEventListener<
+export function useEventListener<
   Target extends TargetWithEventMap,
   EventMap extends EventMapOf<Target>,
   EventType extends keyof EventMap,
@@ -227,7 +227,7 @@ export function createEventListener<
 ): void
 
 // Custom Events
-export function createEventListener<
+export function useEventListener<
   EventMap extends Record<string, Event>,
   EventType extends keyof EventMap = keyof EventMap,
 >(
@@ -237,7 +237,7 @@ export function createEventListener<
   options?: EventListenerOptions,
 ): void
 
-export function createEventListener(
+export function useEventListener(
   targets: MaybeAccessor<MaybeArray<EventTarget | InferEventTarget<string> | undefined | null>>,
   type: MaybeAccessor<MaybeArray<string>>,
   handler: (event: Event) => void,
