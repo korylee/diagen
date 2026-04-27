@@ -8,6 +8,7 @@ import type {
   SidebarDensity,
   SidebarFrameProps,
   SidebarItemData,
+  SidebarPreviewData,
   SidebarRailProps,
   SidebarSearchFieldProps,
   SidebarSectionData,
@@ -26,8 +27,13 @@ function hasSectionHeader(section: SidebarSectionData): boolean {
   return Boolean(section.title || section.description || section.meta || section.headerAction)
 }
 
-function resolveItemVisual(item: SidebarItemData, layout: SidebarSectionLayout): JSX.Element | undefined {
-  return layout === 'grid' ? (item.preview ?? item.leading) : (item.leading ?? item.preview)
+function resolveItemVisual(
+  item: SidebarItemData,
+  layout: SidebarSectionLayout,
+  renderPreview?: (preview: SidebarPreviewData, variant: 'item' | 'tooltip') => JSX.Element,
+): JSX.Element | undefined {
+  const preview = item.preview && renderPreview ? renderPreview(item.preview, 'item') : undefined
+  return layout === 'grid' ? (preview ?? item.leading) : (item.leading ?? preview)
 }
 
 export function SidebarFrame(props: SidebarFrameProps): JSX.Element {
@@ -157,11 +163,14 @@ function SidebarItemButton(props: {
   readonly?: boolean
   onItemSelect?: (item: SidebarItemData) => void
   density?: SidebarDensity
+  renderPreview?: (preview: SidebarPreviewData, variant: 'item' | 'tooltip') => JSX.Element
 }): JSX.Element {
   const isGrid = () => props.layout === 'grid'
   const isActive = () => props.item.active ?? props.item.id === props.activeItemId
   const isDisabled = () => Boolean(props.readonly || props.item.disabled)
-  const visual = () => resolveItemVisual(props.item, props.layout)
+  const visual = () => resolveItemVisual(props.item, props.layout, props.renderPreview)
+  const [isTooltipOpen, setIsTooltipOpen] = createSignal(false)
+  const hasTooltip = () => Boolean(props.item.preview && props.renderPreview) && !isDisabled()
 
   return (
     <button
@@ -169,10 +178,25 @@ function SidebarItemButton(props: {
       role="listitem"
       class={bem('item', [isGrid() ? 'grid' : 'list'])}
       disabled={isDisabled()}
-      title={props.item.title ?? props.item.label}
+      title={hasTooltip() ? undefined : (props.item.title ?? props.item.label)}
       data-active={isActive() ? 'true' : undefined}
       data-disabled={isDisabled() ? 'true' : undefined}
       data-density={props.density ?? 'comfortable'}
+      data-tooltip-open={isTooltipOpen() ? 'true' : undefined}
+      onMouseEnter={() => {
+        if (!hasTooltip()) return
+        setIsTooltipOpen(true)
+      }}
+      onMouseLeave={() => {
+        setIsTooltipOpen(false)
+      }}
+      onFocus={() => {
+        if (!hasTooltip()) return
+        setIsTooltipOpen(true)
+      }}
+      onBlur={() => {
+        setIsTooltipOpen(false)
+      }}
       onClick={() => {
         if (isDisabled()) return
         props.item.onSelect?.()
@@ -202,6 +226,22 @@ function SidebarItemButton(props: {
       </span>
 
       <Show when={props.item.badge}>{badge => <span class={bem('item-badge')}>{badge()}</span>}</Show>
+
+      <Show when={isTooltipOpen() && !isDisabled() && props.item.preview}>
+        {preview => (
+          <span class={bem('item-tooltip')} role="tooltip" aria-hidden="true">
+            <span class={bem('item-tooltip-card')}>
+              <span class={bem('item-tooltip-visual')}>{props.renderPreview?.(preview(), 'tooltip')}</span>
+              <span class={bem('item-tooltip-copy')}>
+                <span class={bem('item-tooltip-label')}>{props.item.label}</span>
+                <Show when={props.item.description}>
+                  <span class={bem('item-tooltip-description')}>{props.item.description}</span>
+                </Show>
+              </span>
+            </span>
+          </span>
+        )}
+      </Show>
     </button>
   )
 }
@@ -214,6 +254,7 @@ export function SidebarSection(props: {
   density?: SidebarDensity
   onCollapsedChange?: (collapsed: boolean) => void
   onItemSelect?: (item: SidebarItemData, section: SidebarSectionData) => void
+  renderPreview?: (preview: SidebarPreviewData, variant: 'item' | 'tooltip') => JSX.Element
 }): JSX.Element {
   const defaults = useUIDefaults()
   const layout = createMemo<SidebarSectionLayout>(() => resolveSectionLayout(props.section))
@@ -249,6 +290,7 @@ export function SidebarSection(props: {
                   activeItemId={props.activeItemId}
                   readonly={props.readonly}
                   density={props.density}
+                  renderPreview={props.renderPreview}
                   onItemSelect={resolvedItem => props.onItemSelect?.(resolvedItem, props.section)}
                 />
               )}

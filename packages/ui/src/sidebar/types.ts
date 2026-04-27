@@ -1,3 +1,5 @@
+import { CanvasPreviewProps } from '@diagen/renderer'
+import { Optional } from '@diagen/shared'
 import type { Accessor, JSX, ParentProps } from 'solid-js'
 
 export type SidebarSectionLayout = 'list' | 'grid'
@@ -31,13 +33,18 @@ export interface SidebarSectionData {
   items: readonly SidebarItemData[]
 }
 
+export interface SidebarPreviewData extends Optional<
+  Pick<CanvasPreviewProps, 'schema' | 'schemaId' | 'accent'>,
+  'accent'
+> {}
+
 export interface SidebarItemData {
   id: string
   label: string
   description?: string
   badge?: string
   title?: string
-  preview?: JSX.Element
+  preview?: SidebarPreviewData
   leading?: JSX.Element
   meta?: string
   keywords?: readonly string[]
@@ -66,7 +73,8 @@ export interface SidebarRailItem {
   disabled?: boolean
 }
 
-export interface SidebarRailProps extends SidebarSharedProps, Omit<JSX.HTMLAttributes<HTMLDivElement>, 'class' | 'style'> {
+export interface SidebarRailProps
+  extends SidebarSharedProps, Omit<JSX.HTMLAttributes<HTMLDivElement>, 'class' | 'style'> {
   items: readonly SidebarRailItem[]
   activeItemId?: string
   readonly?: boolean

@@ -1,99 +1,125 @@
-import { Menu, type MenuClickInfo } from '@diagen/components'
-import { createEventListener } from '@diagen/primitives'
+import { Menu, type MenuClickInfo, type MenuDataItem } from '@diagen/components'
+import { createElementSize, onClickOutside, useEventListener } from '@diagen/primitives'
+import { createDgBem, type Point } from '@diagen/shared'
 import type { JSX } from 'solid-js'
-import { createMemo, Show, splitProps } from 'solid-js'
+import { createMemo, createSignal, Show, splitProps } from 'solid-js'
 import { Portal } from 'solid-js/web'
-import { renderIcon } from '../../iconRegistry'
 import { useUIIconRegistry } from '../../config'
-import { createContextMenuBridge } from './createContextMenuBridge'
-import type { ContextMenuEntries, ContextMenuItem, ContextMenuState } from './types'
-import { createDgBem } from '@diagen/shared'
+import { renderIcon } from '../../iconRegistry'
+import type { ResolvedContextMenuAction, ResolvedContextMenuDivider, ResolvedContextMenuEntry } from './types'
 
-import "./index.scss"
+import './index.scss'
 
-export interface ContextMenuProps extends Omit<JSX.HTMLAttributes<HTMLDivElement>, 'style' | 'onSelect'> {
-  state: ContextMenuState
-  onClose?: () => void
-  entries?: ContextMenuEntries
+const CONTEXT_MENU_VIEWPORT_GAP = 8
+const CONTEXT_MENU_Z_INDEX = 11000
+
+function isDivider(entry: ResolvedContextMenuEntry): entry is ResolvedContextMenuDivider {
+  return (entry as ResolvedContextMenuDivider).type === 'divider'
+}
+
+export interface ContextMenuProps extends Omit<JSX.HTMLAttributes<HTMLDivElement>, 'style' | 'onSelect' | 'onClose'> {
+  open: boolean
+  position: Point
+  items: readonly ResolvedContextMenuEntry[]
+  onSelect: (id: string) => void
+  onClose?: (reason: 'outside' | 'escape' | 'select') => void
   style?: JSX.CSSProperties
-  renderIcon?: (icon: string, item: ContextMenuItem) => JSX.Element | undefined
+  renderIcon?: (icon: string, item: ResolvedContextMenuAction) => JSX.Element | undefined
 }
 
 const bem = createDgBem('context-menu')
 
+function clampMenuCoordinate(value: number, size: number, viewportSize: number): number {
+  if (size <= 0) {
+    return Math.max(CONTEXT_MENU_VIEWPORT_GAP, value)
+  }
+
+  const max = Math.max(CONTEXT_MENU_VIEWPORT_GAP, viewportSize - size - CONTEXT_MENU_VIEWPORT_GAP)
+  return Math.min(Math.max(value, CONTEXT_MENU_VIEWPORT_GAP), max)
+}
+
 export function ContextMenu(props: ContextMenuProps) {
-  const [local, rest] = splitProps(props, ['state', 'onClose', 'renderIcon', 'entries', 'style'])
-  // Keep menu item resolution bound to a single state object so
-  // open/position/context always move together from the caller side.
-  const bridge = createContextMenuBridge(() => local.state.context, local.entries)
-  const globalIconRegistry = useUIIconRegistry()
-  const renderMenuIcon = (icon: ContextMenuItem['icon'], item: ContextMenuItem) => {
-    // Let provider-level icons stay the default source,
-    // while renderIcon remains the final escape hatch for callers.
+  const [local, rest] = splitProps(props, ['open', 'position', 'items', 'onSelect', 'onClose', 'renderIcon', 'style'])
+  const iconRegistry = useUIIconRegistry()
+  const renderMenuIcon = (icon: ResolvedContextMenuAction['icon'], item: ResolvedContextMenuAction) => {
     return typeof icon === 'string'
       ? local.renderIcon
         ? local.renderIcon(icon, item)
-        : renderIcon(icon as any, globalIconRegistry())
+        : renderIcon(icon as any, iconRegistry())
       : icon?.({})
   }
-  const items = createMemo(() =>
-    bridge.items().map((item, index) => {
-      if (item === '|') {
+  const items = createMemo<readonly MenuDataItem[]>(() => {
+    function mapEntry(entry: ResolvedContextMenuEntry): MenuDataItem {
+      if (isDivider(entry)) {
+        return { type: 'divider', key: entry.key }
+      }
+
+      const icon = renderMenuIcon(entry.icon, entry)
+
+      if (entry.children?.length) {
         return {
-          type: 'divider',
-          key: `divider:${index}`,
+          key: entry.key,
+          label: entry.label,
+          icon,
+          disabled: entry.disabled,
+          children: entry.children.map(mapEntry),
         }
       }
+
       return {
-        key: item.id,
-        label: item.label,
-        disabled: item.isDisabled?.(),
-        extra: item.shortcut,
-        danger: item.danger,
-        'data-menu-id': item.id,
-        icon: renderMenuIcon(item.icon, item),
+        key: entry.key,
+        label: entry.label,
+        disabled: entry.disabled,
+        extra: entry.extra,
+        danger: entry.danger,
+        'data-menu-id': entry.key,
+        icon,
       }
-    }),
-  )
-
-  let rootRef: HTMLDivElement | undefined
-
-  const handleDocumentPointerDown = (event: MouseEvent) => {
-    if (!local.state.open) return
-    const target = event.target as Node | null
-    if (rootRef && target && !rootRef.contains(target)) {
-      local.onClose?.()
     }
-  }
 
-  const handleDocumentKeyDown = (event: KeyboardEvent) => {
-    if (!local.state.open) return
-    if (event.key === 'Escape') {
-      local.onClose?.()
+    return local.items.map(mapEntry)
+  })
+
+  const [rootRef, setRootRef] = createSignal<HTMLDivElement>()
+  const { width: menuWidth, height: menuHeight } = createElementSize(rootRef, {
+    box: 'border-box',
+  })
+
+  const resolvedPosition = createMemo(() => ({
+    x: clampMenuCoordinate(local.position.x, menuWidth(), window.innerWidth),
+    y: clampMenuCoordinate(local.position.y, menuHeight(), window.innerHeight),
+  }))
+
+  useEventListener(window, 'keydown', event => {
+    if (event.key === 'Escape' && local.open) {
+      local.onClose?.('escape')
     }
-  }
+  })
 
-  createEventListener(document, 'mousedown', handleDocumentPointerDown)
-  createEventListener(document, 'keydown', handleDocumentKeyDown)
+  onClickOutside(rootRef, () => {
+    if (local.open) {
+      local.onClose?.('outside')
+    }
+  })
 
   const handleClick = (info: MenuClickInfo) => {
-    if (bridge.execute(info.key)) {
-      local.onClose?.()
-    }
+    local.onSelect(info.key)
+    local.onClose?.('select')
   }
 
   return (
-    <Show when={local.state.open}>
+    <Show when={local.open}>
       <Portal>
         <div
           {...rest}
-          ref={rootRef}
+          ref={setRootRef}
           class={bem()}
+          data-context-menu="true"
           style={{
             position: 'fixed',
-            left: `${local.state.position.x}px`,
-            top: `${local.state.position.y}px`,
-            'z-index': 2000,
+            left: `${resolvedPosition().x}px`,
+            top: `${resolvedPosition().y}px`,
+            'z-index': CONTEXT_MENU_Z_INDEX,
             ...local.style,
           }}
           onContextMenu={event => {

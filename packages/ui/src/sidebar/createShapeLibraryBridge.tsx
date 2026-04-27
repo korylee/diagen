@@ -1,9 +1,9 @@
-import { createMemo, type Accessor } from 'solid-js'
 import { Schema, type Designer } from '@diagen/core'
+import { createMemo, type Accessor } from 'solid-js'
 
-import { SidebarCanvasPreview } from './SidebarCanvasPreview'
+import { access } from '@diagen/primitives'
 import { selectLinkerCreationTool, selectShapeCreationTool, type SidebarCreationMode } from './creationMode'
-import type { SidebarSectionData } from './types'
+import type { SidebarPreviewData, SidebarSectionData } from './types'
 
 function resolveActiveItemId(designer: Designer): string | undefined {
   const current = designer.tool.toolState()
@@ -19,23 +19,19 @@ function resolveActiveItemId(designer: Designer): string | undefined {
   return undefined
 }
 
-function createShapePreview(shapeId: string) {
-  return <SidebarCanvasPreview shapeId={shapeId} class="sidebar-preview" accent="#8b5e34" />
-}
+const SHAPE_PREVIEW_ACCENT = '#8b5e34'
+const LINKER_PREVIEW_ACCENT = '#0f766e'
 
-function createLinkerPreview(linkerId: string) {
-  return <SidebarCanvasPreview linkerId={linkerId} class="sidebar-preview" accent="#0f766e" />
+function createPreview(schema: SidebarPreviewData['schema'], schemaId: string, accent: string): SidebarPreviewData {
+  return { schema, schemaId, accent }
 }
 
 export interface CreateShapeLibraryBridgeOptions {
   creationMode?: Accessor<SidebarCreationMode>
 }
 
-function resolveCreationMode(creationMode?: Accessor<SidebarCreationMode>): SidebarCreationMode {
-  return creationMode?.() ?? 'batch'
-}
-
 export function createShapeLibraryBridge(designer: Designer, options: CreateShapeLibraryBridgeOptions = {}) {
+  const { creationMode = 'batch' } = options
   const activeItemId = createMemo<string | undefined>(() => resolveActiveItemId(designer))
 
   const shapeSections = createMemo<SidebarSectionData[]>(() =>
@@ -52,11 +48,11 @@ export function createShapeLibraryBridge(designer: Designer, options: CreateShap
           id: `tool:shape:${shape.id}`,
           label: shape.title,
           description: shape.name,
-          preview: createShapePreview(shape.id),
+          preview: createPreview('shape', shape.id, SHAPE_PREVIEW_ACCENT),
           meta: category.name,
           keywords: [shape.id, shape.name, shape.title, category.id, category.name],
           onSelect: () => {
-            selectShapeCreationTool(designer, shape.id, resolveCreationMode(options.creationMode))
+            selectShapeCreationTool(designer, shape.id, access(creationMode))
           },
         })),
       }
@@ -73,11 +69,11 @@ export function createShapeLibraryBridge(designer: Designer, options: CreateShap
       id: `tool:linker:${linker.id}`,
       label: linker.title,
       description: linker.name,
-      preview: createLinkerPreview(linker.id),
+      preview: createPreview('linker', linker.id, LINKER_PREVIEW_ACCENT),
       meta: '连线',
       keywords: [linker.id, linker.name, linker.title, 'line', 'linker', 'connector'],
       onSelect: () => {
-        selectLinkerCreationTool(designer, linker.id, resolveCreationMode(options.creationMode))
+        selectLinkerCreationTool(designer, linker.id, access(creationMode))
       },
     })),
   }))

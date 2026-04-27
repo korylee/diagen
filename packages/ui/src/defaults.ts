@@ -1,12 +1,13 @@
 import { resolveRendererDefaults, type RendererDefaults, type RendererDefaultsOverrides } from '@diagen/renderer'
-import type { ActionEntry } from './actions'
+import type { ActionEntry, UIAction } from './actions'
 import type { ContextMenuTargetType } from './editor/contextMenu/types'
 import type { IconRegistryOverrides } from './iconRegistry'
 
 export interface UiContextMenuDefaults {
-  canvas: readonly ActionEntry[]
-  element: readonly ActionEntry[]
-  linker: readonly ActionEntry[]
+  canvas: readonly (ActionEntry | UIAction)[]
+  element: readonly (ActionEntry | UIAction)[]
+  linker: readonly (ActionEntry | UIAction)[]
+  selection: readonly (ActionEntry | UIAction)[]
 }
 
 export interface UiSidebarDefaults {
@@ -14,16 +15,20 @@ export interface UiSidebarDefaults {
   emptyText: string
 }
 
+export interface ToolbarDefaults {
+  entries: readonly (ActionEntry | 'spacer')[]
+}
+
 export interface UiDefaults {
-  toolbarEntries: readonly (ActionEntry | 'spacer')[]
-  contextMenuEntries: UiContextMenuDefaults
+  toolbar: ToolbarDefaults
+  contextMenu: { entries: UiContextMenuDefaults }
   iconRegistry: IconRegistryOverrides
   sidebar: UiSidebarDefaults
 }
 
 export interface UiDefaultsOverrides {
-  toolbarEntries?: readonly (ActionEntry | 'spacer')[]
-  contextMenuEntries?: Partial<UiContextMenuDefaults>
+  toolbar?: { entries?: readonly (ActionEntry | 'spacer')[] }
+  contextMenu?: { entries?: Partial<UiContextMenuDefaults> }
   iconRegistry?: IconRegistryOverrides
   sidebar?: Partial<UiSidebarDefaults>
 }
@@ -38,20 +43,8 @@ export interface DiagenDefaultsOverrides {
   ui?: UiDefaultsOverrides
 }
 
-export const UI_DEFAULTS: UiDefaults = {
-  toolbarEntries: [
-    'history:undo',
-    'history:redo',
-    '|',
-    'arrange:group',
-    'arrange:ungroup',
-    'edit:delete',
-    '|',
-    'view:zoom-out',
-    'view:fit',
-    'view:zoom-in',
-  ] as const,
-  contextMenuEntries: {
+const CONTEXT_MENU_DEFAULT = {
+  entries: {
     canvas: ['clipboard:paste', '|', 'history:undo', 'history:redo', '|', 'view:fit'] as const,
     element: [
       'clipboard:copy',
@@ -67,6 +60,7 @@ export const UI_DEFAULTS: UiDefaults = {
       'history:redo',
       '|',
       'view:fit',
+      'view:fit-selection',
     ] as const,
     linker: [
       'clipboard:copy',
@@ -81,7 +75,39 @@ export const UI_DEFAULTS: UiDefaults = {
       '|',
       'view:fit',
     ] as const,
+    selection: [
+      'clipboard:copy',
+      'clipboard:cut',
+      'clipboard:paste',
+      'clipboard:duplicate',
+      '|',
+      'arrange:group',
+      'edit:delete',
+      '|',
+      'history:undo',
+      'history:redo',
+      '|',
+      'view:fit-selection',
+    ] as const,
   },
+}
+
+export const UI_DEFAULTS: UiDefaults = {
+  toolbar: {
+    entries: [
+      'history:undo',
+      'history:redo',
+      '|',
+      'arrange:group',
+      'arrange:ungroup',
+      'edit:delete',
+      '|',
+      'view:zoom-out',
+      'view:fit',
+      'view:zoom-in',
+    ] as const,
+  },
+  contextMenu: CONTEXT_MENU_DEFAULT,
   iconRegistry: {},
   sidebar: {
     searchPlaceholder: 'Search',
@@ -89,19 +115,21 @@ export const UI_DEFAULTS: UiDefaults = {
   },
 }
 
-function resolveUiContextMenuDefaults(overrides?: UiDefaultsOverrides['contextMenuEntries']): UiContextMenuDefaults {
-  // 菜单分场景独立替换，避免数组级 merge 造成菜单顺序与分隔符失真。
-  return {
-    canvas: overrides?.canvas ?? UI_DEFAULTS.contextMenuEntries.canvas,
-    element: overrides?.element ?? UI_DEFAULTS.contextMenuEntries.element,
-    linker: overrides?.linker ?? UI_DEFAULTS.contextMenuEntries.linker,
-  }
-}
-
 export function resolveUiDefaults(overrides?: UiDefaultsOverrides): UiDefaults {
+  // 菜单分场景独立替换，避免数组级 merge 造成菜单顺序与分隔符失真。
+  const ctx = overrides?.contextMenu?.entries
   return {
-    toolbarEntries: overrides?.toolbarEntries ?? UI_DEFAULTS.toolbarEntries,
-    contextMenuEntries: resolveUiContextMenuDefaults(overrides?.contextMenuEntries),
+    toolbar: {
+      entries: overrides?.toolbar?.entries ?? UI_DEFAULTS.toolbar.entries,
+    },
+    contextMenu: {
+      entries: {
+        canvas: ctx?.canvas ?? UI_DEFAULTS.contextMenu.entries.canvas,
+        element: ctx?.element ?? UI_DEFAULTS.contextMenu.entries.element,
+        linker: ctx?.linker ?? UI_DEFAULTS.contextMenu.entries.linker,
+        selection: ctx?.selection ?? UI_DEFAULTS.contextMenu.entries.selection,
+      },
+    },
     iconRegistry: {
       ...UI_DEFAULTS.iconRegistry,
       ...overrides?.iconRegistry,
@@ -121,8 +149,12 @@ export function resolveDiagenDefaults(overrides?: DiagenDefaultsOverrides): Diag
   }
 }
 
-export function getContextMenuDefaultEntries(targetType: ContextMenuTargetType, defaults: UiContextMenuDefaults): readonly ActionEntry[] {
+export function getContextMenuDefaultEntries(
+  targetType: ContextMenuTargetType,
+  defaults: UiContextMenuDefaults,
+): readonly (ActionEntry | UIAction)[] {
   if (targetType === 'canvas') return defaults.canvas
   if (targetType === 'linker') return defaults.linker
+  if (targetType === 'selection') return defaults.selection
   return defaults.element
 }

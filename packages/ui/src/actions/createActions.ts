@@ -155,6 +155,20 @@ export function createActions(designer: Designer): UIActions {
       },
     ],
     [
+      'view:fit-selection',
+      {
+        id: 'view:fit-selection',
+        label: '适应选中',
+        title: '适应选中',
+        icon: 'fit',
+        shortcut: 'Ctrl+Shift+F',
+        isDisabled: () => selection.isEmpty(),
+        execute: () => {
+          view.fitToSelection()
+        },
+      },
+    ],
+    [
       'view:zoom-in',
       {
         id: 'view:zoom-in',

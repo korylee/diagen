@@ -1,5 +1,6 @@
 import { createDgBem, cx, ensureArray } from '@diagen/shared'
 import { createEffect, createMemo, createSignal, For, mergeProps, Show, splitProps, type JSX } from 'solid-js'
+import { TooltipCanvasPreview } from '../preview'
 import {
   SidebarBody,
   SidebarFooter,
@@ -9,7 +10,14 @@ import {
   SidebarSearchField,
   SidebarSection,
 } from './panel'
-import type { SidebarFrameProps, SidebarItemData, SidebarRailItem, SidebarSectionData } from './types'
+import { SidebarCanvasPreview } from './SidebarCanvasPreview'
+import type {
+  SidebarFrameProps,
+  SidebarItemData,
+  SidebarPreviewData,
+  SidebarRailItem,
+  SidebarSectionData,
+} from './types'
 
 import { useUIIconRegistry } from '../config'
 import { renderIcon } from '../iconRegistry'
@@ -31,6 +39,13 @@ export interface SidebarProps extends Omit<SidebarFrameProps, 'children'> {
 }
 
 const bem = createDgBem('sidebar')
+
+function renderSidebarPreview(preview: SidebarPreviewData, variant: 'item' | 'tooltip'): JSX.Element {
+  if (variant === 'tooltip') {
+    return <TooltipCanvasPreview {...preview} />
+  }
+  return <SidebarCanvasPreview {...preview} class="sidebar-preview" />
+}
 
 export function Sidebar(props: SidebarProps): JSX.Element {
   const designer = useDesigner()
@@ -172,6 +187,7 @@ export function Sidebar(props: SidebarProps): JSX.Element {
                   section={section}
                   readonly={local.readonly}
                   emptyState={local.emptyState}
+                  renderPreview={renderSidebarPreview}
                   onCollapsedChange={collapsed => local.onSectionToggle?.(section, collapsed)}
                   onItemSelect={local.onItemSelect}
                 />
@@ -192,6 +208,7 @@ export function Sidebar(props: SidebarProps): JSX.Element {
                     readonly={local.readonly}
                     emptyState={local.emptyState}
                     density="compact"
+                    renderPreview={renderSidebarPreview}
                     onCollapsedChange={collapsed => local.onSectionToggle?.(section, collapsed)}
                     onItemSelect={local.onItemSelect}
                   />
@@ -218,6 +235,7 @@ export function Sidebar(props: SidebarProps): JSX.Element {
                     readonly={local.readonly}
                     emptyState={local.emptyState}
                     density="compact"
+                    renderPreview={renderSidebarPreview}
                     onCollapsedChange={collapsed => local.onSectionToggle?.(section, collapsed)}
                     onItemSelect={local.onItemSelect}
                   />

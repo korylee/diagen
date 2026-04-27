@@ -39,9 +39,9 @@
 
 专项目标：
 
-- 清理 `binding.target` 迁移后的少量旧测试口径
-- 补齐 `perimeter` 附着点预览
-- 增加 `fixed / perimeter` 的显式切换能力
+- 清理端点顶层 `target` 迁移后的少量旧测试口径
+- 补齐 `edge` 附着点预览
+- 增加 `anchor / edge` 的显式切换能力
 - 继续降低端点拖拽过程中的吸附跳变
 
 专项文档：
@@ -111,7 +111,7 @@
 2. 再统一导航动作在 UI action、快捷键与 renderer 手势中的行为
 3. 然后收口默认样式入口
 4. 再完成选中元素的批量样式应用
-5. 并行推进 `LinkerEndpoint` 交互收口专项：先清理旧测试口径，再补 `perimeter` 预览、显式切换与吸附稳定性微调
+5. 并行推进 `LinkerEndpoint` 交互收口专项：先清理旧测试口径，再补 `edge` 预览、显式切换与吸附稳定性微调
 6. 最后评估 minimap 与阶段文档收尾
 
 原因：
@@ -208,8 +208,8 @@
 4. 给 `packages/renderer/src/scene/Renderer.test.ts` 增补 `Space + drag`、缩放后导航动作与现有拖拽/编辑链路不冲突的回归
 5. 并行启动 `LinkerEndpoint` 交互收口专项，按 `docs/LINKER_ENDPOINT_OPTIMIZATION.md` 的顺序推进：
    - 先清理 renderer 集成测试中的旧 `from.id / to.id` 断言
-   - 再补 `perimeter` 附着点预览
-   - 再补 `fixed / perimeter` 显式切换
+   - 再补 `edge` 附着点预览
+   - 再补 `anchor / edge` 显式切换
    - 最后再做吸附稳定性微调与回归测试
 6. 导航闭环稳定后，再开始默认样式入口与批量样式应用的正式 manager 设计
 

@@ -15,6 +15,7 @@ export interface UIAction {
   width?: number | string
   isDisabled?: () => boolean
   execute?: () => void
+  children?: readonly (ActionEntry | UIAction)[]
 }
 
 export interface UIActions {

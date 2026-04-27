@@ -12,7 +12,7 @@ export function createToolbarBridge(entries?: ToolbarEntries): ToolbarBridge {
   const actions = createMemo(() => configuredActions() ?? (designer ? createActions(designer) : undefined))
   const items = createMemo<readonly ToolbarBridgeItem[]>(() => {
     const resolvedActions = actions()
-    const resolvedEntries = typeof entries === 'function' ? entries() : (entries ?? defaults().ui.toolbarEntries)
+    const resolvedEntries = typeof entries === 'function' ? entries() : (entries ?? defaults().ui.toolbar.entries)
     if (!resolvedActions) {
       return []
     }
