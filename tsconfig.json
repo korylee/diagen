@@ -40,6 +40,6 @@
     "declarationDir": "./types",
     "skipDefaultLibCheck": true
   },
-  "include": ["*.ts", "packages", "playgrounds"],
+  "include": ["*.ts", "*.d.ts", "packages", "playgrounds"],
   "exclude": ["node_modules", "dist", "**/*.md", "packages/.test"]
 }
