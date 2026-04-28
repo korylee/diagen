@@ -7,7 +7,7 @@ import type { LinkerElement, ShapeElement } from '@diagen/core'
 import { createDesigner, Schema } from '@diagen/core'
 import { DesignerProvider, useDesigner } from '@diagen/renderer'
 import { generateId } from '@diagen/shared'
-import { Editor, Sidebar, Toolbar } from '@diagen/ui'
+import { Editor, Inspector, Sidebar, Toolbar } from '@diagen/ui'
 import type { Accessor, JSX } from 'solid-js'
 import { batch, createMemo, onMount } from 'solid-js'
 
@@ -75,6 +75,7 @@ function EditorShell(): JSX.Element {
       <div class="app-body">
         <SidebarPanel status={status} />
         <EditorCanvas />
+        <Inspector class="app-inspector" />
       </div>
     </div>
   )
@@ -125,13 +126,13 @@ function SampleDataLoader() {
     const linkers: LinkerElement[] = [
       Schema.createLinker(
         'linker',
-        { id: shape1Id, x: 250, y: 200, binding: { type: 'free' } },
-        { id: shape2Id, x: 400, y: 200, binding: { type: 'free' } },
+        { x: 250, y: 200, binding: { type: 'free' } },
+        { x: 400, y: 200, binding: { type: 'free' } },
       )!,
       Schema.createLinker(
         'linker',
-        { id: shape2Id, x: 550, y: 200, binding: { type: 'free' } },
-        { id: shape3Id, x: 700, y: 200, binding: { type: 'free' } },
+        { x: 550, y: 200, binding: { type: 'free' } },
+        { x: 700, y: 200, binding: { type: 'free' } },
       )!,
     ]
 
