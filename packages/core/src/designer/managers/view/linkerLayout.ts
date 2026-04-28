@@ -161,7 +161,7 @@ export function createLinkerLayoutController(options: CreateLinkerLayoutControll
 
   function resolveRouteJumps(linker: LinkerElement, route: LinkerRoute): LinkerRoute['jumps'] {
     if (!isLineJumpsEnabled()) return []
-    if (element.linkers().length > DEFAULTS.DISABLE_LINE_JUMPS_THRESHOLD) return []
+    if (element.linkers().length > DEFAULTS.performance.lineJumpsLimit) return []
 
     // 依赖全局连线场景版本，确保任意相关布局变化都能刷新跳线。
     const sceneStamp = linkerSceneStamp()

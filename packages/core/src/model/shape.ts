@@ -55,9 +55,9 @@ export interface ShapeElement extends BaseElement {
 
 export function createShape(patch: Partial<ShapeElement>): ShapeElement {
   // 默认值按实例克隆，避免某个 shape 的运行时修改污染全局默认配置。
-  const defaultTextBlock = deepClone(DEFAULTS.DEFAULT_TEXT_BLOCK)
-  const defaultAnchors = deepClone(DEFAULTS.DEFAULT_ANCHORS)
-  const defaultPath = deepClone(DEFAULTS.DEFAULT_PATH)
+  const defaultTextBlock = deepClone(DEFAULTS.shape.textBlock)
+  const defaultAnchors = deepClone(DEFAULTS.shape.anchors)
+  const defaultPath = deepClone(DEFAULTS.shape.path)
 
   return {
     type: 'shape',
@@ -71,24 +71,24 @@ export function createShape(patch: Partial<ShapeElement>): ShapeElement {
     props: {
       x: 0,
       y: 0,
-      w: DEFAULTS.DEFAULT_SHAPE_WIDTH,
-      h: DEFAULTS.DEFAULT_SHAPE_HEIGHT,
+      w: DEFAULTS.shape.width,
+      h: DEFAULTS.shape.height,
       angle: 0,
     },
     shapeStyle: {
       alpha: 1,
     },
     lineStyle: {
-      lineWidth: DEFAULTS.DEFAULT_LINE_WIDTH,
-      lineColor: DEFAULTS.DEFAULT_LINE_COLOR,
-      lineStyle: DEFAULTS.DEFAULT_LINE_STYLE.lineStyle,
+      lineWidth: DEFAULTS.style.line.lineWidth,
+      lineColor: DEFAULTS.style.line.lineColor,
+      lineStyle: DEFAULTS.style.line.lineStyle,
     },
-    fillStyle: { ...DEFAULTS.DEFAULT_FILL_STYLE },
-    fontStyle: { ...DEFAULTS.DEFAULT_FONT_STYLE },
+    fillStyle: { ...DEFAULTS.style.fill },
+    fontStyle: { ...DEFAULTS.style.font },
     textBlock: [defaultTextBlock],
     anchors: defaultAnchors,
     path: defaultPath,
-    attribute: { ...DEFAULTS.DEFAULT_ATTRIBUTE },
+    attribute: { ...DEFAULTS.shape.attribute },
     dataAttributes: [],
     data: {},
     ...patch,

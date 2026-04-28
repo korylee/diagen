@@ -1,5 +1,4 @@
 import { ValueOf } from '@diagen/shared'
-// Element Types
 import {
   DEFAULT_ANCHORS,
   DEFAULT_ATTRIBUTE,
@@ -19,7 +18,6 @@ export const ElementType = {
 } as const
 export type ElementType = ValueOf<typeof ElementType>
 
-// Shape Categories (similar to ProcessOn)
 export const ShapeCategory = {
   STANDARD: 'standard',
   BASIC: 'basic',
@@ -30,7 +28,6 @@ export const ShapeCategory = {
 } as const
 export type ShapeCategory = ValueOf<typeof ShapeCategory>
 
-// Linker Types
 export const LinkerType = {
   BROKEN: 'broken',
   STRAIGHT: 'straight',
@@ -39,7 +36,6 @@ export const LinkerType = {
 } as const
 export type LinkerType = ValueOf<typeof LinkerType>
 
-// Arrow Styles
 export const ArrowStyle = {
   NONE: 'none',
   SOLID_ARROW: 'solidArrow',
@@ -49,7 +45,6 @@ export const ArrowStyle = {
 } as const
 export type ArrowStyle = ValueOf<typeof ArrowStyle>
 
-// Line Styles
 export const LineStyleType = {
   SOLID: 'solid',
   DASHED: 'dashed',
@@ -57,7 +52,6 @@ export const LineStyleType = {
 } as const
 export type LineStyleType = ValueOf<typeof LineStyleType>
 
-// Fill Types
 export const FillType = {
   NONE: 'none',
   SOLID: 'solid',
@@ -66,14 +60,12 @@ export const FillType = {
 } as const
 export type FillType = ValueOf<typeof FillType>
 
-// Gradient Types
 export const GradientType = {
   LINEAR: 'linear',
   RADIAL: 'radial',
 } as const
 export type GradientType = ValueOf<typeof GradientType>
 
-// Text Alignments
 export const TextAlign = {
   LEFT: 'left',
   CENTER: 'center',
@@ -88,59 +80,83 @@ export const VerticalAlign = {
 } as const
 export type VerticalAlign = ValueOf<typeof VerticalAlign>
 
-// Text Orientation
 export const TextOrientation = {
   HORIZONTAL: 'horizontal',
   VERTICAL: 'vertical',
 } as const
 export type TextOrientation = ValueOf<typeof TextOrientation>
 
-// Default Values
 export const DEFAULTS = {
-  // config
-  GRID_SIZE: 15,
-  GRID_COLOR: '#e0e0e0',
-  DEFAULT_ZOOM: 1,
-  MIN_ZOOM: 0.1,
-  MAX_ZOOM: 5,
-  ZOOM_STEP: 0.1,
-  SHOW_GRID: true,
+  grid: {
+    size: 15,
+    color: '#e0e0e0',
+    show: true,
+  },
 
-  // Page
-  PAGE_WIDTH: 1050,
-  PAGE_HEIGHT: 1000,
-  PAGE_BACKGROUND: 'rgb(255, 255, 255)',
-  PAGE_PADDING: 20,
-  LINE_JUMPS: false,
+  zoom: {
+    default: 1,
+    min: 0.1,
+    max: 5,
+    step: 0.1,
+  },
 
-  // Shape
-  DEFAULT_SHAPE_WIDTH: 120,
-  DEFAULT_SHAPE_HEIGHT: 80,
-  DEFAULT_ANCHORS: DEFAULT_ANCHORS,
-  DEFAULT_PATH: RECTANGLE_PATH,
-  DEFAULT_TEXT_BLOCK: DEFAULT_TEXT_BLOCK,
-  DEFAULT_ATTRIBUTE: DEFAULT_ATTRIBUTE,
-  DEFAULT_LINE_STYLE: DEFAULT_LINE_STYLE,
-  DEFAULT_FONT_STYLE: DEFAULT_FONT_STYLE,
-  DEFAULT_FILL_STYLE: DEFAULT_FILL_STYLE,
+  page: {
+    width: 1050,
+    height: 1000,
+    background: 'rgb(255, 255, 255)',
+    padding: 20,
+    margin: 800,
+    lineJumps: false,
+    gridStyle: 'line',
+    orientation: 'portrait',
+  },
 
-  // Line
-  DEFAULT_LINE_WIDTH: DEFAULT_LINE_STYLE.lineWidth,
-  DEFAULT_LINE_COLOR: DEFAULT_LINE_STYLE.lineColor,
+  shape: {
+    width: 120,
+    height: 80,
+    anchors: DEFAULT_ANCHORS,
+    path: RECTANGLE_PATH,
+    textBlock: DEFAULT_TEXT_BLOCK,
+    attribute: DEFAULT_ATTRIBUTE,
+  },
 
-  // Font
-  DEFAULT_FONT_FAMILY: DEFAULT_FONT_STYLE.fontFamily,
-  DEFAULT_FONT_SIZE: DEFAULT_FONT_STYLE.size,
-  DEFAULT_FONT_COLOR: DEFAULT_FONT_STYLE.color,
+  style: {
+    line: DEFAULT_LINE_STYLE,
+    font: DEFAULT_FONT_STYLE,
+    fill: DEFAULT_FILL_STYLE,
+  },
 
-  // Selection
-  SELECTION_COLOR: '#2196f3',
-  SELECTION_BOX_COLOR: '#2196f3',
+  editor: {
+    anchorSize: 8,
+    rotaterSize: 9,
+    anchorColor: '#067bef',
+    selectorColor: '#067bef',
+    containerInset: 800,
+  },
 
-  // History
-  MAX_HISTORY_SIZE: 100,
+  autoGrow: {
+    enabled: true,
+    growPadding: 240,
+    growStep: 200,
+    maxWidth: 20000,
+    maxHeight: 20000,
+    shrink: false,
+    shrinkPadding: 320,
+  },
 
-  // Performance
-  DISABLE_LINE_JUMPS_THRESHOLD: 400,
-  ENABLE_VIRTUALIZATION_THRESHOLD: 2000,
+  linker: {
+    strategies: {
+      [LinkerType.BROKEN]: 'obstacle',
+      [LinkerType.ORTHOGONAL]: 'obstacle',
+      [LinkerType.STRAIGHT]: 'basic',
+      [LinkerType.CURVED]: 'basic',
+    },
+    obstacleConfig: { padding: 15 },
+    obstacleOptions: { algorithm: 'hybrid' },
+    lineJumpRadius: 10,
+  },
+
+  performance: {
+    lineJumpsLimit: 400,
+  },
 } as const

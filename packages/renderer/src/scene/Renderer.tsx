@@ -1,4 +1,4 @@
-import { DesignerToolState, Schema } from '@diagen/core'
+import { DEFAULTS, DesignerToolState, Schema } from '@diagen/core'
 import { useEventListener, useKeyboard } from '@diagen/primitives'
 import { createDgBem, type Point } from '@diagen/shared'
 import { createEffect, createMemo, createSignal, JSX, Show } from 'solid-js'
@@ -102,9 +102,7 @@ export function Renderer(props: {
   onContextMenu?: (request: RendererContextMenuRequest) => void
 }) {
   const { selection, edit, view, state, history, tool, clipboard, element, emitter } = useDesigner()
-  const rendererDefaults = resolveRendererDefaults(props.defaults)
-  const interactionDefaults = rendererDefaults.interaction
-  const zoomDefaults = rendererDefaults.zoom
+  const interactionDefaults = resolveRendererDefaults(props.defaults)
 
   const [viewportRef, setViewportRef] = createSignal<HTMLDivElement | null>(null)
   const [containerRef, setContainerRef] = createSignal<HTMLDivElement | null>(null)
@@ -423,8 +421,8 @@ export function Renderer(props: {
     if (textEditor.isEditing()) return
     if (event.ctrlKey) {
       event.preventDefault()
-      const delta = event.deltaY > 0 ? -zoomDefaults.step : zoomDefaults.step
-      const newZoom = Math.max(zoomDefaults.min, Math.min(zoomDefaults.max, view.transform().zoom + delta))
+      const delta = event.deltaY > 0 ? -DEFAULTS.zoom.step : DEFAULTS.zoom.step
+      const newZoom = Math.max(DEFAULTS.zoom.min, Math.min(DEFAULTS.zoom.max, view.transform().zoom + delta))
       view.setZoom(newZoom, coordinate.eventToCanvas(event))
     }
   }

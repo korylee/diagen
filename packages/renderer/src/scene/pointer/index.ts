@@ -32,7 +32,7 @@ export interface CreatePointerInteractionOptions {
  * - 内部组合所有鼠标相关交互模块
  */
 export function createPointerInteraction(coordinate: CoordinateService, options: CreatePointerInteractionOptions = {}) {
-  const defaultInteraction = RENDERER_DEFAULTS.interaction
+  const defaultInteraction = RENDERER_DEFAULTS
   const {
     panButton = defaultInteraction.panButton,
     shapeDragThreshold = defaultInteraction.shapeDragThreshold,

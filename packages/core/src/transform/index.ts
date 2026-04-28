@@ -85,7 +85,7 @@ export function canvasToScreen<T extends Point | Bounds>(
 }
 
 /** 限制缩放级别在有效范围内 */
-export function clampZoom(zoom: number, min: number = DEFAULTS.MIN_ZOOM, max: number = DEFAULTS.MAX_ZOOM): number {
+export function clampZoom(zoom: number, min: number = DEFAULTS.zoom.min, max: number = DEFAULTS.zoom.max): number {
   return clamp(zoom, min, max)
 }
 

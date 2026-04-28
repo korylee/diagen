@@ -82,8 +82,8 @@ export function createLinker(patch: Partial<LinkerElement>): LinkerElement {
     points: [],
     textPosition: undefined,
     // 保持 create 时的独立对象语义，避免实例间共享默认样式引用。
-    lineStyle: { ...DEFAULTS.DEFAULT_LINE_STYLE } as LineStyle,
-    fontStyle: { ...DEFAULTS.DEFAULT_FONT_STYLE } as FontStyle,
+    lineStyle: { ...DEFAULTS.style.line } as LineStyle,
+    fontStyle: { ...DEFAULTS.style.font } as FontStyle,
     dataAttributes: [],
     data: {},
     ...patch,

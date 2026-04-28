@@ -17,13 +17,10 @@ export function Editor(props: EditorProps) {
   const defaults = useUIDefaults()
   const rendererDefaults = createMemo(() => {
     const base = defaults().renderer
-    if (!props.zoom && !props.interaction) {
+    if (!props.interaction) {
       return base
     }
-    return {
-      zoom: { ...base.zoom, ...props.zoom },
-      interaction: { ...base.interaction, ...props.interaction },
-    }
+    return { ...base, ...props.interaction }
   })
   const [contextMenuContext, setContextMenuContext] = createSignal<ContextMenuContext>(defaultContext)
   const [contextMenuOpen, setContextMenuOpen] = createSignal(false)

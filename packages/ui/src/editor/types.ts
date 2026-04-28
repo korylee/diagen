@@ -1,4 +1,4 @@
-import type { RendererInteractionDefaults, RendererZoomDefaults } from '@diagen/renderer'
+import type { RendererInteractionDefaults } from '@diagen/renderer'
 import type { JSX } from 'solid-js'
 import type { ContextMenuEntries, ResolvedContextMenuAction } from './contextMenu'
 
@@ -12,7 +12,6 @@ export interface EditorContextMenuOptions {
 export interface EditorProps {
   class?: string
   style?: Record<string, string>
-  zoom?: Partial<RendererZoomDefaults>
   interaction?: Partial<RendererInteractionDefaults>
   contextMenu?: EditorContextMenuOptions
 }

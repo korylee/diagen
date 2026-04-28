@@ -15,19 +15,19 @@ describe('model/defaults isolation', () => {
     shapeA.path[0].actions[0].x = '20'
     shapeA.attribute.linkable = false
 
-    expect(shapeB.fillStyle.color).toBe(DEFAULTS.DEFAULT_FILL_STYLE.color)
-    expect(shapeB.fontStyle.size).toBe(DEFAULTS.DEFAULT_FONT_STYLE.size)
-    expect(shapeB.textBlock[0].position.x).toBe(DEFAULTS.DEFAULT_TEXT_BLOCK.position.x)
-    expect(shapeB.anchors[0].x).toBe(DEFAULTS.DEFAULT_ANCHORS[0].x)
-    expect(shapeB.path[0].actions[0].x).toBe(DEFAULTS.DEFAULT_PATH[0].actions[0].x)
-    expect(shapeB.attribute.linkable).toBe(DEFAULTS.DEFAULT_ATTRIBUTE.linkable)
+    expect(shapeB.fillStyle.color).toBe(DEFAULTS.style.fill.color)
+    expect(shapeB.fontStyle.size).toBe(DEFAULTS.style.font.size)
+    expect(shapeB.textBlock[0].position.x).toBe(DEFAULTS.shape.textBlock.position.x)
+    expect(shapeB.anchors[0].x).toBe(DEFAULTS.shape.anchors[0].x)
+    expect(shapeB.path[0].actions[0].x).toBe(DEFAULTS.shape.path[0].actions[0].x)
+    expect(shapeB.attribute.linkable).toBe(DEFAULTS.shape.attribute.linkable)
 
-    expect(DEFAULTS.DEFAULT_FILL_STYLE.color).toBe('255,255,255')
-    expect(DEFAULTS.DEFAULT_FONT_STYLE.size).toBe(13)
-    expect(DEFAULTS.DEFAULT_TEXT_BLOCK.position.x).toBe(10)
-    expect(DEFAULTS.DEFAULT_ANCHORS[0].x).toBe('w/2')
-    expect(DEFAULTS.DEFAULT_PATH[0].actions[0].x).toBe('0')
-    expect(DEFAULTS.DEFAULT_ATTRIBUTE.linkable).toBe(true)
+    expect(DEFAULTS.style.fill.color).toBe('255,255,255')
+    expect(DEFAULTS.style.font.size).toBe(13)
+    expect(DEFAULTS.shape.textBlock.position.x).toBe(10)
+    expect(DEFAULTS.shape.anchors[0].x).toBe('w/2')
+    expect(DEFAULTS.shape.path[0].actions[0].x).toBe('0')
+    expect(DEFAULTS.shape.attribute.linkable).toBe(true)
   })
 
   it('createLinker 创建的默认样式不应共享引用', () => {
@@ -37,14 +37,15 @@ describe('model/defaults isolation', () => {
     linkerA.lineStyle.lineColor = '1,1,1'
     linkerA.fontStyle.size = 42
 
-    expect(linkerB.lineStyle.lineColor).toBe(DEFAULTS.DEFAULT_LINE_STYLE.lineColor)
-    expect(linkerB.fontStyle.size).toBe(DEFAULTS.DEFAULT_FONT_STYLE.size)
-    expect(DEFAULTS.DEFAULT_LINE_STYLE.lineColor).toBe('50,50,50')
-    expect(DEFAULTS.DEFAULT_FONT_STYLE.size).toBe(13)
+    expect(linkerB.lineStyle.lineColor).toBe(DEFAULTS.style.line.lineColor)
+    expect(linkerB.fontStyle.size).toBe(DEFAULTS.style.font.size)
+    expect(DEFAULTS.style.line.lineColor).toBe('50,50,50')
+    expect(DEFAULTS.style.font.size).toBe(13)
   })
 
-  it('线条快捷默认值应与 DEFAULT_LINE_STYLE 保持一致', () => {
-    expect(DEFAULTS.DEFAULT_LINE_WIDTH).toBe(DEFAULTS.DEFAULT_LINE_STYLE.lineWidth)
-    expect(DEFAULTS.DEFAULT_LINE_COLOR).toBe(DEFAULTS.DEFAULT_LINE_STYLE.lineColor)
+  it('lineStyle 默认值字段应自洽', () => {
+    expect(DEFAULTS.style.line.lineWidth).toBe(2)
+    expect(DEFAULTS.style.line.lineColor).toBe('50,50,50')
+    expect(DEFAULTS.style.line.lineStyle).toBe('solid')
   })
 })

@@ -1,7 +1,7 @@
 import { createStore } from 'solid-js/store'
 
 import { createEmitter, DeepPartial, generateId, pick } from '@diagen/shared'
-import { DEFAULTS, LinkerType } from '../constants'
+import { DEFAULTS } from '../constants'
 import { unwrapClone } from '../_internal'
 import type { Transform } from '../transform'
 
@@ -24,32 +24,6 @@ import type { DesignerEmitter, EditorConfig, EditorState } from './types'
 interface DesignerOptions extends DeepPartial<EditorConfig>, DeepPartial<Pick<Diagram, 'id' | 'name' | 'page'>> {
   transform?: Partial<Transform>
 }
-
-const DEFAULT_AUTO_GROW_CONFIG = {
-  enabled: true,
-  growPadding: 240,
-  growStep: 200,
-  maxWidth: 20000,
-  maxHeight: 20000,
-  shrink: false,
-  shrinkPadding: 320,
-}
-
-const DEFAULT_LINKER_ROUTE_CONFIG = {
-  strategies: {
-    [LinkerType.BROKEN]: 'obstacle',
-    [LinkerType.ORTHOGONAL]: 'obstacle',
-    [LinkerType.STRAIGHT]: 'basic',
-    [LinkerType.CURVED]: 'basic',
-  },
-  obstacleConfig: {
-    padding: 15,
-  },
-  obstacleOptions: {
-    algorithm: 'hybrid',
-  },
-  lineJumpRadius: 10,
-} as const
 
 function serializeDesignerDiagram(diagram: Diagram): string {
   return JSON.stringify(diagram, null, 2)
@@ -91,13 +65,13 @@ function cloneDesignerDiagram(diagram: Diagram): Diagram {
 }
 
 function createResolvedConfig(options: DesignerOptions): EditorConfig {
-  const containerInset = typeof options.containerInset === 'number' ? options.containerInset : 800
+  const containerInset = typeof options.containerInset === 'number' ? options.containerInset : DEFAULTS.editor.containerInset
 
   return {
-    anchorSize: 8,
-    rotaterSize: 9,
-    anchorColor: '#067bef',
-    selectorColor: '#067bef',
+    anchorSize: DEFAULTS.editor.anchorSize,
+    rotaterSize: DEFAULTS.editor.rotaterSize,
+    anchorColor: DEFAULTS.editor.anchorColor,
+    selectorColor: DEFAULTS.editor.selectorColor,
     containerInset,
     ...pick(options, [
       'anchorSize',
@@ -107,23 +81,23 @@ function createResolvedConfig(options: DesignerOptions): EditorConfig {
       'containerInset',
     ]),
     autoGrow: {
-      ...DEFAULT_AUTO_GROW_CONFIG,
+      ...DEFAULTS.autoGrow,
       ...options.autoGrow,
     },
     linkerRoute: {
       strategies: {
-        ...DEFAULT_LINKER_ROUTE_CONFIG.strategies,
+        ...DEFAULTS.linker.strategies,
         ...options.linkerRoute?.strategies,
       },
       obstacleConfig: {
-        ...DEFAULT_LINKER_ROUTE_CONFIG.obstacleConfig,
+        ...DEFAULTS.linker.obstacleConfig,
         ...options.linkerRoute?.obstacleConfig,
       },
       obstacleOptions: {
-        ...DEFAULT_LINKER_ROUTE_CONFIG.obstacleOptions,
+        ...DEFAULTS.linker.obstacleOptions,
         ...options.linkerRoute?.obstacleOptions,
       },
-      lineJumpRadius: options.linkerRoute?.lineJumpRadius ?? DEFAULT_LINKER_ROUTE_CONFIG.lineJumpRadius,
+      lineJumpRadius: options.linkerRoute?.lineJumpRadius ?? DEFAULTS.linker.lineJumpRadius,
     },
   }
 }
@@ -139,7 +113,7 @@ function createInitialState(options: DesignerOptions): EditorState {
     transform: {
       x: 0,
       y: 0,
-      zoom: DEFAULTS.DEFAULT_ZOOM,
+      zoom: DEFAULTS.zoom.default,
       ...options.transform,
     },
     viewportSize: {
