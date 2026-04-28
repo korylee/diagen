@@ -1,242 +1,160 @@
 # 当前计划实施指引
 
-当前执行阶段：Phase4 样式体系与导航效率
+当前执行阶段：Phase4 — 属性编辑面板优先
 
-目标：
+目标：让选中元素后能直接编辑颜色、线宽、字体等样式字段，一次补齐"批量样式应用 + 默认样式编辑"两块能力，对标 draw.io 右侧格式面板。
 
-- 收口默认样式、批量样式应用与主题 preset 基础入口，让样式成为正式编辑能力，而不是零散字段。
-- 收口缩放、适配、平移与高频导航动作的一致性，让长时间编辑体验更接近 `draw.io / ProcessOn`。
+## 1. 为什么从"属性面板"切入
 
-## 1. 当前计划状态
+之前的计划按"补 action → 补测试 → 补默认样式入口"线性推进，但当前最扎眼的缺口不是缺某个 toolbar 按钮，而是**选中元素后你根本改不了它的颜色、线宽、字体**。
 
-### 已完成阶段
+Diagen 的写链路早已就绪：
 
-- Phase1 基础交互主链路已完成。
-- Phase2 连线编辑成熟度已完成，已形成正式能力集合：
-  - 端点重连
-  - 控制点编辑
-  - 正交线路调整
-  - 连线标签定位
-  - line jump 收口
-- Phase3 容器与层级语义已完成当前阶段验收：
-  - `parent / children / container` 已进入正式模型
-  - 拖入、拖出、跨容器移动已进入正式交互主链路
-  - 容器场景下的 selection / clipboard / history 核心闭环已具备测试覆盖
+- `edit.update` 具备事务化单元素 / 多元素写入
+- `lineStyle / fillStyle / fontStyle / shapeStyle` 模型字段完备
+- Schema 层有 `setDefaultLineStyle / setDefaultFillStyle / setDefaultFontStyle` 注册入口
+- 右键菜单、toolbar、sidebar bridge 模式已稳定，可作为面板接线的参考模板
 
-### 当前阶段判断
+属性面板会自然覆盖：
 
-当前计划已从“容器与层级语义”切换到“样式体系与导航效率”。
+| 计划原目标 | 面板如何覆盖 |
+|-----------|-------------|
+| 批量样式应用 | 多选时面板显示混合值，修改即批量写入，单 history entry |
+| 默认样式编辑 | 面板底部"保存为默认样式"→ Schema API |
+| navigation 收尾 | `actual-size` 顺便补，不值得单独排期 |
+| 样式 / history 一致性 | 所有修改走 `edit.update`，天然单事务 |
 
-切换原因：
+## 2. 面板设计概要
 
-- 容器语义已经具备进入下一阶段所需的正式编辑基础，不再是主阻塞项。
-- 当前最直接影响编辑器生产力的剩余短板，已经转移到样式操作效率与导航效率。
-- 多 page、持久化与导入导出仍重要，但继续后置，优先补齐更直接影响日常编辑体验的能力。
+### 2.1 位置与交互
 
-### 并行专项
+- 参照 draw.io：右侧固定面板，选中元素时显示，取消选中时隐藏 / 置灰
+- 编辑行为：修改即时生效（onChange commit），不走"确认 / 取消"弹窗
+- 多选行为：字段值不一致时显示"混合"态；用户修改后写入全部选中元素
 
-在不切换当前主阶段的前提下，允许并行推进 `LinkerEndpoint` 交互收口专项。
+### 2.2 字段范围
 
-专项目标：
+首版先做最直接影响外观的字段，不追求大而全：
 
-- 清理端点顶层 `target` 迁移后的少量旧测试口径
-- 补齐 `edge` 附着点预览
-- 增加 `anchor / edge` 的显式切换能力
-- 继续降低端点拖拽过程中的吸附跳变
+**Line（边框）**
+- `lineWidth`：线宽（number）
+- `lineColor`：颜色（string，hex/rgb）
+- `lineStyle`：线型（solid / dashed / dotted）
+- `beginArrowStyle` / `endArrowStyle`：箭头（仅 linker 显示）
 
-专项文档：
+**Fill（填充）**
+- `fillType`：填充类型（none / solid / gradient）
+- `fillColor`：颜色（fillType=solid 时显示）
 
-- `docs/LINKER_ENDPOINT_OPTIMIZATION.md`
+**Font（字体）**
+- `fontFamily`：字体
+- `fontSize`：字号
+- `fontColor`：颜色
+- `bold` / `italic` / `underline`：样式开关
+- `textAlign`：水平对齐
 
-## 2. 本阶段范围
+**暂不做**：shapeStyle（透明度 / 阴影 / 圆角）、gradient 细节、link 超链接编辑
 
-本阶段建议先做：
+### 2.3 与"默认样式"的关系
 
-- 先收口 `zoom in / zoom out / fit to content / fit to selection / actual size` 与 space 平移
-- 再补导航动作的 UI action / 快捷键 / renderer 行为一致性
-- 再收口默认样式入口，让新建 shape / linker 能稳定继承默认样式
-- 再收口选中元素的批量样式应用语义
-- 最后评估 `zoom preset / theme preset / minimap` 是否进入本阶段尾声
+面板底部加一个"Set as default"按钮（或图钉 icon）：
 
-本阶段先不做：
+- 点击后调 Schema API 将当前选中元素的样式注册为对应类型默认值
+- 新建 shape / linker 时自动继承
+- 不额外引入"主题管理"面板——Schema 就是事实源
 
-- 面向业务的复杂主题系统
-- 容器专属样式面板
-- 多 page 导航 UI
-- 正式持久化、导入导出与自动保存工作流
-- 高级图库、业务 schema 扩展协议
+## 3. 推荐的实现顺序
 
-## 3. 设计边界
+### Step 1：属性面板 UI 骨架 + 单元素编辑
 
-样式语义：
+**目标**：选中一个 shape 后，右侧面板可修改 lineColor / fillColor / fontSize，即时生效。
 
-- 正式样式仍以模型字段为准：`lineStyle / fillStyle / fontStyle / shapeStyle / theme`
-- 默认样式与主题 preset 必须收口到正式模型或 schema 配置，不新增只服务临时 UI 的事实源
-- 批量样式应用优先复用 `designer.edit`，保持单事务 history 语义
+**文件**（新建）：
+- `packages/ui/src/inspector/InspectorPanel.tsx` — 面板容器
+- `packages/ui/src/inspector/InspectorBridge.ts` — 读选中元素、生成字段状态、调用 edit
+- `packages/ui/src/inspector/fields/` — 各字段控件（ColorField / NumberField / SelectField / ToggleField）
 
-导航语义：
+**关键约束**：
+- 面板通过 `useDesignerContext()` 获取 `designer`，不引入新的全局状态
+- 每个字段的 onChange 直接 `edit.update(elementId, { lineStyle: { lineColor: newColor } })`
+- 复用现有 `nested setter` 语义做深层字段局部更新
 
-- 画布导航统一由 `view manager` 提供正式能力
-- `renderer` 只负责事件采集与坐标换算，不额外维护第二套导航状态
-- UI action 与快捷键必须共享同一组 view API，不允许动作入口和快捷键各写一套逻辑
+**验收**：
+- 选中一个 shape → 面板显示当前 lineColor / fillColor / fontSize
+- 修改颜色 → canvas 即时刷新
+- undo → 颜色回退
 
-约束：
+### Step 2：多元素批量编辑
 
-- 不为了样式能力引入与当前项目不匹配的大型状态层
-- 不提前做保存、导入导出、多 page 的宿主接入逻辑
-- 导航能力优先追求一致、可预测，再追求更复杂的产品化外观
+**目标**：选中多个元素时，面板不消失，修改后全部选中元素一起变更。
 
-## 4. 当前判断
+**核心逻辑**（在 Bridge 中）：
+- 所有选中元素的某字段值相同时 → 正常显示
+- 不同时 → 显示"混合"态（input 显示 `—` 或 placeholder "Mixed"）
+- 用户修改 → `edit.update()` 对每个选中元素执行（合并为一个 transaction，单 undo entry）
 
-已进入代码并可复用的基础能力：
+**验收**：
+- 选中两个不同颜色的 shape → 颜色字段显示混合态
+- 修改为红色 → 两个 shape 都变红
+- undo → 一次回退两个
 
-- `packages/core/src/model/shape.ts`、`packages/core/src/model/linker.ts` 已具备 `lineStyle / fillStyle / fontStyle / shapeStyle / theme` 字段基础
-- `packages/core/src/schema/Schema.ts` 已具备默认样式与主题注册的基础入口
-- `packages/core/src/designer/managers/view/index.ts` 已提供 `setZoom / setPan / pan / fitBounds / fitToContent / fitToSelection / zoomIn / zoomOut`
-- `packages/renderer/src/scene/pointer/viewport/createPan.ts` 已支持 middle button 与 `Space + drag` 平移
-- `packages/ui/src/actions/createActions.ts` 已接线 `zoom in / zoom out / fit to content` 动作
-- `packages/ui/src/sidebar/creationMode.ts` 与 `packages/core/src/designer/managers/tool.ts` 已开始统一单个 / 批量创建模式的工具态连续性语义
+### Step 3：默认样式 Set as default
 
-当前核心缺口：
-
-- `actual size`、`fit to selection`、`zoom preset` 仍缺少正式 UI action 与阶段验收口径
-- 导航动作虽然已有 `view manager` 基础，但 `UI action / 快捷键 / renderer` 还没完全形成统一对外工作流
-- 默认样式与新建元素之间还没有形成完整、明确的编辑工作流
-- 批量样式应用尚未形成正式 manager 语义与测试口径
-- 样式与导航的阶段验收标准仍需根据当前代码进度更新
-
-## 5. 建议实现顺序
-
-1. 先补齐导航动作入口（`actual size / fit to selection / zoom preset`）
-2. 再统一导航动作在 UI action、快捷键与 renderer 手势中的行为
-3. 然后收口默认样式入口
-4. 再完成选中元素的批量样式应用
-5. 并行推进 `LinkerEndpoint` 交互收口专项：先清理旧测试口径，再补 `edge` 预览、显式切换与吸附稳定性微调
-6. 最后评估 minimap 与阶段文档收尾
-
-原因：
-
-- `view manager`、`createPan` 与现有 toolbar action 已经具备导航基础，继续补齐入口和一致性，返工成本最低
-- 默认样式入口虽然重要，但当前代码明显先进入了导航与工具态一致性收口，先顺势收口这部分更符合当前分支实际状态
-- 批量样式应用依赖默认样式与正式样式入口更稳定之后再做，更不容易重写
-- `LinkerEndpoint` 当前更适合作为并行专项逐步收口，而不是重新切换整个主阶段
-
-## 6. 样式与导航规则表
-
-### 6.1 默认样式
-
-- 新建 shape / linker 时应优先继承当前正式默认样式，而不是在 UI 层临时拼装样式 patch
-- 默认样式的事实源必须可被 `core` 直接回答，不能只存在于工具栏或侧边栏组件局部状态
-
-### 6.2 批量样式应用
-
-- 批量样式应用默认以“选中什么就修改什么”为原则
-- 对不兼容的元素字段应跳过，而不是写入无效字段
-- 一次批量样式修改应尽量形成一个 history entry
-
-### 6.3 导航动作
-
-- `zoom in / zoom out / fit to content / fit to selection / actual size` 应统一落到 `view manager`
-- 鼠标滚轮缩放、快捷键、UI action 的行为应保持一致
-- space 平移优先复用现有平移能力，不额外引入新的导航状态机
-
-### 6.4 minimap
-
-- 当前阶段先做必要性评估，不把 minimap 作为默认必须交付项
-- 若接入，应优先保证只读预览与主视口同步，不提前承诺复杂交互
-
-## 7. 事务与落盘边界
-
-### 7.1 core 负责的内容
-
-- 正式样式更新必须通过 `packages/core/src/designer/managers/edit/index.ts` 执行
-- 默认样式与主题 preset 的正式来源必须可被 `core` 查询与测试
-- 历史粒度继续复用 `packages/core/src/designer/managers/history.ts`
-
-### 7.2 renderer / ui 负责的内容
-
-- `renderer` 负责导航事件采集、滚轮缩放与坐标换算
-- `ui/actions` 负责暴露导航与样式动作入口
-- `ui` 只能驱动正式 API，不额外持有一套样式或导航事实源
-
-## 8. 起手文件
-
-### 8.1 优先阅读入口
-
-模型与 schema：
-
-- `packages/core/src/model/shape.ts`
-- `packages/core/src/model/linker.ts`
-- `packages/core/src/model/diagram.ts`
-- `packages/core/src/schema/Schema.ts`
-
-正式 manager：
-
-- `packages/core/src/designer/create.ts`
-- `packages/core/src/designer/managers/edit/index.ts`
-- `packages/core/src/designer/managers/history.ts`
-- `packages/core/src/designer/managers/view/index.ts`
-
-交互与 UI：
-
-- `packages/renderer/src/scene/Renderer.tsx`
-- `packages/renderer/src/scene/pointer/viewport/createPan.ts`
-- `packages/ui/src/actions/createActions.ts`
-- `packages/ui/src/editor/Editor.tsx`
-
-调试入口：
-
-- `playgrounds/vite`
-
-## 9. 最小验收标准
-
-- `zoom in / zoom out / fit to content / fit to selection / actual size` 具备正式入口，并共享同一组 `view manager` API
-- space 平移、滚轮缩放与 UI action 在行为上保持一致
-- 新建 shape / linker 能稳定继承当前默认样式
-- 批量样式应用能在一次操作中写入多个选中元素，并保持 undo / redo 一致
-- 当前知识库可以直接回答“默认样式来源于哪里、导航状态来源于哪里、创建模式连续性由哪里统一维护”
-
-## 10. 推荐下一步
-
-当前分支更像是在收口“导航与工具态一致性”，而不是正式进入样式系统实现。
-
-因此推荐下一步按下面顺序推进：
-
-1. 在 `packages/ui/src/actions/createActions.ts` 补上 `view:actual-size`、`view:fit-selection`，必要时增加 `zoom preset`
-2. 把对应入口接到 `packages/ui/src/toolbar/createToolbarBridge.ts` / `packages/ui/src/toolbar/Toolbar.tsx`
-3. 给 `packages/core/src/designer/managers/view/index.test.ts` 增补 `actual size / fitToSelection` 的明确断言
-4. 给 `packages/renderer/src/scene/Renderer.test.ts` 增补 `Space + drag`、缩放后导航动作与现有拖拽/编辑链路不冲突的回归
-5. 并行启动 `LinkerEndpoint` 交互收口专项，按 `docs/LINKER_ENDPOINT_OPTIMIZATION.md` 的顺序推进：
-   - 先清理 renderer 集成测试中的旧 `from.id / to.id` 断言
-   - 再补 `edge` 附着点预览
-   - 再补 `anchor / edge` 显式切换
-   - 最后再做吸附稳定性微调与回归测试
-6. 导航闭环稳定后，再开始默认样式入口与批量样式应用的正式 manager 设计
-
-这样做的原因：
-
-- 现有代码已经有 `view manager + createPan + toolbar/sidebar/tool continuous` 的连续改动轨迹
-- 先把导航闭环做完，可以更快形成本阶段一个可验证、可演示的子里程碑
-- 样式系统目前仍停留在 `Schema` 默认值层，直接推进批量样式应用容易反复调整事实源
-- `LinkerEndpoint` 当前主要是交互体验收口，不需要打断主阶段，但适合并行推进并持续回归
-
-## 11. 对应测试
-
-优先补：
-
-- `packages/core/src/designer/managers/view/index.test.ts`
-- `packages/renderer/src/scene/Renderer.test.ts`
-- `packages/ui/src/actions/createActions.ts` 对应 bridge 测试（若已有）
-- 导航闭环完成后，再补 `packages/core/src/designer/managers/edit/index.test.ts` / `history.test.ts` 的样式事务测试
-
-建议新增断言：
-
-- `actual size` 把 zoom 复位到 `1`
-- `fitToSelection` 在空选区与单/多选场景下行为可预测
-- `Space + drag` 与中键平移共享同一套 view 结果
-- 工具栏动作不会破坏现有拖拽、建线、文本编辑主链路
-- 导航入口补齐后，知识库描述与代码现状一致
+**目标**：面板底部按钮将当前选中元素的样式注册为默认值。
+
+**行为**：
+- 选中单个 shape → 按钮可用 → 点击后将当前 lineStyle / fillStyle / fontStyle 写入 Schema
+- 多选或空选 → 按钮禁用
+- 新建 shape → 自动继承新默认值
+
+**验收**：
+- 修改一个 shape 为红色填充 → Set as default → 新建 shape 默认红色填充
+- 不污染已有元素的样式
+
+### Step 4：收尾
+
+- 补 `view:actual-size` action（五分钟工作量）
+- 补 Inspector 相关测试
+- 更新 toolbar / sidebar 默认配置，把面板入口接上
+- 评估 minimap 必要性
+
+## 4. 不做的事情
+
+- 不做独立的"主题编辑器"——默认样式 + Schema 是唯一事实源
+- 不做 shapeStyle 高级字段（透明度、阴影、圆角）——字段模型在，UI 留给后续
+- 不做渐变编辑器——fillType=gradient 占位即可
+- 不做"样式复制 / 粘贴格式刷"——值得做，但本阶段先聚焦基础面板
+- 不引入新的状态管理库
+
+## 5. 起手文件
+
+**参考模板**（bridge 模式已稳定）：
+- `packages/ui/src/toolbar/createToolbarBridge.ts` — 读取 designer、提供 items signal
+- `packages/ui/src/editor/contextMenu/createContextMenuBridge.ts` — 读取 defaults、按上下文切换
+- `packages/ui/src/sidebar/createSidebarBridge.tsx` — 完整 bridge + 组件模式
+
+**新建核心文件**：
+- `packages/ui/src/inspector/InspectorBridge.ts`
+- `packages/ui/src/inspector/InspectorPanel.tsx`
+- `packages/ui/src/inspector/fields/ColorField.tsx`
+- `packages/ui/src/inspector/fields/NumberField.tsx`
+- `packages/ui/src/inspector/fields/SelectField.tsx`
+
+**依赖的现有模块**：
+- `packages/core/src/designer/managers/edit/index.ts` — `edit.update`
+- `packages/core/src/model/shape.ts` — `ShapeElement`
+- `packages/core/src/model/linker.ts` — `LinkerElement`
+- `packages/core/src/schema/Schema.ts` — 默认样式注册
+- `packages/renderer/src/scene/Renderer.tsx` — `useDesignerContext`
+
+## 6. 测试要点
+
+- 单元素修改 → canvas 刷新 + undo/redo
+- 多元素批量修改 → 单 history entry
+- 混合值显示与编辑
+- Set as default → 新建元素继承
+- 面板在切换选中 / 取消选中时的显示 / 隐藏逻辑
 
 ---
 
-最后更新：2026-04-20
+最后更新：2026-04-28

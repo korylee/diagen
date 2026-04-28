@@ -18,7 +18,7 @@
 
 当前判断：
 - `Diagram` 已足够表达当前正式导入导出的文件内容。
-- 若后续进入多 page，优先直接扩展 `Diagram`，而不是再包一层 `Document`。
+- 若后续进入多 page，优先直接扩展 `Diagram`。
 
 ## 2. 导入导出与宿主快照分层
 
@@ -29,11 +29,7 @@
 ```ts
 interface LocalSnapshot {
   diagram: Diagram
-  view?: {
-    x: number
-    y: number
-    zoom: number
-  }
+  view?: { x: number; y: number; zoom: number }
   activePageId?: string
   savedAt: number
 }
@@ -42,7 +38,6 @@ interface LocalSnapshot {
 理由：
 - 正式导入导出语义最自然的是"一张图文件"
 - `view / savedAt / activePageId` 属于宿主恢复需求，不属于正式交换格式
-- 这样可以同时保持 `core` 协议简洁和宿主恢复能力
 
 ## 3. 页面模型 `DiagramPage`
 文件：`packages/core/src/model/page.ts`
@@ -54,9 +49,6 @@ interface LocalSnapshot {
 - `showGrid / gridSize / gridColor / gridStyle`
 - `orientation`
 - `lineJumps`
-
-说明：
-- 页面配置属于文档态，应参与导出与导入。
 
 ## 4. 元素模型
 
@@ -71,8 +63,8 @@ interface LocalSnapshot {
 - `group`
 - `parent`
 - `children`
-- `category`：元素类别（新增）
-- `zIndex`：层级索引（新增）
+- `category`
+- `zIndex`
 
 ### Shape `ShapeElement`
 文件：`packages/core/src/model/shape.ts`
@@ -86,31 +78,48 @@ interface LocalSnapshot {
 - `anchors`
 - `path`
 - `attribute`
-- `title`：标题（新增）
-- `link`：超链接（新增）
-- `dataAttributes`：数据属性列表（新增）
-- `data`：自定义数据（新增）
-- `theme`：主题标识（新增）
+- `title`
+- `link`
+- `dataAttributes`
+- `data`
+- `theme`
 
 ### Linker `LinkerElement`
 文件：`packages/core/src/model/linker.ts`
 
-- `from / to`
-- `points`
-- `routePoints`
+- `from: LinkerEndpoint` — 起始端点
+- `to: LinkerEndpoint` — 结束端点
+- `points` — 自定义路由控制点
+- `routePoints` — 计算后的路由点
 - `lineStyle`
 - `fontStyle`
-- `text`：连线标签文本（新增）
-- `textPosition`：标签位置偏移 `{ dx, dy }`（新增）
-- `linkerType`：连线类型（新增）
-- `dataAttributes`：数据属性列表（新增）
-- `data`：自定义数据（新增）
+- `text` — 连线标签文本
+- `textPosition: { dx, dy }` — 标签位置偏移
+- `linkerType` — 连线类型（`broken | straight | curved | orthogonal`）
+- `dataAttributes`
+- `data`
+
+端点模型 `LinkerEndpoint`（已收口）：
+```ts
+type LinkerEndpointBinding =
+  | { type: 'free' }
+  | { type: 'anchor'; anchorId: string }
+  | { type: 'edge'; pathIndex: number; segmentIndex: number; t: number }
+
+type LinkerEndpoint =
+  | (Point & { angle?: number; binding: { type: 'free' } })
+  | (Point & { angle?: number; target: string; binding: Exclude<LinkerEndpointBinding, { type: 'free' }> })
+```
+
+- `target`：端点连接的目标元素 ID
+- `binding`：附着方式（自由 / 锚点 / 边上位置）
+- 旧 `from.id / to.id` 口径已清理
 
 ## 5. 不应持久化的状态
 文件：`packages/core/src/designer/types.ts`
 
 以下字段属于运行时状态：
-- `diagram`：图表数据（虽为文档态，但作为 state 的根字段）
+- `diagram`（文档态，作为 state 根字段）
 - `transform`
 - `viewportSize`
 - `worldSize`
@@ -118,23 +127,36 @@ interface LocalSnapshot {
 - `config`
 - `tool`
 
-注意：
-- 其中 `transform` 是否保留到宿主级 `LocalSnapshot.view` 是宿主决策，不是 `Diagram` 基础语义。
-- `tool / originOffset / viewportSize` 明确不应进入导出文件。
+## 6. 默认样式来源
 
-## 6. 当前模型层缺口
+默认样式常量定义在 `packages/core/src/schema/defaults.ts`：
+
+```
+DEFAULT_LINE_STYLE   → { lineWidth: 2, lineColor: '50,50,50', lineStyle: 'solid', ... }
+DEFAULT_FILL_STYLE   → { type: 'solid', color: '255,255,255' }
+DEFAULT_FONT_STYLE   → { fontFamily: '微软雅黑, Arial, sans-serif', size: 13, ... }
+```
+
+Schema 运行时注册入口（`packages/core/src/schema/Schema.ts`）：
+- `setDefaultLineStyle(style)`
+- `setDefaultFillStyle(style)`
+- `setDefaultFontStyle(style)`
+
+新建 shape / linker 时，Schema 将当前默认样式 merge 进定义，确保新元素继承默认样式。
+
+## 7. 当前模型层缺口
 - 编辑链路没有系统维护 `diagram.updatedAt`
 - 缺少文档级 `schemaVersion`
 - 缺少文档合法性校验入口
 - 缺少脏状态与已保存文档状态表达
 
-## 7. 后续建模约束
-1. 所有新文档字段先判断是否属于 `Diagram` 语义，而不是先塞到运行时 state。
-2. 评论、权限、协作用户态应放在应用层，不要直接加进 `Diagram`。
-3. 当前阶段不为旧格式做兼容建模，协议变更时直接重构到位。
-4. 正式导入导出优先保持 `Diagram` 作为文件根；宿主快照层不进入 `core` 正式协议。
+## 8. 后续建模约束
+1. 所有新文档字段先判断是否属于 `Diagram` 语义。
+2. 评论、权限、协作用户态应放在应用层。
+3. 当前阶段不为旧格式做兼容建模。
+4. 正式导入导出优先保持 `Diagram` 作为文件根。
 
-## 8. 分页建模计划
+## 9. 分页建模计划
 若后续实现多 page，推荐模型方向：
 
 ```ts
@@ -164,12 +186,6 @@ interface DiagramPage {
 - `core` 负责 page 语义、页内元素操作、跨页操作、导入导出
 - 应用层负责 page tabs、缩略图、排序交互、删除确认等 UI
 
-运行时建议：
-- `activePageId` 放在 `EditorState`
-- 是否持久化"上次打开页"由宿主层决定，不默认进入正式文件协议
+---
 
-导入导出建议：
-- 默认导入导出整份多 page `Diagram`
-- 若后续支持"导出当前页"，作为衍生能力处理，不改变正式文件根模型
-
-最后更新：2026-04-11
+最后更新：2026-04-28

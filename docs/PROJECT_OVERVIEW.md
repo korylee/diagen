@@ -3,7 +3,7 @@
 ## 1. 项目定位
 
 - Diagen 是一个基于 SolidJS 的图编辑内核与 UI 组合库。
-- 当前主目标已从“补齐基础交互”转向“补齐真正决定可用性的核心编辑能力”，优先级参考 `draw.io / ProcessOn` 的能力差距。
+- 当前主目标已从"补齐基础交互"转向"补齐真正决定可用性的核心编辑能力"，优先级参考 `draw.io / ProcessOn` 的能力差距。
 - `.processon/` 仅作为历史参考资料，不属于运行时代码和当前知识库主线。
 - 项目当前未对外发布，因此不以兼容旧设计为目标，而以最佳结构设计为目标。
 
@@ -18,13 +18,13 @@
 
 ## 3. 包职责
 
-- `@diagen/core`：Diagram 模型、designer 状态、history、edit、selection、group、clipboard、tool、view
-- `@diagen/renderer`：Renderer 组件、canvas 渲染、interaction machine、overlay、坐标换算、滚动服务
+- `@diagen/core`：Diagram 模型、designer 状态、history、edit、selection、group、clipboard、tool、view、schema
+- `@diagen/renderer`：Renderer 组件、canvas 渲染与预览、interaction machine、overlay、坐标换算、滚动服务
 - `@diagen/primitives`：浏览器能力封装，如 keyboard、event listener、scroll、observer
 - `@diagen/shared`：通用类型、对象工具、几何工具、uid、事件器
 - `@diagen/icons`：SVG 图标与生成产物
 - `@diagen/components`：纯基础 UI 构件
-- `@diagen/ui`：toolbar、sidebar、editor 壳层与 `Designer -> UI` bridge
+- `@diagen/ui`：toolbar、sidebar、editor 壳层、context menu、actions、默认值配置
 
 ## 4. 当前已完成能力
 
@@ -33,16 +33,24 @@
 - shape / linker 文本编辑已进入正式主链路，具备双击进入、提交/取消、selection/history 协同与定位基础
 - `clipboard manager` 已支持 `copy / cut / paste / duplicate`，并保持事务化 history 语义
 - `edit manager` 已统一 `patch / setter / nested setter` 的命令快照逻辑
-- 容器层级语义已进入正式主链路：`parent / children / container` 的拖入、拖出、跨容器移动、预览反馈与核心 undo/redo 闭环已进入代码与测试
-- 连线编辑成熟度阶段已完成：端点重连、控制点编辑、正交线路调整、连线文字定位、line jump 已进入正式能力集合
+- 容器层级语义已进入正式主链路：`parent / children / container` 的拖入、拖出、跨容器移动、预览反馈与核心 undo/redo 闭环
+- 连线编辑成熟度阶段已完成：端点重连、控制点编辑、正交线路调整、连线文字定位、line jump
+- **导航动作**：`zoom in / zoom out / fit to content / fit to selection` 已进入正式 UI action 与 view manager，space 平移与中键平移已统一
+- **右键菜单**：按目标类型（canvas / element / linker / selection）分场景提供默认菜单，支持外部覆盖
+- **侧边栏预览**：CanvasPreview 系统支持 shape/linker tooltip 与内联预览
+- **默认值配置**：core / renderer / ui 三层默认值通过 `resolveDiagenDefaults()` 统一解析
+- **工具连续性**：single / batch 创建模式通过 `tool manager` 统一维护
+- **LinkerEndpoint**：端点 binding 模型已收口为 `free | anchor | edge`，旧口径已清理
 
 ## 5. 当前主要缺口
 
-- 样式体系与导航能力还没有形成完整产品体验
+- `actual size` 动作尚未实现
+- 批量样式应用尚未形成正式 manager 语义
+- 默认样式编辑缺少 UI 入口
 - 持久化尚未形成完整的宿主接入闭环
 - 导入导出尚未接入 UI 动作体系
 - 多 page 分页能力尚未正式建模
-- UI 层缺少“保存 / 另存 / 导入 / 导出”等产品入口
+- 缺少 `diagram.updatedAt` 系统维护、`schemaVersion` 与文档合法性校验
 
 ## 6. 当前阶段与开发路线图
 
@@ -53,17 +61,24 @@
 ### 当前阶段：P1 样式体系与导航效率
 
 **阶段切换原因**：
-- 容器与层级语义阶段已完成当前阶段验收，不再继续占用主执行阶段。
-- 当前最直接影响编辑效率的剩余短板，已经转移到样式操作效率与导航效率。
-- 在容器语义稳定之后，默认样式、批量样式应用与导航动作的一致性，已经成为继续接近 `draw.io / ProcessOn` 的下一块核心能力。
+- 容器与层级语义阶段已完成。
+- 连线编辑成熟度阶段已完成。
+- 当前最直接影响编辑效率的剩余短板是样式操作效率与导航效率。
 
 **当前目标**：让样式与导航成为正式、高频、稳定的编辑能力
 
-**当前任务**：
-1. 收口默认样式与主题 preset 的正式入口
-2. 收口选中元素的批量样式应用语义
-3. 收口 zoom / fit / actual size / space 平移等导航动作
-4. 梳理样式与导航相关 history / action / view 一致性
+**已完成**：
+1. 导航动作入口（zoom in / zoom out / fit / fit-selection）已接入 view manager、UI action、toolbar、context menu
+2. 右键菜单架构已按目标类型收口
+3. 侧边栏 CanvasPreview 系统已就位
+4. 默认值配置已统一 core/renderer/ui 三层
+5. LinkerEndpoint binding 模型已收口
+
+**任务**：
+1. 补齐 `actual size` action 与入口
+2. 收口默认样式编辑 UI 入口
+3. 收口选中元素的批量样式应用语义
+4. 评估 zoom preset 与 minimap
 
 **实施入口**：见 `docs/CURRENT_PLAN.md`
 
@@ -71,7 +86,7 @@
 
 | 优先级 | 阶段 | 关键任务 |
 |--------|------|----------|
-| P1 | 样式体系与导航效率 | 默认样式、批量应用、主题 preset、space 平移、zoom preset、minimap 评估 |
+| P1 | 样式体系与导航效率 | actual size、默认样式编辑、批量样式应用、zoom preset、minimap 评估 |
 | P2 | 多 Page 分页 | Diagram 升级为多 page 文件根模型、page manager、最小分页 UI |
 | P2 | 正式持久化与导入导出 | serializeDiagram / parseDiagram / loadDiagram、LocalSnapshot、UI 动作入口 |
 | P3 | 保存体验与工作流 | dirty 状态、自动保存、恢复提示、未保存变更警告 |
@@ -83,10 +98,10 @@
 ## 7. 设计约束
 
 - 当前阶段不做向后兼容承诺
-- 文档协议调整时，同步修改测试、playground 和 UI 接线，不保留旧入口
-- 正式导入导出默认围绕 `Diagram` 本身，不额外增加 `Document` 根层
+- 文档协议调整时，同步修改测试、playground 和 UI 接线
+- 正式导入导出默认围绕 `Diagram` 本身
 - 分页语义归 `core`，分页 UI 归应用层
-- 若宿主本地恢复需要 `savedAt / view / activePageId` 等附加信息，由宿主快照层承载
+- 宿主本地恢复信息由宿主快照层承载
 
 ## 8. 运行入口
 
@@ -94,21 +109,22 @@
 - core 工厂：`packages/core/src/designer/create.ts`
 - renderer 入口：`packages/renderer/src/scene/Renderer.tsx`
 - UI 编辑器壳层：`packages/ui/src/editor/Editor.tsx`
+- 默认值入口：`packages/ui/src/defaults.ts`（`resolveDiagenDefaults`）
+- 预览入口：`packages/renderer/src/canvas/preview/`
 
 ## 9. 测试计划要点
 
 当前阶段必须新增：
-- 默认样式与批量样式应用测试
-- 样式与 history 组合语义测试
-- 导航动作与 view 一致性测试
-- renderer 集成级导航回归测试
+- `view:actual-size` 动作与 view manager 一致性测试
+- 默认样式编辑与新建元素继承测试
+- 批量样式应用与 history 粒度测试
+- renderer 集成级 Space + drag 与导航回归测试
 
 后续阶段再补：
-- 样式批量应用与导航效率测试
 - page 切换、新建、删除、重命名的 `core` 语义测试
 - `serializeDiagram -> parseDiagram -> loadDiagram` 往返测试
 - 自动保存与导入后状态清理测试
 
 ---
 
-最后更新：2026-04-17
+最后更新：2026-04-28
