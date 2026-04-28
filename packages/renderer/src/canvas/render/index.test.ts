@@ -1,6 +1,6 @@
 import { createLinker, createShape } from '@diagen/core'
 import { describe, expect, it, vi } from 'vitest'
-import { renderLinker, renderShape } from '../canvas/render'
+import { renderLinker, renderShape } from '.'
 import { getLinkerTextBox } from '@diagen/core/text'
 
 function createContextMock() {
